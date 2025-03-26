@@ -1,0 +1,1 @@
+// Archivo: ProductImage.js
