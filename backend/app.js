@@ -1,73 +1,93 @@
+require('dotenv').config({ path: __dirname + '/.env' });
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
+const { connect } = require('./config/sage200db');
+const { pool: mysqlPool } = require('./config/localDb');
 
-const app = express();
-// Verificar variables de entorno críticas
+// ======================
+// 1. VERIFICACIÓN INICIAL
+// ======================
+console.log('\n🔧 ===== INICIANDO SERVIDOR ===== 🔧');
+console.log('🔍 Verificando variables de entorno...');
+
 const requiredEnvVars = [
-  'SAGE200_SERVER', 
+  'SAGE200_SERVER',
   'SAGE200_DATABASE',
   'SAGE200_USER',
-  'SAGE200_PASSWORD'
+  'SAGE200_PASSWORD',
+  'MYSQL_HOST'
 ];
 
+let allVarsPresent = true;
 requiredEnvVars.forEach(envVar => {
   if (!process.env[envVar]) {
     console.error(`❌ Variable de entorno faltante: ${envVar}`);
-    process.exit(1);
+    allVarsPresent = false;
+  } else {
+    console.log(`   ✔ ${envVar}: ${envVar.includes('PASSWORD') ? '*****' : process.env[envVar]}`);
   }
 });
 
-console.log('🔧 Configuración inicial verificada');
-// Middlewares
-app.use(cors());
-app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Importar solo las rutas que existen
-try {
-  const productsRouter = require('./routes/products');
-  app.use('/api/products', productsRouter);
-  
-  // Verificar si existen otros routers antes de usarlos
-  try {
-    const ordersRouter = require('./routes/orders');
-    app.use('/api/orders', ordersRouter);
-  } catch (e) {
-    console.warn('ordersRouter no disponible:', e.message);
-  }
-
-  try {
-    const imagesRouter = require('./routes/images');
-    app.use('/api/images', imagesRouter);
-  } catch (e) {
-    console.warn('imagesRouter no disponible:', e.message);
-  }
-
-  try {
-    const adminRouter = require('./routes/admin');
-    app.use('/api/admin', adminRouter);
-  } catch (e) {
-    console.warn('adminRouter no disponible:', e.message);
-  }
-
-} catch (e) {
-  console.error('Error cargando routers:', e);
+if (!allVarsPresent) {
+  console.error('\n⚠️  Faltan variables esenciales. El servidor no puede iniciar.');
   process.exit(1);
 }
 
-// Ruta de prueba básica
-app.get('/', (req, res) => {
-  res.send('API del Gestor de Compras funcionando');
-});
+// ======================
+// 2. CONEXIÓN A BASES DE DATOS
+// ======================
+console.log('\n🔌 Probando conexiones a bases de datos...');
 
-// Error handling
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send('Error del servidor');
-});
+connect().then(async sageConnected => {
+  if (!sageConnected) {
+    console.error('⚠️  AVISO: Sage200 no está disponible (el servidor iniciará igual)');
+  }
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor en http://localhost:${PORT}`);
+  try {
+    await mysqlPool.getConnection();
+    console.log('✅ MySQL: Conexión exitosa');
+  } catch (mysqlErr) {
+    console.error('⚠️  AVISO: Error de conexión a MySQL', mysqlErr.message);
+  }
+
+  // ======================
+  // 3. INICIO DE EXPRESS
+  // ======================
+  const app = express();
+
+
+  app.use(cors());
+  app.use(express.json());
+
+  app.use((req, res, next) => {
+    console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.path}`);
+    next();
+  });
+
+  app.use('/api/products', require('./routes/products'));
+  app.use('/api/images', require('./routes/images'));
+  app.use('/api/orders', require('./routes/orders'));
+
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'OK',
+      sage200: sageConnected ? 'CONNECTED' : 'DISCONNECTED',
+      mysql: 'OPERATIONAL',
+      environment: 'development'
+    });
+  });
+
+  app.use((err, req, res, next) => {
+    console.error('Error:', err.message);
+    res.status(500).json({ error: 'Algo salió mal' });
+  });
+
+  const PORT = process.env.PORT || 3001;
+  app.listen(PORT, () => {
+    console.log('\n🚀 ===== SERVIDOR INICIADO ===== 🚀');
+    console.log(`   URL: http://localhost:${PORT}`);
+    console.log(`   Modo: Desarrollo local`);
+    console.log(`   Sage200: ${sageConnected ? '✅ CONECTADO' : '❌ DESCONECTADO'}`);
+    console.log(`   MySQL: ✅ OPERATIVO\n`);
+  });
 });

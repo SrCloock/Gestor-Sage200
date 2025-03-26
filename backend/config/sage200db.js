@@ -1,3 +1,4 @@
+
 const { ConnectionPool } = require('mssql');
 require('dotenv').config();
 
@@ -9,41 +10,34 @@ const config = {
   options: {
     encrypt: false,
     trustServerCertificate: true,
-    connectTimeout: 15000,
-    requestTimeout: 15000
-  },
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000
+    appName: 'GestorComprasWeb',
+    connectTimeout: 30000 
   }
 };
 
 const pool = new ConnectionPool(config);
 
-// Conexión de prueba al iniciar
-pool.connect()
-  .then(() => {
-    console.log('✅ Conexión exitosa a Sage200');
-    // Prueba de consulta simple
-    pool.request().query('SELECT TOP 1 * FROM Articulos')
-      .then(result => {
-        console.log(`📦 Primer artículo encontrado: ${result.recordset[0]?.Descripcion || 'No hay datos'}`);
-      })
-      .catch(queryErr => {
-        console.error('❌ Error en consulta de prueba:', queryErr.message);
-      });
-  })
-  .catch(err => {
-    console.error('❌ Error de conexión a Sage200:', {
-      message: err.message,
-      server: config.server,
-      database: config.database,
-      suggestion: 'Verifica: 1) Servidor encendido 2) Credenciales 3) Firewall'
-    });
-  });
+
+pool.on('error', err => {
+  console.error('❌ Error permanente en el pool:', err);
+});
 
 module.exports = {
-  sage200Pool: pool,
-  poolConnect: pool.connect()
+  pool,
+  connect: async () => {
+    try {
+      await pool.connect();
+      console.log('✅ Conexión a Sage200 establecida');
+      return true;
+    } catch (err) {
+      console.error('❌ Fallo de conexión a Sage200:', {
+        message: err.message,
+        server: config.server,
+        database: config.database,
+        user: config.user,
+        suggestion: 'Verifique: 1) Sage200 en ejecución 2) Usuario/contraseña 3) Servidor accesible'
+      });
+      return false;
+    }
+  }
 };
