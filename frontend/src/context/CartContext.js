@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext } from 'react';
 
+// Declaración única del contexto (eliminada la duplicada al final)
 const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
@@ -38,3 +39,5 @@ export const useCart = () => {
   }
   return context;
 };
+
+// Eliminada la línea duplicada: export const CartContext = createContext();

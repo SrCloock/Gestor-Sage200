@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react'; // Importación única de React
 import { useCart } from '../../context/CartContext';
 import CartItem from '../../components/Cart/CartItem';
 import CartSummary from '../../components/Cart/CartSummary';

@@ -1,34 +1,48 @@
-const { sage200Pool } = require('../config');
+const { sage200Pool, poolConnect } = require('../config/sage200db');
 
 exports.getProducts = async (req, res) => {
   try {
-    console.log('Ejecutando consulta corregida a Sage200...');
-    
+    console.log('Iniciando consulta a Sage200...');
+    await poolConnect; // Esperar a que la conexión esté lista
+
     const query = `
       SELECT 
         ap.CodigoEmpresa,
         ap.CodigoArticulo,
         ap.CodigoProveedor,
-        a.Descripcion AS NombreArticulo,  /* Cambiado de Nombre a Descripcion */
+        a.Descripcion AS NombreArticulo,
         p.Nombre AS NombreProveedor,
-        a.PrecioVenta AS Precio         /* Cambiado de Precio a PrecioVenta */
+        a.PrecioVenta AS Precio,
+        CONVERT(VARCHAR(50), ap.CodigoArticulo) AS id
       FROM ArticuloProveedor ap
-      JOIN Articulos a ON ap.CodigoArticulo = a.Codigo
-      JOIN Proveedores p ON ap.CodigoProveedor = p.Codigo
-      ORDER BY ap.CodigoEmpresa, ap.CodigoArticulo, ap.CodigoProveedor
+      INNER JOIN Articulos a ON ap.CodigoArticulo = a.Codigo
+      INNER JOIN Proveedores p ON ap.CodigoProveedor = p.Codigo
+      WHERE ap.CodigoEmpresa = '001' -- Filtro por empresa (ajustar según necesidad)
+      ORDER BY a.Descripcion
     `;
-    
-    const result = await sage200Pool.request().query(query);
-    console.log('Productos obtenidos:', result.recordset.length);
-    
+
+    const request = sage200Pool.request();
+    const result = await request.query(query);
+
+    if (!result.recordset || result.recordset.length === 0) {
+      console.warn('⚠️ La consulta no devolvió resultados');
+      return res.status(404).json({ message: 'No se encontraron productos' });
+    }
+
+    console.log(`✅ ${result.recordset.length} productos obtenidos`);
     res.json(result.recordset);
-    
+
   } catch (err) {
-    console.error('Error en getProducts:', err);
-    res.status(500).json({ 
+    console.error('❌ Error en getProducts:', {
+      message: err.message,
+      code: err.code,
+      stack: err.stack
+    });
+
+    res.status(500).json({
       error: 'Error al obtener productos',
       details: err.message,
-      suggestion: 'Verifique los nombres de columna en la base de datos'
+      suggestion: 'Verifique: 1) Conexión al servidor, 2) Nombre de tablas, 3) Permisos de usuario'
     });
   }
 };
