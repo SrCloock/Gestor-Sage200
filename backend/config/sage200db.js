@@ -4,8 +4,8 @@ const { ConnectionPool } = require('mssql');
 const config = {
   server: 'SVRALANDALUS',
   database: 'DEMOS',
-  user: 'Logic',
-  password: 'Sage2024+',
+  user: 'administrador',
+  password: 'admin2024',
   options: { encrypt: false, trustServerCertificate: true }
 };
 
