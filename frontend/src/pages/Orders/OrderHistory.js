@@ -1,6 +1,6 @@
 // Archivo: OrderPage.js
 import React, { useContext, useState } from 'react';
-import { CartContext } from '../context/CartContext';
+import { CartContext } from '../../context/CartContext';
 
 const OrderPage = () => {
   const { cart } = useContext(CartContext);
@@ -37,3 +37,5 @@ const OrderPage = () => {
     </div>
   );
 };
+
+export default OrderPage;

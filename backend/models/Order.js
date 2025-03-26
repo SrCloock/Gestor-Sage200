@@ -1,5 +1,5 @@
 // Archivo: Order.js
-const { sage200Pool, localPool } = require('../config');
+const { sage200Pool, localPool } = require('../config/index.js');
 
 class Order {
   static async create(userId, items) {
