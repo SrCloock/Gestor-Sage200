@@ -1,48 +1,50 @@
-const { sage200Pool, poolConnect } = require('../config/sage200db');
+const { sage200Pool } = require('../config/sage200db');
 
 exports.getProducts = async (req, res) => {
   try {
-    console.log('Iniciando consulta a Sage200...');
-    await poolConnect; // Esperar a que la conexión esté lista
+    console.log('🔍 Ejecutando consulta a Sage200...');
+    
+    // Asegurar conexión
+    await sage200Pool.connect();
 
     const query = `
-      SELECT 
-        ap.CodigoEmpresa,
-        ap.CodigoArticulo,
-        ap.CodigoProveedor,
+      SELECT TOP 100
+        a.Codigo AS CodigoArticulo,
         a.Descripcion AS NombreArticulo,
-        p.Nombre AS NombreProveedor,
         a.PrecioVenta AS Precio,
-        CONVERT(VARCHAR(50), ap.CodigoArticulo) AS id
-      FROM ArticuloProveedor ap
-      INNER JOIN Articulos a ON ap.CodigoArticulo = a.Codigo
-      INNER JOIN Proveedores p ON ap.CodigoProveedor = p.Codigo
-      WHERE ap.CodigoEmpresa = '001' -- Filtro por empresa (ajustar según necesidad)
+        p.Codigo AS CodigoProveedor,
+        p.Nombre AS NombreProveedor,
+        CONVERT(VARCHAR, a.UltimaActualizacion, 120) AS UltimaActualizacion
+      FROM Articulos a
+      LEFT JOIN ArticuloProveedor ap ON a.Codigo = ap.CodigoArticulo
+      LEFT JOIN Proveedores p ON ap.CodigoProveedor = p.Codigo
+      WHERE a.Activo = 1
       ORDER BY a.Descripcion
     `;
 
-    const request = sage200Pool.request();
-    const result = await request.query(query);
-
-    if (!result.recordset || result.recordset.length === 0) {
-      console.warn('⚠️ La consulta no devolvió resultados');
-      return res.status(404).json({ message: 'No se encontraron productos' });
-    }
-
+    const result = await sage200Pool.request().query(query);
+    
     console.log(`✅ ${result.recordset.length} productos obtenidos`);
-    res.json(result.recordset);
+    res.json({
+      success: true,
+      count: result.recordset.length,
+      data: result.recordset
+    });
 
   } catch (err) {
-    console.error('❌ Error en getProducts:', {
+    console.error('❌ Error crítico en getProducts:', {
       message: err.message,
-      code: err.code,
-      stack: err.stack
+      stack: err.stack,
+      sqlError: err.originalError?.info?.message
     });
 
     res.status(500).json({
+      success: false,
       error: 'Error al obtener productos',
-      details: err.message,
-      suggestion: 'Verifique: 1) Conexión al servidor, 2) Nombre de tablas, 3) Permisos de usuario'
+      details: process.env.NODE_ENV === 'development' ? {
+        message: err.message,
+        sqlError: err.originalError?.info?.message
+      } : undefined
     });
   }
 };

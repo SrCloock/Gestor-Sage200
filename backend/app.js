@@ -3,7 +3,22 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
+// Verificar variables de entorno críticas
+const requiredEnvVars = [
+  'SAGE200_SERVER', 
+  'SAGE200_DATABASE',
+  'SAGE200_USER',
+  'SAGE200_PASSWORD'
+];
 
+requiredEnvVars.forEach(envVar => {
+  if (!process.env[envVar]) {
+    console.error(`❌ Variable de entorno faltante: ${envVar}`);
+    process.exit(1);
+  }
+});
+
+console.log('🔧 Configuración inicial verificada');
 // Middlewares
 app.use(cors());
 app.use(express.json());
