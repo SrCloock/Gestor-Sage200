@@ -6,44 +6,84 @@ import ProductFilter from '../../components/Products/ProductFilter';
 import { fetchProducts, testConnection } from '../../services/productService';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import Notification from '../../components/UI/Notification';
+import './ProductList.css';
 
 const ProductList = () => {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filter, setFilter] = useState('all');
   const { addToCart } = useCart();
 
   useEffect(() => {
-    const initialize = async () => {
+    const loadProducts = async () => {
       try {
-        const isBackendAlive = await testConnection();
-        if (!isBackendAlive) {
-          throw new Error('No se puede conectar con el servidor');
+        const isConnected = await testConnection();
+        if (!isConnected) {
+          throw new Error('No se pudo conectar al servidor');
         }
 
-        const data = await fetchProducts();
-        setProducts(data);
-        setFilteredProducts(data);
+        const productsData = await fetchProducts();
+        if (!productsData || productsData.length === 0) {
+          throw new Error('No se encontraron productos');
+        }
+
+        setProducts(productsData);
+        setFilteredProducts(productsData);
       } catch (err) {
-        console.error('Error inicializando:', err);
-        setError(err.message || 'Error al cargar productos');
+        console.error('Error al cargar productos:', err);
+        setError(err.message || 'Error al cargar los productos');
       } finally {
         setLoading(false);
       }
     };
 
-    initialize();
+    loadProducts();
   }, []);
 
-  if (loading) return <LoadingSpinner fullPage />;
+  useEffect(() => {
+    let results = [...products];
+    
+    // Aplicar búsqueda
+    if (searchTerm) {
+      results = results.filter(product =>
+        product.NombreArticulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.CodigoArticulo.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Aplicar filtros
+    if (filter === 'price_asc') {
+      results.sort((a, b) => a.Precio - b.Precio);
+    } else if (filter === 'price_desc') {
+      results.sort((a, b) => b.Precio - a.Precio);
+    } else if (filter === 'available') {
+      results = results.filter(p => p.Stock > 0);
+    }
+
+    setFilteredProducts(results);
+  }, [searchTerm, filter, products]);
+
+  const handleSearch = (term) => {
+    setSearchTerm(term);
+  };
+
+  const handleFilter = (filterType) => {
+    setFilter(filterType);
+  };
+
+  if (loading) {
+    return <LoadingSpinner fullPage />;
+  }
 
   if (error) {
     return (
-      <div className="container mt-5">
+      <div className="error-container">
         <Notification type="error" message={error} />
-        <button 
-          className="btn btn-retry"
+        <button
+          className="retry-button"
           onClick={() => window.location.reload()}
         >
           Reintentar
@@ -54,37 +94,37 @@ const ProductList = () => {
 
   return (
     <div className="product-list-container">
-      <h1 className="page-title">Catálogo de Productos</h1>
-      
-      <div className="product-controls">
-        <ProductSearch 
-          products={products} 
-          onSearch={setFilteredProducts} 
-        />
-        <ProductFilter 
-          products={products} 
-          onFilter={setFilteredProducts} 
-        />
+      <div className="product-list-header">
+        <h1>Catálogo de Productos</h1>
+        <div className="product-controls">
+          <ProductSearch onSearch={handleSearch} />
+          <ProductFilter 
+            onFilter={handleFilter} 
+            filters={[
+              { value: 'all', label: 'Todos' },
+              { value: 'price_asc', label: 'Precio: Menor a Mayor' },
+              { value: 'price_desc', label: 'Precio: Mayor a Menor' },
+              { value: 'available', label: 'Disponibles' }
+            ]}
+          />
+        </div>
       </div>
 
-      {filteredProducts.length === 0 ? (
-        <div className="no-results">
-          No se encontraron productos con los filtros aplicados
-        </div>
-      ) : (
-        <div className="product-grid">
-          {filteredProducts.map(product => (
+      <div className="product-grid">
+        {filteredProducts.length > 0 ? (
+          filteredProducts.map(product => (
             <ProductCard
-              key={product.id}
-              product={{
-                ...product,
-                image: product.imagenUrl || '/placeholder-product.jpg'
-              }}
+              key={product.CodigoArticulo}
+              product={product}
               onAddToCart={() => addToCart(product)}
             />
-          ))}
-        </div>
-      )}
+          ))
+        ) : (
+          <div className="no-products">
+            No se encontraron productos con los filtros aplicados
+          </div>
+        )}
+      </div>
     </div>
   );
 };

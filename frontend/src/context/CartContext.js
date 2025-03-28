@@ -1,32 +1,44 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useContext, useReducer } from 'react';
 
-// Declaración única del contexto (eliminada la duplicada al final)
 const CartContext = createContext();
 
-export const CartProvider = ({ children }) => {
-  const [cart, setCart] = useState([]);
+const cartReducer = (state, action) => {
+  switch (action.type) {
+    case 'ADD_ITEM':
+      // Lógica para añadir items
+      return { ...state, items: [...state.items, action.payload] };
+    case 'REMOVE_ITEM':
+      // Lógica para remover items
+      return { ...state, items: state.items.filter(item => item.id !== action.payload) };
+    case 'CLEAR_CART':
+      return { ...state, items: [] };
+    default:
+      return state;
+  }
+};
 
-  const addToCart = (product, quantity = 1) => {
-    setCart(prev => {
-      const existing = prev.find(item => item.CodigoArticulo === product.CodigoArticulo);
-      return existing
-        ? prev.map(item =>
-            item.CodigoArticulo === product.CodigoArticulo
-              ? { ...item, quantity: item.quantity + quantity }
-              : item
-          )
-        : [...prev, { ...product, quantity }];
-    });
+export const CartProvider = ({ children }) => {
+  const [state, dispatch] = useReducer(cartReducer, { items: [] });
+
+  const addToCart = (product) => {
+    dispatch({ type: 'ADD_ITEM', payload: product });
   };
 
   const removeFromCart = (productId) => {
-    setCart(prev => prev.filter(item => item.CodigoArticulo !== productId));
+    dispatch({ type: 'REMOVE_ITEM', payload: productId });
   };
 
-  const clearCart = () => setCart([]);
+  const clearCart = () => {
+    dispatch({ type: 'CLEAR_CART' });
+  };
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, clearCart }}>
+    <CartContext.Provider value={{ 
+      cart: state.items, 
+      addToCart, 
+      removeFromCart, 
+      clearCart 
+    }}>
       {children}
     </CartContext.Provider>
   );
@@ -39,5 +51,3 @@ export const useCart = () => {
   }
   return context;
 };
-
-// Eliminada la línea duplicada: export const CartContext = createContext();

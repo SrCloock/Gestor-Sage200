@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { fetchProducts, fetchOrders } from '../../services/productService';
-import { BarChart, PieChart } from '../../components/UI/Charts';
+import LoadingSpinner from '../../components/UI/LoadingSpinner';
+import './MainDashboard.css';
 
 const MainDashboard = () => {
   const [stats, setStats] = useState({
     productCount: 0,
-    orderCount: 0,
-    topProducts: [],
-    salesData: []
+    orderCount: 0
   });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
@@ -17,36 +17,26 @@ const MainDashboard = () => {
           fetchProducts(),
           fetchOrders()
         ]);
-
-        // Simular datos para el dashboard
-        const topProducts = products
-          .slice(0, 5)
-          .map(p => ({ name: p.NombreArticulo, value: Math.floor(Math.random() * 100) }));
-
-        const salesData = [
-          { name: 'Ene', value: Math.floor(Math.random() * 5000) },
-          { name: 'Feb', value: Math.floor(Math.random() * 5000) },
-          { name: 'Mar', value: Math.floor(Math.random() * 5000) },
-          { name: 'Abr', value: Math.floor(Math.random() * 5000) },
-        ];
-
+        
         setStats({
           productCount: products.length,
-          orderCount: orders.length,
-          topProducts,
-          salesData
+          orderCount: orders.length
         });
       } catch (error) {
-        console.error('Error loading dashboard data:', error);
+        console.error('Error loading data:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
     loadData();
   }, []);
 
+  if (loading) return <LoadingSpinner />;
+
   return (
-    <div className="dashboard">
-      <h2>Panel de Control</h2>
+    <div className="dashboard-container">
+      <h1>Panel de Control</h1>
       
       <div className="stats-grid">
         <div className="stat-card">
@@ -57,18 +47,6 @@ const MainDashboard = () => {
         <div className="stat-card">
           <h3>Pedidos Totales</h3>
           <p>{stats.orderCount}</p>
-        </div>
-      </div>
-
-      <div className="charts-container">
-        <div className="chart">
-          <h3>Ventas Mensuales</h3>
-          <BarChart data={stats.salesData} />
-        </div>
-        
-        <div className="chart">
-          <h3>Productos Más Vendidos</h3>
-          <PieChart data={stats.topProducts} />
         </div>
       </div>
     </div>
