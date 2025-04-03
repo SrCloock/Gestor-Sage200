@@ -1,4 +1,3 @@
-
 const { ConnectionPool } = require('mssql');
 require('dotenv').config();
 
@@ -17,13 +16,12 @@ const config = {
 
 const pool = new ConnectionPool(config);
 
-
 pool.on('error', err => {
   console.error('❌ Error permanente en el pool:', err);
 });
 
 module.exports = {
-  pool,
+  pool,  // Asegúrate de que pool esté exportado correctamente
   connect: async () => {
     try {
       await pool.connect();

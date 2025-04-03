@@ -1,31 +1,34 @@
-exports.getProductById = async (req, res) => {
+const { pool } = require('../config/sage200db');
+const { cache } = require('../services/cacheService');
+const AppError = require('../utils/AppError');
+
+const CACHE_KEY = 'products';
+
+exports.getProducts = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const query = `
-      SELECT 
-        a.Codigo AS CodigoArticulo,
-        a.Descripcion AS NombreArticulo,
-        a.PrecioVenta AS Precio,
-        p.Codigo AS CodigoProveedor,
-        p.Nombre AS NombreProveedor,
-        a.DescripcionLarga AS Descripcion
-      FROM Articulos a
-      LEFT JOIN ArticuloProveedor ap ON a.Codigo = ap.CodigoArticulo
-      LEFT JOIN Proveedores p ON ap.CodigoProveedor = p.Codigo
-      WHERE a.Codigo = @codigo
-    `;
-
-    const result = await sage200Pool.request()
-      .input('codigo', id)
-      .query(query);
-
-    if (result.recordset.length === 0) {
-      return res.status(404).json({ error: 'Producto no encontrado' });
+    // Verificar caché
+    if (cache.has(CACHE_KEY)) {
+      return res.json({
+        success: true,
+        fromCache: true,
+        data: cache.get(CACHE_KEY)
+      });
     }
 
-    res.json(result.recordset[0]);
+    const query = `SELECT...`; // Tu query optimizada
+    const result = await pool.request().query(query);
+    
+    // Almacenar en caché (1 hora)
+    cache.set(CACHE_KEY, result.recordset, 3600);
+    
+    res.json({
+      success: true,
+      fromCache: false,
+      data: result.recordset,
+      count: result.recordset.length
+    });
+
   } catch (err) {
-    console.error('Error en getProductById:', err);
-    res.status(500).json({ error: 'Error al obtener el producto' });
+    next(new AppError('Error al obtener productos', 500));
   }
 };

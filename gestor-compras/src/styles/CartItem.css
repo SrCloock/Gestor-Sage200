@@ -1,0 +1,72 @@
+/* CartItem.css */
+
+/* Variables para colores y tamaños */
+:root {
+    --primary-color: #007BFF;
+    --secondary-color: #f9f9f9;
+    --disabled-color: #b0b0b0;
+    --danger-color: red;
+    --text-color: #555;
+  }
+  
+  .cart-item {
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    border: 1px solid #ddd;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    background-color: var(--secondary-color);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .cart-item h3 {
+    font-size: 18px;
+    margin: 0 0 5px 0;
+    font-weight: bold;
+  }
+  
+  .cart-item .details {
+    font-size: 16px;
+    margin: 0 0 10px 0;
+    color: var(--text-color);
+  }
+  
+  .cart-item .actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .cart-item .button {
+    padding: 5px 10px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+  }
+  
+  .cart-item .buttonDisabled {
+    background-color: var(--disabled-color);
+  }
+  
+  .cart-item .quantity {
+    font-size: 16px;
+    font-weight: bold;
+    margin: 0 10px;
+  }
+  
+  .cart-item .removeButton {
+    padding: 5px 10px;
+    font-size: 16px;
+    background-color: var(--danger-color);
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+  }
+  
