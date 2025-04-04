@@ -38,6 +38,11 @@ const Navbar = () => {
               {totalItems > 0 && <span className="cart-badge">{totalItems}</span>}
             </NavLink>
           </li>
+          <li>
+            <NavLink to="/admin" className={({ isActive }) => (isActive ? "active" : "")}>
+              Administración
+            </NavLink>
+          </li>
         </ul>
       </div>
     </nav>

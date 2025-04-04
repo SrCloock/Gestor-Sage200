@@ -69,7 +69,10 @@ connect().then(async sageConnected => {
   app.use(cors());
   app.use(express.json());
   app.use('/uploads', express.static(path.join(__dirname, process.env.UPLOADS_DIR)));
-
+  app.use('/api/admin', require('./routes/admin'));
+  app.use('/api/images', require('./routes/images'));
+  app.use('/api/auth', require('./routes/auth'));
+  
   // Logger de requests mejorado
   app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);

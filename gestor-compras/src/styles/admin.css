@@ -1,0 +1,26 @@
+.admin-login {
+    max-width: 400px;
+    margin: 2rem auto;
+    padding: 2rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+  }
+  
+  .dropzone {
+    border: 2px dashed #ccc;
+    padding: 2rem;
+    text-align: center;
+    margin: 1rem 0;
+  }
+  
+  .image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+  }
+  
+  .image-preview img {
+    width: 100%;
+    height: auto;
+    border-radius: 4px;
+  }

@@ -1,43 +1,42 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import ProductTable from '../components/ProductTable'; // Componente nuevo para CRUD
-import ImageUploader from '../components/ImageUploader'; // Componente nuevo para drag-and-drop
+import React, { useState } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import '../styles/admin.css';
 
+
 const Admin = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [rememberMe, setRememberMe] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const navigate = useNavigate();
+  const [images, setImages] = useState([]);
 
-  // Credenciales hardcodeadas
-  const ADMIN_CREDENTIALS = { username: 'admin', password: '1234' };
-
-  useEffect(() => {
-    // Verificar credenciales guardadas en localStorage
-    const savedCredentials = localStorage.getItem('adminCredentials');
-    if (savedCredentials) {
-      const { username: savedUser, password: savedPass } = JSON.parse(savedCredentials);
-      if (savedUser === ADMIN_CREDENTIALS.username && savedPass === ADMIN_CREDENTIALS.password) {
-        setIsLoggedIn(true);
-      }
+  const { getRootProps, getInputProps } = useDropzone({
+    accept: 'image/*',
+    onDrop: (acceptedFiles) => {
+      const newImages = acceptedFiles.map(file => ({
+        file,
+        preview: URL.createObjectURL(file)
+      }));
+      setImages([...images, ...newImages]);
+      toast.success(`${acceptedFiles.length} imágenes añadidas`);
     }
-  }, []);
+  });
 
   const handleLogin = (e) => {
     e.preventDefault();
-    if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
-      setIsLoggedIn(true);
+    if (credentials.username === 'admin' && credentials.password === '1234') {
+      setLoggedIn(true);
+      toast.success('Bienvenido, Admin');
       if (rememberMe) {
-        localStorage.setItem('adminCredentials', JSON.stringify({ username, password }));
+        localStorage.setItem('adminCredentials', JSON.stringify(credentials));
       }
     } else {
-      alert('Credenciales incorrectas');
+      toast.error('Credenciales incorrectas');
     }
   };
 
-  if (!isLoggedIn) {
+  if (!loggedIn) {
     return (
       <div className="admin-login">
         <h2>Acceso Administrador</h2>
@@ -45,20 +44,20 @@ const Admin = () => {
           <input
             type="text"
             placeholder="Usuario"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            value={credentials.username}
+            onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
           />
           <input
             type="password"
             placeholder="Contraseña"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            value={credentials.password}
+            onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
           />
           <label>
             <input
               type="checkbox"
               checked={rememberMe}
-              onChange={() => setRememberMe(!rememberMe)}
+              onChange={(e) => setRememberMe(e.target.checked)}
             />
             Recordar credenciales
           </label>
@@ -69,13 +68,19 @@ const Admin = () => {
   }
 
   return (
-    <div className="admin-panel">
+    <div className="admin-dashboard">
       <h2>Panel de Administración</h2>
-      <button onClick={() => navigate('/')}>Volver al inicio</button>
-      
-      {/* Componentes para gestión */}
-      <ImageUploader />
-      <ProductTable />
+      <div {...getRootProps({ className: 'dropzone' })}>
+        <input {...getInputProps()} />
+        <p>Arrastra imágenes aquí o haz clic para seleccionar</p>
+      </div>
+      <div className="image-grid">
+        {images.map((img, index) => (
+          <div key={index} className="image-preview">
+            <img src={img.preview} alt={`Preview ${index}`} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

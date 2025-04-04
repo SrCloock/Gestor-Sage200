@@ -11,21 +11,25 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
-// Verificación de conexión
+// Verificación y creación de tablas si no existen
 pool.getConnection()
-  .then(connection => {
+  .then(async (connection) => {
     console.log('✅ Conexión a MySQL exitosa');
+    
+    // Crear tabla de imágenes si no existe
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS product_images (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        product_id VARCHAR(50) NOT NULL,
+        image_path VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
     connection.release();
   })
   .catch(err => {
-    console.error('❌ Error de conexión a MySQL:', {
-      message: err.message,
-      code: err.code,
-      stack: err.stack
-    });
+    console.error('❌ Error de conexión a MySQL:', err.message);
   });
 
-module.exports = {
-  pool,
-  getConnection: () => pool.getConnection()
-};
+module.exports = { pool };

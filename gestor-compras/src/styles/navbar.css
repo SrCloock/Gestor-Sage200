@@ -108,4 +108,15 @@ body {
       font-size: 1.2rem;
     }
   }
+  .logout-button {
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    padding: 0.5rem;
+    margin-left: 1rem;
+  }
   
+  .logout-button:hover {
+    text-decoration: underline;
+  }
