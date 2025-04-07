@@ -30,4 +30,8 @@ router.post('/upload', upload.single('image'), async (req, res) => {
   }
 });
 
+router.use('/orders', require('./orders'));
+router.use('/auth', require('./auth')); // <-- Aquí
+
+
 module.exports = router;

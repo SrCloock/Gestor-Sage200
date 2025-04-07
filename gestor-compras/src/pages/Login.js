@@ -1,87 +1,58 @@
-import React, { useState, useContext } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { StoreContext } from "../context";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import "../styles/login.css";
+import React, { useState } from 'react';
 
 const Login = () => {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
-  const [isAdminLogin, setIsAdminLogin] = useState(false);
-  const { login } = useContext(StoreContext);
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [codigoCliente, setCodigoCliente] = useState('');
+  const [contraseña, setContraseña] = useState('');
+  const [error, setError] = useState(null);
 
-  const from = location.state?.from?.pathname || "/";
-
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    
-    // Validación hardcodeada para admin
-    if (isAdminLogin) {
-      if (username === "admin" && password === "1234") {
-        login(JSON.stringify({ username, password }), true);
-        if (rememberMe) {
-          localStorage.setItem("adminCredentials", JSON.stringify({ username, password }));
-        }
-        navigate(from);
+    setError(null);
+
+    try {
+      const res = await fetch('http://localhost:3001/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codigoCliente, contraseña }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Error en login');
         return;
       }
-      toast.error("Credenciales de administrador incorrectas");
-      return;
-    }
 
-    // Aquí iría la lógica para validar con Sage200
-    try {
-      // Simulamos login exitoso
-      const fakeToken = "sage_fake_token";
-      login(fakeToken);
-      navigate(from);
-    } catch (error) {
-      toast.error("Error al validar con Sage200");
+      console.log('Usuario autenticado:', data.user);
+      alert('Bienvenido, ' + data.user.RazonSocial);
+      // Puedes guardar el usuario en localStorage o contexto
+    } catch (err) {
+      console.error(err);
+      setError('Error de conexión con el servidor');
     }
   };
 
   return (
-    <div className="login-container">
-      <h2>{isAdminLogin ? "Acceso Administrador" : "Acceso Usuario"}</h2>
-      <form onSubmit={handleSubmit}>
+    <div style={{ padding: 20 }}>
+      <h2>Iniciar sesión</h2>
+      <form onSubmit={handleLogin}>
         <input
           type="text"
-          placeholder="Usuario"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          placeholder="Código de Cliente"
+          value={codigoCliente}
+          onChange={(e) => setCodigoCliente(e.target.value)}
           required
         />
         <input
           type="password"
           placeholder="Contraseña"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          value={contraseña}
+          onChange={(e) => setContraseña(e.target.value)}
           required
         />
-        {isAdminLogin && (
-          <label className="remember-me">
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-            />
-            Recordar credenciales
-          </label>
-        )}
         <button type="submit">Entrar</button>
+        {error && <p style={{ color: 'red' }}>{error}</p>}
       </form>
-      <button
-        className="switch-mode"
-        onClick={() => setIsAdminLogin(!isAdminLogin)}
-      >
-        {isAdminLogin
-          ? "¿Eres usuario normal?"
-          : "¿Eres administrador?"}
-      </button>
     </div>
   );
 };

@@ -1,26 +1,50 @@
-const { pool: sagePool } = require('../config/sage200db');
-const AppError = require('../utils/AppError');
+const { pool } = require('../config/sage200db');
 
-// Validar usuario en Sage200
-exports.validateSageUser = async (username, password) => {
+const login = async (req, res) => {
+  const { codigoCliente, contraseña } = req.body;
+
+  if (!codigoCliente || !contraseña) {
+    return res.status(400).json({ error: 'Faltan credenciales' });
+  }
+
   try {
-    // Aquí hace falta la sentencia SQL exacta para validar usuarios en Sage200
-    const query = `
-      SELECT Codigo, Nombre 
-      FROM Usuarios 
-      WHERE Usuario = ? AND Contraseña = ?  -- Ajustar nombres de campos según Sage200
-    `;
-    const [rows] = await sagePool.query(query, [username, password]);
-    return rows.length > 0 ? rows[0] : null;
+    const request = pool.request();
+    request.input('CodigoCliente', codigoCliente);
+
+    const result = await request.query(`
+      SELECT 
+        CodigoCliente,
+        RazonSocial,
+        CifDni,
+        UsuarioLogicNet,
+        ContraseñaLogicNet,
+        CODIGOCATEGORIACLIENTE_,
+        JefeDepartamento,
+        DireccionPedido
+      FROM Usuario
+      WHERE CodigoCliente = @CodigoCliente
+    `);
+
+    const user = result.recordset[0];
+
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    if (user.ContraseñaLogicNet !== contraseña) {
+      return res.status(401).json({ error: 'Contraseña incorrecta' });
+    }
+
+    // Excluir la contraseña del resultado
+    const { ContraseñaLogicNet, ...userData } = user;
+
+    res.json({ message: 'Login exitoso', user: userData });
   } catch (err) {
-    throw new AppError('Error al validar usuario en Sage200', 500);
+    console.error('❌ Error en login:', err);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
 
-// Validar admin hardcodeado
-exports.validateHardcodedAdmin = (username, password) => {
-  if (username === 'admin' && password === '1234') {
-    return { id: 0, name: 'Admin' }; // Datos ficticios para el admin
-  }
-  return null;
+module.exports = {
+  login,
 };

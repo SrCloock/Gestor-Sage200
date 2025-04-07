@@ -1,4 +1,5 @@
 const express = require('express');
+const { login } = require('../controllers/authController');
 const { validateSageUser, validateHardcodedAdmin } = require('../controllers/authController');
 const router = express.Router();
 
@@ -28,5 +29,7 @@ router.post('/login', async (req, res, next) => {
     next(err);
   }
 });
+
+router.post('/login', login);
 
 module.exports = router;
