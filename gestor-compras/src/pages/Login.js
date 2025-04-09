@@ -1,58 +1,100 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Reemplazamos useHistory por useNavigate
 
 const Login = () => {
-  const [codigoCliente, setCodigoCliente] = useState('');
-  const [contraseña, setContraseña] = useState('');
-  const [error, setError] = useState(null);
+  const [usuario, setUsuario] = useState('');
+  const [password, setPassword] = useState('');
+  const [codigoEmpresa, setCodigoEmpresa] = useState('');
+  const [error, setError] = useState('');
+  const [mensaje, setMensaje] = useState('');
+  const [razonSocial, setRazonSocial] = useState('');
+  
+  const navigate = useNavigate(); // Reemplazamos useHistory por useNavigate
+
+  // Cargar código de empresa almacenado al iniciar
+  useEffect(() => {
+    const empresaGuardada = localStorage.getItem('codigoEmpresa');
+    if (empresaGuardada) setCodigoEmpresa(empresaGuardada);
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setError(null);
 
     try {
-      const res = await fetch('http://localhost:3001/api/auth/login', {
+      const response = await fetch('http://localhost:3001/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codigoCliente, contraseña }),
+        body: JSON.stringify({
+          UsuarioLogicNet: usuario,
+          password,
+          CodigoCliente: codigoEmpresa,
+        }),
       });
 
-      const data = await res.json();
+      const data = await response.json();
 
-      if (!res.ok) {
-        setError(data.error || 'Error en login');
-        return;
+      if (response.ok) {
+        setMensaje('Login exitoso');
+        setError('');
+
+        // Guardamos el código de empresa y razón social para futuras sesiones
+        localStorage.setItem('codigoEmpresa', codigoEmpresa);
+        if (data.razonSocial) {
+          setRazonSocial(data.razonSocial);
+          localStorage.setItem('razonSocial', data.razonSocial);
+        }
+
+        // Redirigir a la página principal o dashboard
+        navigate('/dashboard'); // Redirigimos a la ruta correcta
+      } else {
+        setError(data.message || 'Credenciales incorrectas');
+        setMensaje('');
       }
-
-      console.log('Usuario autenticado:', data.user);
-      alert('Bienvenido, ' + data.user.RazonSocial);
-      // Puedes guardar el usuario en localStorage o contexto
-    } catch (err) {
-      console.error(err);
-      setError('Error de conexión con el servidor');
+    } catch (error) {
+      setError('Hubo un problema al conectarse con el servidor');
+      setMensaje('');
     }
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Iniciar sesión</h2>
+    <div>
+      <h2>Iniciar Sesión</h2>
       <form onSubmit={handleLogin}>
-        <input
-          type="text"
-          placeholder="Código de Cliente"
-          value={codigoCliente}
-          onChange={(e) => setCodigoCliente(e.target.value)}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Contraseña"
-          value={contraseña}
-          onChange={(e) => setContraseña(e.target.value)}
-          required
-        />
+        <div>
+          <label>Usuario</label>
+          <input
+            type="text"
+            value={usuario}
+            onChange={(e) => setUsuario(e.target.value)}
+            required
+          />
+        </div>
+
+        <div>
+          <label>Contraseña</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+
+        <div>
+          <label>Código de Cliente</label>
+          <input
+            type="text"
+            value={codigoEmpresa}
+            onChange={(e) => setCodigoEmpresa(e.target.value)}
+            required
+          />
+        </div>
+
         <button type="submit">Entrar</button>
-        {error && <p style={{ color: 'red' }}>{error}</p>}
       </form>
+
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {mensaje && <p style={{ color: 'green' }}>{mensaje}</p>}
     </div>
   );
 };

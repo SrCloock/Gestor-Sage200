@@ -73,7 +73,6 @@ connect().then(async sageConnected => {
   app.use('/api/images', require('./routes/images'));
   app.use('/api/auth', require('./routes/auth'));
   app.use('/api', mainRouter); // Esto carga /api/orders
-
   
   // Logger de requests mejorado
   app.use((req, res, next) => {
@@ -110,3 +109,4 @@ connect().then(async sageConnected => {
     console.log(`   Cache: ✅ ACTIVADO (TTL: ${process.env.CACHE_TTL}s)\n`);
   });
 });
+

@@ -1,0 +1,2 @@
+[2025-04-09T14:23:24.814Z] error: ❌ Error al conectar a Sage200: Failed to connect to SVRALANDALUS:1433 - getaddrinfo ENOTFOUND svralandalus
+[2025-04-09T14:23:47.118Z] error: ❌ Error al conectar a Sage200: Failed to connect to SVRALANDALUS:1433 - getaddrinfo ENOTFOUND svralandalus

@@ -22,10 +22,11 @@ const formatCurrency = (value) => {
 };
 
 const OrderDetails = () => {
-  const { orderId } = useParams();
-  const { orders, isLoading, error } = useContext(StoreContext);
+  const { orderId } = useParams(); // Obtiene el ID del pedido desde la URL
+  const { orders, isLoading, error, userData } = useContext(StoreContext);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
+  // Cargar los detalles del pedido basado en el ID
   useEffect(() => {
     if (!orders.length) return;
     const order = orders.find((order) => order.id.toString() === orderId);
@@ -40,6 +41,7 @@ const OrderDetails = () => {
     const logoWidth = 40;
     const logoHeight = 40;
 
+    // Logo de la empresa en el PDF
     doc.addImage(logo, "PNG", margin, margin, logoWidth, logoHeight);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(22);
@@ -51,15 +53,22 @@ const OrderDetails = () => {
     doc.setFontSize(12);
     doc.text(`Pedido #${order.id.toString()}`, margin, 60);
     doc.text(`Fecha: ${formatDate(order.date)}`, margin, 70);
-    doc.text(`Estado: ${order.status}`, margin, 80);
+    doc.text(`Estado: ${order.status || "Desconocido"}`, margin, 80);
     doc.text(`Total: ${formatCurrency(order.total)}`, margin, 90);
+
+    // Información de la empresa (si está disponible en userData)
+    if (userData) {
+      doc.text(`Empresa: ${userData.razonSocial}`, margin, 100);
+      doc.text(`Nombre: ${userData.nombreUsuario}`, margin, 110);
+    }
 
     doc.setLineWidth(0.5);
     doc.line(margin, 95, 200, 95);
 
     doc.setFont("helvetica", "bold");
-    doc.text("Productos:", margin, 105);
+    doc.text("Productos:", margin, 115);
 
+    // Cabecera de la tabla de productos
     const tableHeaders = ["Producto", "Cantidad", "Precio Unitario", "Total"];
     const tableData = order.items.map((item) => [
       item.name,
@@ -68,7 +77,7 @@ const OrderDetails = () => {
       formatCurrency(item.quantity * item.price),
     ]);
 
-    const startY = 115;
+    const startY = 125;
     const rowHeight = 10;
 
     doc.setFont("helvetica", "bold");
@@ -93,6 +102,7 @@ const OrderDetails = () => {
     doc.save(`pedido_${order.id}.pdf`);
   };
 
+  // Condiciones para mostrar mensajes mientras carga o si hay errores
   if (isLoading) return <p className="loading-message">Cargando...</p>;
   if (error) return <p className="error-message">Hubo un error al cargar los detalles del pedido.</p>;
   if (!selectedOrder) return <p className="error-message">No se encontró el pedido.</p>;
@@ -103,7 +113,7 @@ const OrderDetails = () => {
       <div className="order-details-card">
         <div className="order-header">
           <p><strong>Fecha:</strong> {formatDate(selectedOrder.date)}</p>
-          <p><strong>Estado:</strong> {selectedOrder.status}</p>
+          <p><strong>Estado:</strong> {selectedOrder.status || "No especificado"}</p>
           <p><strong>Total:</strong> {formatCurrency(selectedOrder.total)}</p>
         </div>
         <div className="order-items">

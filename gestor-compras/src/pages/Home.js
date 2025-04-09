@@ -1,19 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';  // Para redirigir después de iniciar sesión
 
-// Componente Home mejorado con más detalles y estructura
 const Home = () => {
   const welcomeMessage = "Bienvenido al gestor de compras";
   const [hasStarted, setHasStarted] = useState(false);
+  const [user, setUser] = useState(null); // Estado para almacenar la información del usuario
+  const navigate = useNavigate(); // Reemplazamos useHistory por useNavigate
+
+  useEffect(() => {
+    // Simulamos una verificación de sesión o un fetch de datos de usuario desde una API
+    const loggedInUser = JSON.parse(localStorage.getItem('user'));  // Suponemos que la información de usuario está en localStorage
+    if (loggedInUser) {
+      setUser(loggedInUser);  // Seteamos los datos del usuario si están disponibles
+      setHasStarted(true);  // Ya podemos mostrar el contenido después de loguearse
+    }
+  }, []);
 
   const handleStart = () => {
-    setHasStarted(true);
+    // Redirige al usuario al panel principal o perfil después de hacer clic en comenzar
+    navigate('/dashboard');  // Redirige a la ruta que deseas, por ejemplo, el panel de usuario
   };
 
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>{welcomeMessage}</h1>
       <p style={styles.subtitle}>Organiza y gestiona tus compras de manera eficiente.</p>
-      {!hasStarted ? (
+
+      {hasStarted && user ? (
+        <>
+          <p style={styles.message}>
+            Estás logueado como {user.razonSocial} - {user.nombreUsuario} <br />
+            Código de Empresa: {user.codigoEmpresa}
+          </p>
+          <button 
+            style={styles.button} 
+            onClick={handleStart} 
+            aria-label="Comenzar el gestor de compras"
+          >
+            Comenzar
+          </button>
+        </>
+      ) : (
         <button 
           style={styles.button} 
           onClick={handleStart} 
@@ -21,8 +48,6 @@ const Home = () => {
         >
           Comenzar
         </button>
-      ) : (
-        <p style={styles.message}>¡Estás listo para empezar a gestionar tus compras!</p>
       )}
     </div>
   );

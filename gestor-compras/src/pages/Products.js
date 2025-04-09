@@ -1,7 +1,6 @@
 import { useState, useContext, useMemo, useEffect, useCallback } from "react";
 import { StoreContext } from "../context";
 import ProductCard from "../components/ProductCard";
-import productsData from "../mock/products.json"; // Datos mockeados
 import "../styles/products.css";
 
 const PRODUCTS_PER_PAGE = 20;
@@ -15,12 +14,21 @@ const Products = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortOrder, setSortOrder] = useState("asc"); // Orden por precio
   const [sortBy, setSortBy] = useState("name"); // Orden por nombre o precio
+  const [productsData, setProductsData] = useState([]);
+  const [filteredSuppliers, setFilteredSuppliers] = useState([]);
+  const [selectedSupplier, setSelectedSupplier] = useState("");
 
-  // Simula la carga de productos
+  // Cargar productos desde la base de datos
   useEffect(() => {
     const loadProducts = async () => {
       try {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        setLoading(true);
+        const response = await fetch("/api/products"); // Aquí consultamos a una API que devuelve los productos de la DB
+        const data = await response.json();
+        setProductsData(data);
+        // Extraemos los proveedores para el autocompletado
+        const suppliers = Array.from(new Set(data.map((product) => product.supplier)));
+        setFilteredSuppliers(suppliers);
       } catch (err) {
         setError("Error al cargar los productos");
       } finally {
@@ -45,12 +53,19 @@ const Products = () => {
   const filteredAndSortedProducts = useMemo(() => {
     let filteredProducts = productsData;
 
-    // Filtrar por nombre o proveedor
+    // Filtrar por nombre, proveedor o artículo
     if (debouncedSearch) {
       const normalizedSearch = debouncedSearch.trim().toLowerCase();
       filteredProducts = filteredProducts.filter((product) =>
         product.name.toLowerCase().includes(normalizedSearch) ||
         product.supplier.toLowerCase().includes(normalizedSearch) // Cambiado 'provider' a 'supplier'
+      );
+    }
+
+    // Filtrar por proveedor seleccionado
+    if (selectedSupplier) {
+      filteredProducts = filteredProducts.filter(
+        (product) => product.supplier.toLowerCase() === selectedSupplier.toLowerCase()
       );
     }
 
@@ -69,7 +84,7 @@ const Products = () => {
     }
 
     return sortedProducts;
-  }, [debouncedSearch, sortBy, sortOrder]);
+  }, [debouncedSearch, sortBy, sortOrder, productsData, selectedSupplier]);
 
   // Obtener los productos de la página actual
   const paginatedProducts = useMemo(() => {
@@ -115,7 +130,26 @@ const Products = () => {
         />
       </div>
 
+      {/* Filtros por proveedor y orden */}
       <div className="filters">
+        <div className="filter-group">
+          <label htmlFor="supplier">Proveedor:</label>
+          <input
+            id="supplier"
+            type="text"
+            value={selectedSupplier}
+            onChange={(e) => setSelectedSupplier(e.target.value)}
+            placeholder="Filtrar por proveedor"
+            list="supplier-list"
+            aria-label="Filtrar productos por proveedor"
+          />
+          <datalist id="supplier-list">
+            {filteredSuppliers.map((supplier, index) => (
+              <option key={index} value={supplier} />
+            ))}
+          </datalist>
+        </div>
+
         <div className="filter-group">
           <label htmlFor="sort-by">Ordenar por:</label>
           <select
@@ -141,6 +175,7 @@ const Products = () => {
         </div>
       </div>
 
+      {/* Lista de productos */}
       <div className="product-list">
         {paginatedProducts.length > 0 ? (
           <div className="grid-container">
