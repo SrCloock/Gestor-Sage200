@@ -1,161 +1,83 @@
-import React, { useState, useEffect } from 'react';
-import { useDropzone } from 'react-dropzone';
-import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import '../styles/admin.css';
-import axios from 'axios'; // Para hacer las peticiones al backend
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // Reemplazamos useHistory por useNavigate
+import { createUser } from '../services/api';
 
 const Admin = () => {
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [credentials, setCredentials] = useState({ username: '', password: '' });
-  const [rememberMe, setRememberMe] = useState(false);
-  const [images, setImages] = useState([]);
-  const [userData, setUserData] = useState(null); // Datos del usuario logueado
-  const [newUser, setNewUser] = useState({ username: '', password: '', razonSocial: '', codigoEmpresa: '' }); // Datos del nuevo usuario
-
-  // Obtener las credenciales guardadas si existen
-  useEffect(() => {
-    const storedCredentials = JSON.parse(localStorage.getItem('adminCredentials'));
-    if (storedCredentials) {
-      setCredentials(storedCredentials);
-      setRememberMe(true);
-    }
-  }, []);
-
-  const { getRootProps, getInputProps } = useDropzone({
-    accept: 'image/*',
-    onDrop: (acceptedFiles) => {
-      const newImages = acceptedFiles.map(file => ({
-        file,
-        preview: URL.createObjectURL(file)
-      }));
-      setImages([...images, ...newImages]);
-      toast.success(`${acceptedFiles.length} imágenes añadidas`);
-    }
+  const [userData, setUserData] = useState({
+    razonSocial: '',
+    nombre: '',
+    usuario: '',
+    password: '',
+    codigoCliente: '',
   });
 
-  // Función de login (con credenciales hardcodeadas)
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const navigate = useNavigate(); // Reemplazamos useHistory por useNavigate
 
-    const hardcodedCredentials = {
-      username: 'admin',
-      password: 'admin123'
-    };
-
-    if (credentials.username === hardcodedCredentials.username && credentials.password === hardcodedCredentials.password) {
-      setLoggedIn(true);
-      setUserData({ razonSocial: 'Empresa Admin', codigoEmpresa: '12345', nombre: 'Administrador' });
-      toast.success('Bienvenido, Admin');
-      if (rememberMe) {
-        localStorage.setItem('adminCredentials', JSON.stringify(credentials));
-      }
-    } else {
-      toast.error('Credenciales incorrectas');
-    }
+  const handleInputChange = (e) => {
+    setUserData({ ...userData, [e.target.name]: e.target.value });
   };
 
-  // Función para crear un nuevo usuario
-  const handleCreateUser = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
     try {
-      const response = await axios.post('http://localhost:5000/api/users/create', newUser); // Endpoint del backend para crear un nuevo usuario
-      if (response.data.success) {
-        toast.success('Nuevo usuario creado con éxito');
-        setNewUser({ username: '', password: '', razonSocial: '', codigoEmpresa: '' }); // Limpiar formulario
-      } else {
-        toast.error('Hubo un error al crear el nuevo usuario');
-      }
+      await createUser(userData);
+      alert('Usuario creado con éxito');
+      navigate('/admin'); // Usamos navigate para redirigir
     } catch (error) {
-      toast.error('Error en la creación del usuario');
+      alert('Error al crear el usuario');
     }
   };
 
-  // Si el admin está logueado, se muestra el dashboard
-  if (loggedIn) {
-    return (
-      <div className="admin-dashboard">
-        <h2>Panel de Administración</h2>
-        <div>
-          <h3>Datos del Usuario</h3>
-          <p><strong>Razón Social:</strong> {userData?.razonSocial}</p>
-          <p><strong>Código Empresa:</strong> {userData?.codigoEmpresa}</p>
-          <p><strong>Nombre del Usuario:</strong> {userData?.nombre}</p>
-        </div>
-        <div {...getRootProps({ className: 'dropzone' })}>
-          <input {...getInputProps()} />
-          <p>Arrastra imágenes aquí o haz clic para seleccionar</p>
-        </div>
-        <div className="image-grid">
-          {images.map((img, index) => (
-            <div key={index} className="image-preview">
-              <img src={img.preview} alt={`Preview ${index}`} />
-            </div>
-          ))}
-        </div>
-
-        {/* Formulario para crear nuevos usuarios */}
-        <div className="create-user-form">
-          <h3>Crear Nuevo Usuario</h3>
-          <form onSubmit={handleCreateUser}>
-            <input
-              type="text"
-              placeholder="Nombre de Usuario"
-              value={newUser.username}
-              onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-            />
-            <input
-              type="password"
-              placeholder="Contraseña"
-              value={newUser.password}
-              onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-            />
-            <input
-              type="text"
-              placeholder="Razón Social"
-              value={newUser.razonSocial}
-              onChange={(e) => setNewUser({ ...newUser, razonSocial: e.target.value })}
-            />
-            <input
-              type="text"
-              placeholder="Código Empresa"
-              value={newUser.codigoEmpresa}
-              onChange={(e) => setNewUser({ ...newUser, codigoEmpresa: e.target.value })}
-            />
-            <button type="submit">Crear Usuario</button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // Si no está logueado, se muestra el formulario de login
   return (
-    <div className="admin-login">
-      <h2>Acceso Administrador</h2>
-      <form onSubmit={handleLogin}>
-        <input
-          type="text"
-          placeholder="Usuario"
-          value={credentials.username}
-          onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
-        />
-        <input
-          type="password"
-          placeholder="Contraseña"
-          value={credentials.password}
-          onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
-        />
-        <label>
+    <div>
+      <h2>Crear Nuevo Usuario</h2>
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label>Razón Social:</label>
           <input
-            type="checkbox"
-            checked={rememberMe}
-            onChange={(e) => setRememberMe(e.target.checked)}
+            type="text"
+            name="razonSocial"
+            value={userData.razonSocial}
+            onChange={handleInputChange}
           />
-          Recordar credenciales
-        </label>
-        <button type="submit">Entrar</button>
+        </div>
+        <div>
+          <label>Nombre:</label>
+          <input
+            type="text"
+            name="nombre"
+            value={userData.nombre}
+            onChange={handleInputChange}
+          />
+        </div>
+        <div>
+          <label>Usuario:</label>
+          <input
+            type="text"
+            name="usuario"
+            value={userData.usuario}
+            onChange={handleInputChange}
+          />
+        </div>
+        <div>
+          <label>Contraseña:</label>
+          <input
+            type="password"
+            name="password"
+            value={userData.password}
+            onChange={handleInputChange}
+          />
+        </div>
+        <div>
+          <label>Código Cliente:</label>
+          <input
+            type="text"
+            name="codigoCliente"
+            value={userData.codigoCliente}
+            onChange={handleInputChange}
+          />
+        </div>
+        <button type="submit">Crear Usuario</button>
       </form>
     </div>
   );

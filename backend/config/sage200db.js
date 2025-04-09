@@ -32,7 +32,7 @@ const connect = async () => {
         message: err.message,
         server: config.server,
         database: config.database,
-        user: config.user,
+        user: config.user
       });
       throw err;
     }
@@ -41,9 +41,7 @@ const connect = async () => {
 };
 
 const getPool = () => {
-  if (!connected) {
-    throw new Error('Pool no inicializado. Llama a connect() primero.');
-  }
+  if (!connected) throw new Error('Pool no inicializado. Llama a connect() primero.');
   return pool;
 };
 

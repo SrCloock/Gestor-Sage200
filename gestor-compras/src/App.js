@@ -1,78 +1,30 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { StoreProvider } from "./context";
-import Navbar from "./components/Navbar";
-import Home from "./pages/Home";
-import Products from "./pages/Products";
-import Cart from "./pages/Cart";
-import Orders from "./pages/Orders";
-import Login from "./pages/Login";
-import Admin from "./pages/Admin";
-import OrderDetails from "./pages/OrderDetails";
-import { useContext } from "react";
-import { StoreContext } from "./context";
+import React from 'react';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import Home from './pages/Home';
+import Login from './pages/Login';
+import Admin from './pages/Admin';
+import NewOrder from './pages/NewOrder';
+import OrderDetails from './pages/OrderDetails';
+import Orders from './pages/Orders';
+import Products from './pages/Products';
+import Cart from './pages/Cart';
 
-const AuthWrapper = ({ children }) => {
-  const { isAuthenticated } = useContext(StoreContext);
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
-};
-
-const App = () => (
-  <StoreProvider>
-    <BrowserRouter>
-      <Navbar />
+const App = () => {
+  return (
+    <Router>
       <Routes>
+        <Route path="/home" element={<Home />} />
         <Route path="/login" element={<Login />} />
-        <Route 
-          path="/" 
-          element={
-            <AuthWrapper>
-              <Home />
-            </AuthWrapper>
-          } 
-        />
-        <Route 
-          path="/products" 
-          element={
-            <AuthWrapper>
-              <Products />
-            </AuthWrapper>
-          } 
-        />
-        <Route 
-          path="/cart" 
-          element={
-            <AuthWrapper>
-              <Cart />
-            </AuthWrapper>
-          } 
-        />
-        <Route 
-          path="/orders" 
-          element={
-            <AuthWrapper>
-              <Orders />
-            </AuthWrapper>
-          } 
-        />
-        <Route 
-          path="/admin" 
-          element={
-            <AuthWrapper>
-              <Admin />
-            </AuthWrapper>
-          } 
-        />
-        <Route 
-          path="/order-details/:orderId" 
-          element={
-            <AuthWrapper>
-              <OrderDetails />
-            </AuthWrapper>
-          } 
-        />
+        <Route path="/admin" element={<Admin />} />
+        <Route path="/new-order" element={<NewOrder />} />
+        <Route path="/order/:orderId" element={<OrderDetails />} />
+        <Route path="/orders" element={<Orders />} />
+        <Route path="/products" element={<Products />} />
+        <Route path="/cart" element={<Cart />} />
+        <Route path="/" element={<Home />} />
       </Routes>
-    </BrowserRouter>
-  </StoreProvider>
-);
+    </Router>
+  );
+};
 
 export default App;

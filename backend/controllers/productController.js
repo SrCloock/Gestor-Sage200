@@ -1,93 +1,106 @@
-const { pool } = require('../config/sage200db');
 const AppError = require('../utils/AppError');
-const cache = require('memory-cache'); // Asegúrate de tener la dependencia 'memory-cache' instalada
-
-const CACHE_KEY = 'products';
+const { pool } = require('../config/sage200db');
+const logger = require('../utils/logger');
 
 exports.getProducts = async (req, res, next) => {
   try {
-    // Verificar caché
-    if (cache.has(CACHE_KEY)) {
-      return res.json({
-        success: true,
-        fromCache: true,
-        data: cache.get(CACHE_KEY),
-      });
-    }
-
-    // Desestructurar parámetros de la solicitud para filtrado
-    const { filterBy, searchTerm, order } = req.query; // Añadir filtros
-
-    // Generar cláusula WHERE según los filtros
-    let whereClause = '';
-    if (searchTerm) {
-      if (filterBy === 'supplier') {
-        whereClause += `AND p.RazonSocial LIKE '%${searchTerm}%' `;
-      } else if (filterBy === 'name') {
-        whereClause += `AND ap.NombreArticulo LIKE '%${searchTerm}%' `;
-      }
-    }
-
-    // Definir el orden (A-Z o Z-A)
-    let orderBy = 'ap.CodigoArticulo'; // Por defecto, por código de artículo
-    if (order === 'desc') {
-      orderBy = 'ap.CodigoArticulo DESC'; // Z-A
-    } else {
-      orderBy = 'ap.CodigoArticulo'; // A-Z por defecto
-    }
-
-    // Consulta SQL con filtro dinámico
-    const query = `
+    const { search, proveedor, sortBy, sortOrder } = req.query;
+    
+    let query = `
       SELECT 
-        ap.CodigoEmpresa,
-        ap.CodigoArticulo AS id,
-        ap.NombreArticulo AS name,
-        ap.PrecioProveedor AS price,
-        ap.CodigoProveedor,
-        p.RazonSocial AS supplier
+        ap.CodigoArticulo, a.Nombre AS NombreArticulo,
+        ap.PrecioProveedor AS Precio, p.RazonSocial AS Proveedor,
+        p.CodigoProveedor
       FROM ArticuloProveedor ap
-      INNER JOIN Proveedores p 
-        ON ap.CodigoProveedor = p.CodigoProveedor 
-        AND ap.CodigoEmpresa = p.CodigoEmpresa
-      WHERE 1 = 1 ${whereClause}  -- Condición para agregar dinámicamente filtros
-      ORDER BY ${orderBy};
+      INNER JOIN Articulos a ON ap.CodigoArticulo = a.Codigo
+      INNER JOIN Proveedores p ON ap.CodigoProveedor = p.CodigoProveedor
+      WHERE 1=1
     `;
 
-    const result = await pool.request().query(query);
+    const params = [];
 
-    if (!result.recordset || result.recordset.length === 0) {
-      return next(new AppError('No products found', 404));
+    // Filtros
+    if (search) {
+      query += ` AND a.Nombre LIKE '%' + @search + '%'`;
+      params.push({ name: 'search', value: search });
     }
 
-    // Cachear el resultado
-    cache.put(CACHE_KEY, result.recordset, 3600000); // Cache por 1 hora
+    if (proveedor) {
+      query += ` AND p.RazonSocial LIKE '%' + @proveedor + '%'`;
+      params.push({ name: 'proveedor', value: proveedor });
+    }
 
-    // Retornar resultado
-    res.json({
-      success: true,
-      data: result.recordset,
+    // Ordenación
+    const validSortFields = ['NombreArticulo', 'Precio', 'Proveedor'];
+    const validSortOrders = ['ASC', 'DESC'];
+    
+    const sortField = validSortFields.includes(sortBy) ? sortBy : 'NombreArticulo';
+    const sortDir = validSortOrders.includes(sortOrder?.toUpperCase()) ? sortOrder : 'ASC';
+
+    query += ` ORDER BY ${sortField} ${sortDir}`;
+
+    const request = pool.request();
+    params.forEach(param => {
+      request.input(param.name, param.value);
     });
+
+    const result = await request.query(query);
+
+    res.status(200).json({
+      status: 'success',
+      results: result.recordset.length,
+      data: result.recordset
+    });
+
   } catch (error) {
-    return next(new AppError(error.message, 500));
+    logger.error('Error al obtener productos:', error);
+    next(error);
   }
 };
 
 exports.getProductById = async (req, res, next) => {
-  const { id } = req.params;
   try {
-    const query = `SELECT * FROM Productos WHERE id = @id`;
+    const { id } = req.params;
 
-    const result = await pool.request().input('id', sql.Int, id).query(query);
+    const result = await pool.request()
+      .input('CodigoArticulo', id)
+      .query(`
+        SELECT 
+          a.Codigo, a.Nombre, a.Descripcion,
+          ap.PrecioProveedor AS Precio, p.RazonSocial AS Proveedor
+        FROM Articulos a
+        INNER JOIN ArticuloProveedor ap ON a.Codigo = ap.CodigoArticulo
+        INNER JOIN Proveedores p ON ap.CodigoProveedor = p.CodigoProveedor
+        WHERE a.Codigo = @CodigoArticulo
+      `);
 
-    if (!result.recordset.length) {
-      return next(new AppError('Product not found', 404));
+    if (result.recordset.length === 0) {
+      throw new AppError('Producto no encontrado', 404);
     }
 
-    res.json({
-      success: true,
-      data: result.recordset[0],
+    res.status(200).json({
+      status: 'success',
+      data: result.recordset[0]
     });
   } catch (error) {
-    return next(new AppError(error.message, 500));
+    next(error);
+  }
+};
+
+exports.getProveedores = async (req, res, next) => {
+  try {
+    const result = await pool.request()
+      .query(`
+        SELECT CodigoProveedor, RazonSocial
+        FROM Proveedores
+        ORDER BY RazonSocial
+      `);
+
+    res.status(200).json({
+      status: 'success',
+      data: result.recordset
+    });
+  } catch (error) {
+    next(error);
   }
 };

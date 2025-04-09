@@ -1,15 +1,23 @@
 const express = require('express');
-const { 
-  getProducts, 
-  getProductById 
-} = require('../controllers/productController');
-
 const router = express.Router();
+const { getPool } = require('../config/sage200db');
 
-// Obtener todos los productos o filtrados según query
-router.get('/', getProducts);
+router.get('/', async (req, res, next) => {
+  try {
+    const pool = getPool();
+    const result = await pool.request().query(`
+      SELECT 
+        AP.*, P.RazonSocial 
+      FROM ArticuloProveedor AP
+      LEFT JOIN Proveedores P 
+      ON AP.CodigoEmpresa = P.CodigoEmpresa AND AP.CodigoProveedor = P.CodigoProveedor
+      ORDER BY AP.CodigoEmpresa, AP.CodigoArticulo, AP.CodigoProveedor
+    `);
 
-// Obtener producto por ID
-router.get('/:id', getProductById);
+    res.json(result.recordset);
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;
