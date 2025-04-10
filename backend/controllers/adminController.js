@@ -1,6 +1,8 @@
 const { pool } = require('../config/sage200db');
 const AppError = require('../utils/AppError');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
 
 exports.adminLogin = async (req, res, next) => {
   const { username, password } = req.body;

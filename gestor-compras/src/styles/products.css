@@ -1,217 +1,34 @@
-/* Barra de búsqueda mejorada */
-#search-input-text {
-  font-size: 16px;
-  margin-left: 50px;
+.products-container {
+  padding: 1rem;
 }
 
-#search-input-wrapper {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  margin-top: 30px; /* Asegura un poco de espacio arriba */
-  padding-left: 30px; /* Para alinear con los filtros */
-}
-
-#search-input {
-  width: 100%;
-  max-width: 450px;
-  padding: 12px 40px 12px 20px;
-  border: 1px solid #ddd;
-  border-radius: 50px;
-  font-size: 16px;
-  background-color: #fff;
-  transition: all 0.3s ease;
-  position: relative;
-  margin-top: 30px; /* Puedes ajustar el margen superior según sea necesario */
-}
-
-#search-input:focus {
-  outline: none;
-  border-color: #007bff;
-}
-
-#search-input::placeholder {
-  color: #aaa;
-}
-
-#search-input-icon {
-  position: absolute;
-  top: 50%;
-  left: 12px;
-  transform: translateY(-50%);
-  font-size: 18px;
-  color: #007bff;
-}
-
-/* Filtros */
 .filters {
+  margin: 1rem 0;
   display: flex;
-  justify-content: center;  
-  gap: 20px; /* Espacio entre los filtros */
-  margin: 30px 0;
-  padding-left: 30px; /* Para que no se quede pegado al borde izquierdo */
+  gap: 1rem;
 }
 
-.filter-group {
-  display: flex;
-  align-items: center;
+.filters input {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
 }
 
-.filters label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  margin-right: 10px; /* Espacio entre el label y el desplegable */
-}
-
-.filters select,
-.filters button {
-  padding: 8px 15px;
-  font-size: 14px;
-  border-radius: 30px;
-  border: 1px solid #ddd;
-  background-color: #fff;
-  color: #333;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.3s ease;
-}
-
-.filters select:focus,
-.filters button:focus {
-  outline: none;
-  border-color: #007bff;
-}
-
-.filters select:hover,
-.filters button:hover {
-  background-color: #007bff;
-  color: #fff;
-  transform: scale(1.05);
-}
-
-.filters button {
-  background-color: #28a745;
-  color: white;
-  border: none;
-}
-
-.filters button:hover {
-  background-color: #218838;
-}
-
-.filters select {
-  width: 200px;
-  font-weight: bold;
-}
-
-/* Productos */
-.product-list {
-  margin-top: 40px;
-  width: 100%;
-  padding: 0 30px; /* Márgenes de 30px a izquierda y derecha */
-  box-sizing: border-box; /* Asegura que el padding no afecte al tamaño total */
-}
-
-.grid-container {
+.product-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 30px;
-}
-
-.product-card {
-  background-color: #fff;
-  border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 20px;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  text-align: center;
-  height: 100%;
-}
-
-.product-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-}
-
-.product-card img {
-  max-height: 250px;
-  width: 100%;
-  object-fit: contain;
-  margin-bottom: 15px;
-  border-radius: 8px;
-}
-
-.product-card h3 {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 15px 0;
-  color: #333;
-}
-
-.product-card p {
-  font-size: 14px;
-  color: #888;
-}
-
-.product-card .price {
-  font-size: 18px;
-  font-weight: bold;
-  color: #28a745;
-  margin-top: 10px;
-}
-
-.product-card button {
-  background-color: #007bff;
-  color: #fff;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 30px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.3s ease;
-  margin-top: 15px;
-}
-
-.product-card button:hover {
-  background-color: #0056b3;
-}
-
-/* Mensajes */
-.error {
-  color: red;
-  font-weight: bold;
-  font-size: 16px;
-  text-align: center;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
 }
 
 .pagination {
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-top: 30px;
+  gap: 1rem;
+  margin-top: 1rem;
 }
 
 .pagination button {
-  padding: 12px 20px;
-  background-color: #007bff;
-  color: #fff;
-  border: none;
-  border-radius: 50px;
+  padding: 0.5rem 1rem;
   cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.3s ease;
-  margin: 0 10px;
-}
-
-.pagination button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-
-.pagination span {
-  font-size: 16px;
-  color: #333;
 }

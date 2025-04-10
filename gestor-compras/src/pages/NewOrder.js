@@ -1,76 +1,51 @@
-import React, { useState } from 'react';
-import { useStore } from '../context';
+import React, { useContext } from 'react';
+import { CartContext } from '../context/CartContext';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
 import '../styles/newOrder.css';
 
 const NewOrder = () => {
-  const { user, cart, clearCart, setError } = useStore();
+  const { cartItems, clearCart } = useContext(CartContext);
   const navigate = useNavigate();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   const handleSubmit = async () => {
-    if (!user || cart.length === 0) return;
-    
+    const token = localStorage.getItem('token');
+    const { id: CodigoCliente } = JSON.parse(atob(token.split('.')[1]));
+
     try {
-      setIsSubmitting(true);
-      setError(null);
-      
-      const orderData = {
-        CodigoCliente: user.CodigoCliente,
-        items: cart.map(item => ({
-          id: item.id,
-          quantity: item.quantity,
-          price: item.price
-        }))
-      };
-      
-      const response = await api.createOrder(orderData);
-      
-      if (response.data) {
-        clearCart();
-        navigate(`/order-details/${response.data.NumeroPedido}`);
-      }
-    } catch (error) {
-      setError(error.response?.data?.message || 'Error al crear el pedido');
-    } finally {
-      setIsSubmitting(false);
+      await axios.post(
+        '/api/orders',
+        {
+          CodigoCliente,
+          items: cartItems.map(item => ({
+            CodigoArticulo: item.id,
+            Cantidad: item.quantity,
+            Precio: item.price
+          })),
+          Estado: 'Pendiente'
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      clearCart();
+      navigate('/pedidos');
+    } catch (err) {
+      alert('Error al crear el pedido');
     }
   };
 
   return (
     <div className="new-order-container">
-      <h2>Confirmar Pedido</h2>
-      
-      <div className="order-summary">
-        <h3>Resumen del Pedido</h3>
-        {cart.length === 0 ? (
-          <p>No hay productos en el carrito</p>
-        ) : (
-          <>
-            <ul>
-              {cart.map(item => (
-                <li key={item.id}>
-                  {item.name} - {item.quantity} x {item.price.toFixed(2)}€
-                </li>
-              ))}
-            </ul>
-            
-            <div className="total-section">
-              <strong>Total:</strong> 
-              {cart.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}€
-            </div>
-          </>
-        )}
-        
-        <button 
-          onClick={handleSubmit} 
-          disabled={isSubmitting || cart.length === 0}
-          className="submit-button"
-        >
-          {isSubmitting ? 'Procesando...' : 'Confirmar Pedido'}
-        </button>
+      <h2>Resumen del pedido</h2>
+      <div className="order-items">
+        {cartItems.map(item => (
+          <div key={item.id} className="order-item">
+            <p>{item.name} - {item.quantity} x {item.price.toFixed(2)}€</p>
+          </div>
+        ))}
       </div>
+      <h3>Total: {total.toFixed(2)}€</h3>
+      <button onClick={handleSubmit}>Confirmar pedido</button>
     </div>
   );
 };

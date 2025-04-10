@@ -1,95 +1,51 @@
 import React, { useState } from 'react';
-import { useStore } from '../context';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import '../styles/login.css';
 
 const Login = () => {
-  const { login } = useStore();
+  const [form, setForm] = useState({ UsuarioLogicNet: '', ContraseñaLogicNet: '', CodigoCliente: '' });
   const navigate = useNavigate();
-  const [credentials, setCredentials] = useState({
-    UsuarioLogicNet: '',
-    password: '',
-    CodigoCliente: ''
-  });
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setCredentials(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError('');
-    
     try {
-      const success = await login(credentials);
-      if (success) {
-        navigate('/');
-      } else {
-        setError('Credenciales incorrectas');
-      }
+      const res = await axios.post('/api/auth/login', form);
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+      navigate('/productos');
     } catch (err) {
-      setError('Error al iniciar sesión');
-    } finally {
-      setIsLoading(false);
+      alert('Credenciales incorrectas');
     }
   };
 
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <h2>Iniciar Sesión</h2>
-        
-        {error && <div className="error-message">{error}</div>}
-        
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="CodigoCliente">Código de Cliente</label>
-            <input
-              type="text"
-              id="CodigoCliente"
-              name="CodigoCliente"
-              value={credentials.CodigoCliente}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="UsuarioLogicNet">Usuario</label>
-            <input
-              type="text"
-              id="UsuarioLogicNet"
-              name="UsuarioLogicNet"
-              value={credentials.UsuarioLogicNet}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="password">Contraseña</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={credentials.password}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          
-          <button type="submit" disabled={isLoading}>
-            {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-          </button>
-        </form>
-      </div>
+    <div>
+      <h2>Login</h2>
+      <form onSubmit={handleSubmit}>
+        <input
+          name="UsuarioLogicNet"
+          value={form.UsuarioLogicNet}
+          onChange={(e) => setForm({ ...form, UsuarioLogicNet: e.target.value })}
+          placeholder="Usuario"
+          required
+        />
+        <input
+          name="ContraseñaLogicNet"
+          type="password"
+          value={form.ContraseñaLogicNet}
+          onChange={(e) => setForm({ ...form, ContraseñaLogicNet: e.target.value })}
+          placeholder="Contraseña"
+          required
+        />
+        <input
+          name="CodigoCliente"
+          value={form.CodigoCliente}
+          onChange={(e) => setForm({ ...form, CodigoCliente: e.target.value })}
+          placeholder="Código Cliente"
+          required
+        />
+        <button type="submit">Entrar</button>
+      </form>
     </div>
   );
 };

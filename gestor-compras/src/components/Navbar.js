@@ -1,50 +1,29 @@
-import { useContext } from "react";
-import { StoreContext } from "../context";
-import { NavLink } from "react-router-dom";
-import "../styles/navbar.css";
+import React from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import '../styles/navbar.css';
 
 const Navbar = () => {
-  const { cart } = useContext(StoreContext);
-  const totalItems = cart?.reduce((acc, item) => acc + item.quantity, 0) || 0;
+  const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem('user'));
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login');
+  };
 
   return (
     <nav className="navbar">
-      <div className="container">
-        {/* Logo o Nombre */}
-        <NavLink to="/" className="logo">
-          Sage200
-        </NavLink>
-
-        {/* Menú de Navegación */}
-        <ul className="navbar-links">
-          <li>
-            <NavLink to="/" className={({ isActive }) => (isActive ? "active" : "")}>
-              Inicio
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/products" className={({ isActive }) => (isActive ? "active" : "")}>
-              Productos
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/orders" className={({ isActive }) => (isActive ? "active" : "")}>
-              Historial
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/cart" className={({ isActive }) => (isActive ? "active cart-link" : "cart-link")}>
-              Carrito 
-              {totalItems > 0 && <span className="cart-badge">{totalItems}</span>}
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/admin" className={({ isActive }) => (isActive ? "active" : "")}>
-              Administración
-            </NavLink>
-          </li>
-        </ul>
-      </div>
+      <Link to="/">Inicio</Link>
+      <Link to="/productos">Productos</Link>
+      <Link to="/carrito">Carrito</Link>
+      <Link to="/pedidos">Mis Pedidos</Link>
+      {user && (
+        <div className="user-section">
+          <span className="user-name">{user.NombreCompleto}</span>
+          <button onClick={handleLogout}>Cerrar sesión</button>
+        </div>
+      )}
     </nav>
   );
 };

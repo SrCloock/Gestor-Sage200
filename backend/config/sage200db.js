@@ -24,7 +24,7 @@ const pool = new ConnectionPool(config);
 let connected = false;
 
 pool.on('error', err => {
-  console.error('❌ Error permanente en el pool:', err);
+  console.error('❌ Error en el pool de conexiones:', err);
 });
 
 const connect = async () => {
@@ -34,13 +34,7 @@ const connect = async () => {
       connected = true;
       console.log('✅ Conexión a Sage200 establecida');
     } catch (err) {
-      console.error('❌ Fallo de conexión a Sage200:', {
-        message: err.message,
-        server: config.server,
-        database: config.database,
-        user: config.user,
-        suggestion: 'Verifique: 1) Sage200 en ejecución 2) Usuario/contraseña 3) Servidor accesible'
-      });
+      console.error('❌ Fallo de conexión a Sage200:', err.message);
       throw err;
     }
   }

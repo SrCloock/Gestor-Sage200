@@ -1,33 +1,25 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import { StoreProvider } from './context';
-import Home from './pages/Home';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { CartProvider } from './context/CartContext';
 import Login from './pages/Login';
-import Admin from './pages/Admin';
-import NewOrder from './pages/NewOrder';
-import OrderDetails from './pages/OrderDetails';
-import Orders from './pages/Orders';
 import Products from './pages/Products';
 import Cart from './pages/Cart';
+import Orders from './pages/Orders';
 
-const App = () => {
+function App() {
   return (
-    <StoreProvider>
+    <CartProvider>
       <Router>
         <Routes>
-          <Route path="/home" element={<Home />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/new-order" element={<NewOrder />} />
-          <Route path="/order/:orderId" element={<OrderDetails />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/" element={<Home />} />
+          <Route path="/productos" element={<Products />} />
+          <Route path="/carrito" element={<Cart />} />
+          <Route path="/pedidos" element={<Orders />} />
         </Routes>
       </Router>
-    </StoreProvider>
+    </CartProvider>
   );
-};
+}
 
 export default App;
