@@ -1,64 +1,95 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // Reemplazamos useHistory por useNavigate
-import { loginUser } from '../services/api';
+import { useStore } from '../context';
+import { useNavigate } from 'react-router-dom';
+import '../styles/login.css';
 
 const Login = () => {
+  const { login } = useStore();
+  const navigate = useNavigate();
   const [credentials, setCredentials] = useState({
-    usuarioLogicNet: '',
+    UsuarioLogicNet: '',
     password: '',
-    codigoCliente: '',
+    CodigoCliente: ''
   });
-
-  const navigate = useNavigate(); // Reemplazamos useHistory por useNavigate
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
-    setCredentials({ ...credentials, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setCredentials(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    
     try {
-      const user = await loginUser(credentials);
-      sessionStorage.setItem('user', JSON.stringify(user));
-      navigate('/home'); // Usamos navigate para redirigir
-    } catch (error) {
-      alert('Credenciales incorrectas');
+      const success = await login(credentials);
+      if (success) {
+        navigate('/');
+      } else {
+        setError('Credenciales incorrectas');
+      }
+    } catch (err) {
+      setError('Error al iniciar sesión');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div>
-      <h2>Iniciar Sesión</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>Usuario:</label>
-          <input
-            type="text"
-            name="usuarioLogicNet"
-            value={credentials.usuarioLogicNet}
-            onChange={handleChange}
-          />
-        </div>
-        <div>
-          <label>Contraseña:</label>
-          <input
-            type="password"
-            name="password"
-            value={credentials.password}
-            onChange={handleChange}
-          />
-        </div>
-        <div>
-          <label>Código Cliente:</label>
-          <input
-            type="text"
-            name="codigoCliente"
-            value={credentials.codigoCliente}
-            onChange={handleChange}
-          />
-        </div>
-        <button type="submit">Iniciar Sesión</button>
-      </form>
+    <div className="login-container">
+      <div className="login-card">
+        <h2>Iniciar Sesión</h2>
+        
+        {error && <div className="error-message">{error}</div>}
+        
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="CodigoCliente">Código de Cliente</label>
+            <input
+              type="text"
+              id="CodigoCliente"
+              name="CodigoCliente"
+              value={credentials.CodigoCliente}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          
+          <div className="form-group">
+            <label htmlFor="UsuarioLogicNet">Usuario</label>
+            <input
+              type="text"
+              id="UsuarioLogicNet"
+              name="UsuarioLogicNet"
+              value={credentials.UsuarioLogicNet}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          
+          <div className="form-group">
+            <label htmlFor="password">Contraseña</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              value={credentials.password}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          
+          <button type="submit" disabled={isLoading}>
+            {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 };

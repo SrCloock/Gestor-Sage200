@@ -1,0 +1,76 @@
+.new-order-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Arial', sans-serif;
+  }
+  
+  .order-summary {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .order-summary h3 {
+    margin-top: 0;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+  }
+  
+  .order-summary ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 20px 0;
+  }
+  
+  .order-summary li {
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .total-section {
+    font-size: 18px;
+    text-align: right;
+    margin: 20px 0;
+    padding-top: 10px;
+    border-top: 1px solid #ddd;
+  }
+  
+  .submit-button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    width: 100%;
+    transition: background-color 0.3s;
+  }
+  
+  .submit-button:hover {
+    background-color: #45a049;
+  }
+  
+  .submit-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
+  
+  .loading-message {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+  }
+  
+  .error-message {
+    color: #d32f2f;
+    padding: 10px;
+    background-color: #fde0e0;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    text-align: center;
+  }

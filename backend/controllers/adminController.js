@@ -1,77 +1,108 @@
-const AppError = require('../utils/AppError');
 const { pool } = require('../config/sage200db');
-const logger = require('../utils/logger');
+const AppError = require('../utils/AppError');
 const bcrypt = require('bcryptjs');
 
+exports.adminLogin = async (req, res, next) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return next(new AppError('Usuario y contraseña son requeridos', 400));
+  }
+
+  // Credenciales hardcodeadas (solo para desarrollo)
+  const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+
+  if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
+    return next(new AppError('Credenciales incorrectas', 401));
+  }
+
+  const token = jwt.sign(
+    { id: 0, role: 'admin' },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN }
+  );
+
+  res.status(200).json({
+    status: 'success',
+    token
+  });
+};
+
 exports.createUser = async (req, res, next) => {
+  const { UsuarioLogicNet, ContraseñaLogicNet, RazonSocial, Nombre } = req.body;
+
+  if (!UsuarioLogicNet || !ContraseñaLogicNet || !RazonSocial || !Nombre) {
+    return next(new AppError('Todos los campos son requeridos', 400));
+  }
+
   try {
-    const { usuarioLogicNet, contrasenaLogicNet, codigoCliente, codigoEmpresa, nombre, razonSocial } = req.body;
+    // 1. Obtener último código de cliente
+    const lastCodeResult = await pool.request()
+      .query(`
+        SELECT TOP 1 CodigoCliente 
+        FROM CLIENTES 
+        WHERE CODIGOCATEGORIACLIENTE_='EMP' 
+        ORDER BY CodigoCliente DESC
+      `);
 
-    // Validación de campos requeridos
-    if (!usuarioLogicNet || !contrasenaLogicNet || !codigoCliente || !codigoEmpresa) {
-      throw new AppError('Todos los campos son obligatorios', 400);
-    }
+    const newCodigoCliente = (lastCodeResult.recordset[0]?.CodigoCliente || 0) + 1;
 
-    // Verificar si el usuario ya existe
-    const userExists = await pool.request()
-      .input('UsuarioLogicNet', usuarioLogicNet)
-      .query('SELECT 1 FROM CLIENTES WHERE UsuarioLogicNet = @UsuarioLogicNet');
+    // 2. Hashear contraseña
+    const hashedPassword = await bcrypt.hash(ContraseñaLogicNet, 12);
 
-    if (userExists.recordset.length > 0) {
-      throw new AppError('El usuario ya existe', 409);
-    }
-
-    // Hash de la contraseña
-    const hashedPassword = await bcrypt.hash(contrasenaLogicNet, 12);
-
-    // Crear el usuario
+    // 3. Crear nuevo usuario
     await pool.request()
-      .input('UsuarioLogicNet', usuarioLogicNet)
+      .input('CodigoCliente', newCodigoCliente)
+      .input('UsuarioLogicNet', UsuarioLogicNet)
       .input('ContraseñaLogicNet', hashedPassword)
-      .input('CodigoCliente', codigoCliente)
-      .input('CodigoEmpresa', codigoEmpresa)
-      .input('Nombre', nombre)
-      .input('RazonSocial', razonSocial)
-      .input('CodigoCategoriaCliente', 'EMP')
+      .input('RazonSocial', RazonSocial)
+      .input('Nombre', Nombre)
+      .input('Categoria', 'EMP')
       .query(`
         INSERT INTO CLIENTES (
-          UsuarioLogicNet, ContraseñaLogicNet, CodigoCliente, 
-          CodigoEmpresa, Nombre, RazonSocial, CODIGOCATEGORIACLIENTE_
+          CodigoCliente, UsuarioLogicNet, ContraseñaLogicNet,
+          RazonSocial, Nombre, CODIGOCATEGORIACLIENTE_
         )
         VALUES (
-          @UsuarioLogicNet, @ContraseñaLogicNet, @CodigoCliente,
-          @CodigoEmpresa, @Nombre, @RazonSocial, @CodigoCategoriaCliente
+          @CodigoCliente, @UsuarioLogicNet, @ContraseñaLogicNet,
+          @RazonSocial, @Nombre, @Categoria
         )
       `);
 
     res.status(201).json({
       status: 'success',
-      message: 'Usuario creado correctamente'
+      data: {
+        CodigoCliente: newCodigoCliente,
+        UsuarioLogicNet,
+        RazonSocial,
+        Nombre
+      }
     });
-
   } catch (error) {
-    logger.error('Error en createUser:', error);
-    next(error);
+    next(new AppError('Error al crear el usuario', 500));
   }
 };
 
-exports.getUsers = async (req, res, next) => {
+exports.getLastClientCode = async (req, res, next) => {
   try {
     const result = await pool.request()
       .query(`
-        SELECT 
-          UsuarioLogicNet, CodigoCliente, CodigoEmpresa,
-          Nombre, RazonSocial
-        FROM CLIENTES
-        WHERE CODIGOCATEGORIACLIENTE_ = 'EMP'
-        ORDER BY CodigoEmpresa, CodigoCliente
+        SELECT TOP 1 CodigoCliente 
+        FROM CLIENTES 
+        WHERE CODIGOCATEGORIACLIENTE_='EMP' 
+        ORDER BY CodigoCliente DESC
       `);
 
-    res.status(200).json({
+    const lastCode = result.recordset[0]?.CodigoCliente || 0;
+
+    res.json({
       status: 'success',
-      data: result.recordset
+      data: {
+        lastCode
+      }
     });
   } catch (error) {
-    next(error);
+    next(new AppError('Error al obtener el último código', 500));
   }
 };

@@ -1,35 +1,88 @@
 import axios from 'axios';
+import { getToken } from '../utils/auth';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
-export const loginUser = async (credentials) => {
-  const response = await axios.post(`${API_URL}/auth/login`, credentials);
-  return response.data;
+const api = axios.create({
+  baseURL: API_URL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+// Interceptor para añadir token a las peticiones
+api.interceptors.request.use(config => {
+  const token = getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+}, error => {
+  return Promise.reject(error);
+});
+
+// Interceptor para manejar errores globales
+api.interceptors.response.use(response => {
+  return response;
+}, error => {
+  if (error.response?.status === 401) {
+    // Manejar logout si el token es inválido
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+  }
+  return Promise.reject(error);
+});
+
+// ========== AUTENTICACIÓN ==========
+export const loginUser = (credentials) => {
+  return api.post('/auth/login', credentials);
 };
 
-export const createUser = async (userData) => {
-  const response = await axios.post(`${API_URL}/admin`, userData);
-  return response.data;
+export const getProfile = () => {
+  return api.get('/auth/me');
 };
 
-export const getOrders = async () => {
-  const response = await axios.get(`${API_URL}/orders`);
-  return response.data;
+export const adminLogin = (credentials) => {
+  return api.post('/admin/login', credentials);
 };
 
-export const createOrder = async (orderData) => {
-  const response = await axios.post(`${API_URL}/orders`, orderData);
-  return response.data;
+// ========== PRODUCTOS ==========
+export const getProducts = () => {
+  return api.get('/products');
 };
 
-export const getOrderDetails = async (orderId) => {
-  const response = await axios.get(`${API_URL}/orders/${orderId}`);
-  return response.data;
+export const searchProducts = (filters) => {
+  return api.get('/products/search', { params: filters });
 };
 
-export const getProducts = async (search = '') => {
-  const response = await axios.get(`${API_URL}/products`, {
-    params: { search },
+export const getProductById = (id) => {
+  return api.get(`/products/${id}`);
+};
+
+// ========== PEDIDOS ==========
+export const createOrder = (orderData) => {
+  return api.post('/orders', orderData);
+};
+
+export const getOrders = (CodigoCliente) => {
+  return api.get(`/orders/${CodigoCliente}`);
+};
+
+export const getOrderDetail = (CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido) => {
+  return api.get('/orders/detail', {
+    params: { CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido }
   });
-  return response.data;
 };
+
+// ========== ADMINISTRACIÓN ==========
+export const createUser = (userData) => {
+  return api.post('/admin/users', userData);
+};
+
+export const getLastClientCode = () => {
+  return api.get('/admin/last-client-code');
+};
+
+export default api;

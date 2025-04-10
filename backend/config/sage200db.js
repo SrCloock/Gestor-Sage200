@@ -1,5 +1,5 @@
 const { ConnectionPool } = require('mssql');
-const logger = require('../utils/logger');
+require('dotenv').config();
 
 const config = {
   server: process.env.SAGE200_SERVER,
@@ -7,18 +7,24 @@ const config = {
   user: process.env.SAGE200_USER,
   password: process.env.SAGE200_PASSWORD,
   options: {
-    encrypt: true,
-    trustServerCertificate: false,
+    encrypt: false,
+    trustServerCertificate: true,
     appName: 'GestorComprasWeb',
     connectTimeout: 30000,
-  },
+    requestTimeout: 30000,
+    pool: {
+      max: 10,
+      min: 0,
+      idleTimeoutMillis: 30000
+    }
+  }
 };
 
 const pool = new ConnectionPool(config);
 let connected = false;
 
 pool.on('error', err => {
-  logger.error('❌ Error en el pool de conexiones Sage200:', err);
+  console.error('❌ Error permanente en el pool:', err);
 });
 
 const connect = async () => {
@@ -26,13 +32,14 @@ const connect = async () => {
     try {
       await pool.connect();
       connected = true;
-      logger.info('✅ Conexión a Sage200 establecida');
+      console.log('✅ Conexión a Sage200 establecida');
     } catch (err) {
-      logger.error('❌ Error al conectar a Sage200:', {
+      console.error('❌ Fallo de conexión a Sage200:', {
         message: err.message,
         server: config.server,
         database: config.database,
-        user: config.user
+        user: config.user,
+        suggestion: 'Verifique: 1) Sage200 en ejecución 2) Usuario/contraseña 3) Servidor accesible'
       });
       throw err;
     }
@@ -41,7 +48,7 @@ const connect = async () => {
 };
 
 const getPool = () => {
-  if (!connected) throw new Error('Pool no inicializado. Llama a connect() primero.');
+  if (!connected) throw new Error('❌ Conexión no inicializada. Ejecuta connect() primero.');
   return pool;
 };
 

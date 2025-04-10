@@ -1,43 +1,76 @@
 import React, { useState } from 'react';
-import { createOrder } from '../services/api';
+import { useStore } from '../context';
+import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
+import '../styles/newOrder.css';
 
 const NewOrder = () => {
-  const [orderData, setOrderData] = useState({
-    codigoProveedor: '',
-    productos: [],
-    total: 0,
-  });
+  const { user, cart, clearCart, setError } = useStore();
+  const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleInputChange = (e) => {
-    setOrderData({ ...orderData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
+    if (!user || cart.length === 0) return;
+    
     try {
-      await createOrder(orderData);
-      alert('Pedido creado con éxito');
+      setIsSubmitting(true);
+      setError(null);
+      
+      const orderData = {
+        CodigoCliente: user.CodigoCliente,
+        items: cart.map(item => ({
+          id: item.id,
+          quantity: item.quantity,
+          price: item.price
+        }))
+      };
+      
+      const response = await api.createOrder(orderData);
+      
+      if (response.data) {
+        clearCart();
+        navigate(`/order-details/${response.data.NumeroPedido}`);
+      }
     } catch (error) {
-      alert('Error al crear el pedido');
+      setError(error.response?.data?.message || 'Error al crear el pedido');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div>
-      <h2>Nuevo Pedido</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>Código Proveedor:</label>
-          <input
-            type="text"
-            name="codigoProveedor"
-            value={orderData.codigoProveedor}
-            onChange={handleInputChange}
-          />
-        </div>
-        {/* Aquí puedes agregar más campos como productos, cantidades, etc. */}
-        <button type="submit">Crear Pedido</button>
-      </form>
+    <div className="new-order-container">
+      <h2>Confirmar Pedido</h2>
+      
+      <div className="order-summary">
+        <h3>Resumen del Pedido</h3>
+        {cart.length === 0 ? (
+          <p>No hay productos en el carrito</p>
+        ) : (
+          <>
+            <ul>
+              {cart.map(item => (
+                <li key={item.id}>
+                  {item.name} - {item.quantity} x {item.price.toFixed(2)}€
+                </li>
+              ))}
+            </ul>
+            
+            <div className="total-section">
+              <strong>Total:</strong> 
+              {cart.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}€
+            </div>
+          </>
+        )}
+        
+        <button 
+          onClick={handleSubmit} 
+          disabled={isSubmitting || cart.length === 0}
+          className="submit-button"
+        >
+          {isSubmitting ? 'Procesando...' : 'Confirmar Pedido'}
+        </button>
+      </div>
     </div>
   );
 };

@@ -1,106 +1,129 @@
-const AppError = require('../utils/AppError');
 const { pool } = require('../config/sage200db');
-const logger = require('../utils/logger');
+const AppError = require('../utils/AppError');
+const cache = require('../utils/cache');
+
+const CACHE_KEY = 'products';
+const CACHE_TTL = 3600; // 1 hora
 
 exports.getProducts = async (req, res, next) => {
   try {
-    const { search, proveedor, sortBy, sortOrder } = req.query;
-    
+    // Verificar caché
+    if (cache.has(CACHE_KEY)) {
+      return res.json({
+        success: true,
+        fromCache: true,
+        data: cache.get(CACHE_KEY),
+      });
+    }
+
+    const query = `
+      SELECT 
+        ap.CodigoEmpresa,
+        ap.CodigoArticulo AS id,
+        ap.NombreArticulo AS name,
+        ap.PrecioProveedor AS price,
+        ap.CodigoProveedor AS supplierId,
+        p.RazonSocial AS supplier
+      FROM ArticuloProveedor ap
+      INNER JOIN Proveedores p 
+        ON ap.CodigoProveedor = p.CodigoProveedor 
+        AND ap.CodigoEmpresa = p.CodigoEmpresa
+      ORDER BY ap.NombreArticulo ASC
+    `;
+
+    const result = await pool.request().query(query);
+
+    if (!result.recordset || result.recordset.length === 0) {
+      return next(new AppError('No se encontraron productos en el catálogo', 404));
+    }
+
+    // Guardar en caché
+    cache.set(CACHE_KEY, result.recordset, CACHE_TTL);
+
+    res.json({
+      success: true,
+      fromCache: false,
+      data: result.recordset,
+      count: result.recordset.length,
+    });
+  } catch (err) {
+    next(new AppError('Error al obtener productos', 500));
+  }
+};
+
+exports.getFilteredProducts = async (req, res, next) => {
+  try {
+    const { nombre, proveedor, orden } = req.query;
     let query = `
       SELECT 
-        ap.CodigoArticulo, a.Nombre AS NombreArticulo,
-        ap.PrecioProveedor AS Precio, p.RazonSocial AS Proveedor,
-        p.CodigoProveedor
+        ap.CodigoArticulo AS id,
+        ap.NombreArticulo AS name,
+        ap.PrecioProveedor AS price,
+        p.RazonSocial AS supplier,
+        p.CodigoProveedor AS supplierId
       FROM ArticuloProveedor ap
-      INNER JOIN Articulos a ON ap.CodigoArticulo = a.Codigo
-      INNER JOIN Proveedores p ON ap.CodigoProveedor = p.CodigoProveedor
+      INNER JOIN Proveedores p 
+        ON ap.CodigoProveedor = p.CodigoProveedor
       WHERE 1=1
     `;
 
-    const params = [];
+    const request = pool.request();
 
-    // Filtros
-    if (search) {
-      query += ` AND a.Nombre LIKE '%' + @search + '%'`;
-      params.push({ name: 'search', value: search });
+    if (nombre) {
+      query += ' AND ap.NombreArticulo LIKE @nombre';
+      request.input('nombre', `%${nombre}%`);
     }
 
     if (proveedor) {
-      query += ` AND p.RazonSocial LIKE '%' + @proveedor + '%'`;
-      params.push({ name: 'proveedor', value: proveedor });
+      query += ' AND p.RazonSocial LIKE @proveedor';
+      request.input('proveedor', `%${proveedor}%`);
     }
 
-    // Ordenación
-    const validSortFields = ['NombreArticulo', 'Precio', 'Proveedor'];
-    const validSortOrders = ['ASC', 'DESC'];
-    
-    const sortField = validSortFields.includes(sortBy) ? sortBy : 'NombreArticulo';
-    const sortDir = validSortOrders.includes(sortOrder?.toUpperCase()) ? sortOrder : 'ASC';
-
-    query += ` ORDER BY ${sortField} ${sortDir}`;
-
-    const request = pool.request();
-    params.forEach(param => {
-      request.input(param.name, param.value);
-    });
+    query += orden === 'desc' 
+      ? ' ORDER BY ap.NombreArticulo DESC' 
+      : ' ORDER BY ap.NombreArticulo ASC';
 
     const result = await request.query(query);
 
-    res.status(200).json({
-      status: 'success',
-      results: result.recordset.length,
-      data: result.recordset
+    res.json({
+      success: true,
+      data: result.recordset,
+      count: result.recordset.length
     });
-
   } catch (error) {
-    logger.error('Error al obtener productos:', error);
-    next(error);
+    next(new AppError('Error al filtrar productos', 500));
   }
 };
 
 exports.getProductById = async (req, res, next) => {
   try {
     const { id } = req.params;
-
+    
     const result = await pool.request()
-      .input('CodigoArticulo', id)
+      .input('id', id)
       .query(`
         SELECT 
-          a.Codigo, a.Nombre, a.Descripcion,
-          ap.PrecioProveedor AS Precio, p.RazonSocial AS Proveedor
-        FROM Articulos a
-        INNER JOIN ArticuloProveedor ap ON a.Codigo = ap.CodigoArticulo
-        INNER JOIN Proveedores p ON ap.CodigoProveedor = p.CodigoProveedor
-        WHERE a.Codigo = @CodigoArticulo
+          ap.CodigoArticulo AS id,
+          ap.NombreArticulo AS name,
+          ap.PrecioProveedor AS price,
+          ap.Descripcion AS description,
+          p.RazonSocial AS supplier,
+          p.CodigoProveedor AS supplierId
+        FROM ArticuloProveedor ap
+        INNER JOIN Proveedores p 
+          ON ap.CodigoProveedor = p.CodigoProveedor
+        WHERE ap.CodigoArticulo = @id
       `);
 
     if (result.recordset.length === 0) {
-      throw new AppError('Producto no encontrado', 404);
+      return next(new AppError('Producto no encontrado', 404));
     }
 
-    res.status(200).json({
-      status: 'success',
+    res.json({
+      success: true,
       data: result.recordset[0]
     });
   } catch (error) {
-    next(error);
-  }
-};
-
-exports.getProveedores = async (req, res, next) => {
-  try {
-    const result = await pool.request()
-      .query(`
-        SELECT CodigoProveedor, RazonSocial
-        FROM Proveedores
-        ORDER BY RazonSocial
-      `);
-
-    res.status(200).json({
-      status: 'success',
-      data: result.recordset
-    });
-  } catch (error) {
-    next(error);
+    next(new AppError('Error al obtener el producto', 500));
   }
 };
