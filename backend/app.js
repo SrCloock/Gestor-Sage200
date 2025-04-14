@@ -1,26 +1,22 @@
 const express = require('express');
-const dotenv = require('dotenv');
-const cors = require('cors');
 const { connect } = require('./config/sage200db');
-const routes = require('./routes/index');
-const errorMiddleware = require('./middlewares/errorMiddleware');
-
-dotenv.config();
-
 const app = express();
-app.use(cors());
+
+// Middlewares
 app.use(express.json());
 
-app.use('/api', routes);
-app.use(errorMiddleware);
+// Conexión a la base de datos
+connect();
+
+// Rutas
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/orders', require('./routes/orders'));
+app.use('/api/products', require('./routes/products'));
+
+// Manejo de errores
+app.use(require('./middlewares/errorHandler'));
 
 const PORT = process.env.PORT || 5000;
-connect()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`🚀 Servidor backend corriendo en http://localhost:${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error('❌ Error al iniciar el backend:', err);
-  });
+app.listen(PORT, () => {
+  console.log(`Servidor backend corriendo en http://localhost:${PORT}`);
+});

@@ -1,35 +1,26 @@
 const { pool } = require('../config/sage200db');
-const AppError = require('../utils/AppError');
-const sql = require('mssql');
 
-exports.createOrder = async (req, res, next) => {
+exports.createOrder = async (req, res) => {
   const { CodigoCliente, items } = req.body;
 
-  if (!CodigoCliente || !items || items.length === 0) {
-    return next(new AppError('Datos incompletos', 400));
-  }
-
-  const transaction = new sql.Transaction(await pool.connect());
   try {
-    await transaction.begin();
-
     // 1. Obtener datos del cliente
-    const clientResult = await new sql.Request(transaction)
+    const clientResult = await pool.request()
       .input('CodigoCliente', CodigoCliente)
       .query(`
-        SELECT CodigoEmpresa, RazonSocial, CifEuropeo, Nombre
-        FROM CLIENTES
+        SELECT CodigoEmpresa, RazonSocial 
+        FROM CLIENTES 
         WHERE CodigoCliente = @CodigoCliente
       `);
 
     if (clientResult.recordset.length === 0) {
-      throw new AppError('Cliente no encontrado', 404));
+      return res.status(404).json({ error: 'Cliente no encontrado' });
     }
 
-    const { CodigoEmpresa, RazonSocial, CifEuropeo, Nombre } = clientResult.recordset[0];
+    const { CodigoEmpresa, RazonSocial } = clientResult.recordset[0];
 
     // 2. Generar número de pedido
-    const orderNumberResult = await new sql.Request(transaction)
+    const orderNumberResult = await pool.request()
       .input('CodigoEmpresa', CodigoEmpresa)
       .query(`
         SELECT ISNULL(MAX(NumeroPedido), 0) + 1 AS NuevoNumero
@@ -38,36 +29,29 @@ exports.createOrder = async (req, res, next) => {
       `);
 
     const NumeroPedido = orderNumberResult.recordset[0].NuevoNumero;
-    const EjercicioPedido = new Date().getFullYear();
-    const SeriePedido = 'WEB';
+    const FechaPedido = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
     // 3. Insertar cabecera
-    await new sql.Request(transaction)
+    await pool.request()
       .input('CodigoEmpresa', CodigoEmpresa)
-      .input('EjercicioPedido', EjercicioPedido)
-      .input('SeriePedido', SeriePedido)
       .input('NumeroPedido', NumeroPedido)
       .input('CodigoCliente', CodigoCliente)
       .input('RazonSocial', RazonSocial)
-      .input('CifEuropeo', CifEuropeo)
-      .input('Nombre', Nombre)
-      .input('FechaPedido', new Date())
+      .input('FechaPedido', FechaPedido)
       .query(`
         INSERT INTO CabeceraPedidoCliente (
-          CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido,
-          CodigoCliente, RazonSocial, CifEuropeo, Nombre, FechaPedido
+          CodigoEmpresa, NumeroPedido, CodigoCliente, 
+          RazonSocial, FechaPedido, Estado
         ) VALUES (
-          @CodigoEmpresa, @EjercicioPedido, @SeriePedido, @NumeroPedido,
-          @CodigoCliente, @RazonSocial, @CifEuropeo, @Nombre, @FechaPedido
+          @CodigoEmpresa, @NumeroPedido, @CodigoCliente,
+          @RazonSocial, @FechaPedido, 'Pendiente'
         )
       `);
 
     // 4. Insertar líneas
     for (const [index, item] of items.entries()) {
-      await new sql.Request(transaction)
+      await pool.request()
         .input('CodigoEmpresa', CodigoEmpresa)
-        .input('EjercicioPedido', EjercicioPedido)
-        .input('SeriePedido', SeriePedido)
         .input('NumeroPedido', NumeroPedido)
         .input('Orden', index + 1)
         .input('CodigoArticulo', item.id)
@@ -75,23 +59,49 @@ exports.createOrder = async (req, res, next) => {
         .input('Precio', item.price)
         .query(`
           INSERT INTO LineasPedidoCliente (
-            CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido,
-            Orden, CodigoArticulo, Cantidad, Precio
+            CodigoEmpresa, NumeroPedido, Orden,
+            CodigoArticulo, Cantidad, Precio
           ) VALUES (
-            @CodigoEmpresa, @EjercicioPedido, @SeriePedido, @NumeroPedido,
-            @Orden, @CodigoArticulo, @Cantidad, @Precio
+            @CodigoEmpresa, @NumeroPedido, @Orden,
+            @CodigoArticulo, @Cantidad, @Precio
           )
         `);
     }
 
-    await transaction.commit();
-
-    res.status(201).json({
-      status: 'success',
-      data: { CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido }
+    res.json({ 
+      success: true,
+      order: {
+        CodigoEmpresa,
+        NumeroPedido,
+        FechaPedido
+      }
     });
-  } catch (error) {
-    await transaction.rollback();
-    next(new AppError(error.message, 500));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getOrderHistory = async (req, res) => {
+  const { CodigoCliente } = req.params;
+
+  try {
+    const result = await pool.request()
+      .input('CodigoCliente', CodigoCliente)
+      .query(`
+        SELECT 
+          p.NumeroPedido,
+          p.FechaPedido,
+          p.Estado,
+          SUM(l.Cantidad * l.Precio) AS Total
+        FROM CabeceraPedidoCliente p
+        JOIN LineasPedidoCliente l ON p.NumeroPedido = l.NumeroPedido
+        WHERE p.CodigoCliente = @CodigoCliente
+        GROUP BY p.NumeroPedido, p.FechaPedido, p.Estado
+        ORDER BY p.FechaPedido DESC
+      `);
+
+    res.json(result.recordset);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
