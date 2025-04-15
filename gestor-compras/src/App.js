@@ -1,25 +1,26 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Navbar from './components/Navbar';
-import Home from './pages/Home';
-import Catalog from './pages/Catalog';
-import OrderConfirmation from './pages/OrderConfirmation';
-import OrderHistory from './pages/OrderHistory';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
+import Home from './pages/Home';
+import Historial from './pages/Historial';
+import DetallesPedido from './pages/DetallesPedido';
+import Navbar from './components/Navbar';
 
-function App() {
+const App = () => {
+  const user = JSON.parse(sessionStorage.getItem('user'));
+
   return (
     <Router>
-      <Navbar />
+      {user && <Navbar />}
       <Routes>
-        <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/catalog" element={<Catalog />} />
-        <Route path="/confirm" element={<OrderConfirmation />} />
-        <Route path="/history" element={<OrderHistory />} />
+        <Route path="/" element={user ? <Home /> : <Navigate to="/login" />} />
+        <Route path="/historial" element={user ? <Historial /> : <Navigate to="/login" />} />
+        <Route path="/detalles" element={user ? <DetallesPedido /> : <Navigate to="/login" />} />
+        <Route path="*" element={<Navigate to={user ? "/" : "/login"} />} />
       </Routes>
     </Router>
   );
-}
+};
 
 export default App;

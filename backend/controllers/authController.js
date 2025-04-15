@@ -1,19 +1,16 @@
 const { pool } = require('../config/sage200db');
 
 exports.login = async (req, res) => {
-  const { UsuarioLogicNet, ContraseñaLogicNet, CodigoCliente } = req.body;
+  const { UsuarioLogicNet, ContraseñaLogicNet } = req.body;
 
   try {
     const result = await pool.request()
       .input('UsuarioLogicNet', UsuarioLogicNet)
       .input('ContraseñaLogicNet', ContraseñaLogicNet)
-      .input('CodigoCliente', CodigoCliente)
       .query(`
-        SELECT CodigoCliente, RazonSocial, Nombre, CodigoEmpresa 
+        SELECT CodigoCategoriaCliente_, UsuarioLogicNet, ContraseñaLogicNet
         FROM CLIENTES 
-        WHERE UsuarioLogicNet = @UsuarioLogicNet 
-        AND ContraseñaLogicNet = @ContraseñaLogicNet
-        AND CodigoCliente = @CodigoCliente
+		    WHERE CodigoCategoriaCliente_ = 'EMP'
       `);
 
     if (result.recordset.length === 0) {
