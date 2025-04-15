@@ -1,34 +1,29 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
-const path = require('path');
-
-// Cargar variables de entorno
-dotenv.config();
-
-// Rutas
-const authRoutes = require('./routes/auth');
+const authRoutes = require('./routes/authRoutes');
+const productRoutes = require('./routes/productRoutes');
+const orderRoutes = require('./routes/orderRoutes');
+const { connect } = require('./db/Sage200db');
 
 const app = express();
+const PORT = process.env.PORT || 5000;
 
-// Middlewares
 app.use(cors());
 app.use(express.json());
 
-// Rutas de la API
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/pedidos', require('./routes/pedidos'));
-
-// Servir frontend en producción
-const clientBuildPath = path.join(__dirname, '../gestor-compras/build');
-app.use(express.static(clientBuildPath));
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(clientBuildPath, 'index.html'));
+// Conectar a la base de datos
+connect().then(() => {
+  console.log('✅ Base de datos conectada');
+}).catch(err => {
+  console.error('❌ Error al conectar a la base de datos:', err);
 });
 
-// Iniciar servidor
-const PORT = process.env.PORT || 5000;
+// Rutas
+app.use('/api/auth', authRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/orders', orderRoutes);
+
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en el puerto ${PORT}`);
+  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
 });

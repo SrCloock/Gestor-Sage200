@@ -1,30 +1,38 @@
-const { pool } = require('../config/sage200db');
+const { getPool } = require('../db/Sage200db');
 
-exports.login = async (req, res) => {
-  const { UsuarioLogicNet, ContraseñaLogicNet } = req.body;
-
+const login = async (req, res) => {
+  const { username, password } = req.body;
+  
   try {
+    const pool = await getPool();
     const result = await pool.request()
-      .input('UsuarioLogicNet', UsuarioLogicNet)
-      .input('ContraseñaLogicNet', ContraseñaLogicNet)
+      .input('username', username)
+      .input('password', password)
       .query(`
-        SELECT CodigoCategoriaCliente_, UsuarioLogicNet, ContraseñaLogicNet
+        SELECT CodigoCliente, CifDni, UsuarioLogicNet 
         FROM CLIENTES 
-		    WHERE CodigoCategoriaCliente_ = 'EMP'
+        WHERE UsuarioLogicNet = @username 
+        AND ContraseñaLogicNet = @password
+        AND CodigoCategoriaCliente_ = 'EMP'
       `);
 
-    if (result.recordset.length === 0) {
-      return res.status(401).json({ error: 'Credenciales incorrectas' });
+    if (result.recordset.length > 0) {
+      return res.status(200).json({ 
+        success: true, 
+        user: result.recordset[0] 
+      });
     }
-
-    const user = result.recordset[0];
-    res.json({
-      CodigoCliente: user.CodigoCliente,
-      RazonSocial: user.RazonSocial,
-      Nombre: user.Nombre,
-      CodigoEmpresa: user.CodigoEmpresa
+    return res.status(200).json({ 
+      success: false, 
+      message: 'Credenciales incorrectas' 
     });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (error) {
+    console.error('Error en login:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Error del servidor' 
+    });
   }
 };
+
+module.exports = { login }; // Asegúrate de exportar la función
