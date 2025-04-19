@@ -1,22 +1,23 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
-import Header from './Header'; // Asegúrate que coincida con la exportación
+import Header from './Header';
 import Sidebar from './Sidebar';
 import './Header.css';
 import './Sidebar.css';
+import './Layout.css';
 
-function Layout() {
+const Layout = () => {
   return (
     <div className="app-layout">
       <Header />
-      <div className="main-content">
+      <div className="layout-body">
         <Sidebar />
-        <div className="content-area">
+        <main className="content-area">
           <Outlet />
-        </div>
+        </main>
       </div>
     </div>
   );
-}
+};
 
-export default Layout; // Export por defecto
+export default Layout;

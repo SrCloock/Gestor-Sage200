@@ -1,97 +1,267 @@
 const { getPool } = require('../db/Sage200db');
 
+// Función para crear pedido
 const createOrder = async (req, res) => {
-  if (!req.session.user) {
-    return res.status(401).json({ error: 'No autenticado' });
+  const { items } = req.body;
+
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'El pedido no contiene items válidos'
+    });
   }
 
-  const { items } = req.body;
-  const { codigoCliente, cifDni } = req.session.user;
+  if (!items[0]?.CodigoCliente || !items[0]?.CifDni) {
+    return res.status(400).json({
+      success: false,
+      message: 'Datos del cliente incompletos'
+    });
+  }
 
   try {
     const pool = await getPool();
-    
-    // 1. Crear cabecera del pedido
-    const cabeceraResult = await pool.request()
-      .input('CodigoCliente', codigoCliente)
-      .input('CifDni', cifDni)
-      .query(`
-        INSERT INTO CabeceraPedidoCliente (
-          CodigoEmpresa, EjercicioPedido, SeriePedido, FechaPedido, 
-          NumeroPedido, CodigoCliente, SiglaNacion, CifDni, RazonSocial
-        ) 
-        OUTPUT INSERTED.NumeroPedido
-        VALUES (
-          1, YEAR(GETDATE()), 'WEB', GETDATE(), 
-          NEXT VALUE FOR SecuenciaPedidos, @CodigoCliente, 'ES', @CifDni, 
-          (SELECT RazonSocial FROM CLIENTES WHERE CodigoCliente = @CodigoCliente)
-        )
-      `);
+    const transaction = pool.transaction();
+    await transaction.begin();
 
-    const numeroPedido = cabeceraResult.recordset[0].NumeroPedido;
-
-    // 2. Insertar líneas de pedido
-    for (const item of items) {
-      await pool.request()
-        .input('NumeroPedido', numeroPedido)
-        .input('CodigoArticulo', item.CodigoArticulo)
-        .input('Cantidad', item.Cantidad)
-        .input('Precio', item.PrecioCompra)
+    try {
+      // 1. Verificar cliente
+      const clienteResult = await transaction.request()
+        .input('CodigoCliente', items[0].CodigoCliente)
+        .input('CifDni', items[0].CifDni)
         .query(`
-          INSERT INTO LineasPedidoCliente (
-            CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido, Orden,
-            FechaRegistro, FechaPedido, CodigoArticulo, DescripcionArticulo,
-            Cantidad, PrecioCompra, CodigoProveedor
+          SELECT RazonSocial 
+          FROM CLIENTES 
+          WHERE CodigoCliente = @CodigoCliente 
+          AND CifDni = @CifDni
+          AND CodigoCategoriaCliente_ = 'EMP'
+        `);
+
+      if (clienteResult.recordset.length === 0) {
+        throw new Error('Cliente no encontrado o no tiene permisos');
+      }
+
+      const razonSocial = clienteResult.recordset[0].RazonSocial;
+
+      // 2. Crear cabecera del pedido
+      await transaction.request()
+        .input('CodigoCliente', items[0].CodigoCliente)
+        .input('CifDni', items[0].CifDni)
+        .input('RazonSocial', razonSocial)
+        .query(`
+          INSERT INTO CabeceraPedidoCliente (
+            CodigoEmpresa, EjercicioPedido, SeriePedido, FechaPedido, 
+            NumeroPedido, CodigoCliente, SiglaNacion, CifDni, RazonSocial
           )
           VALUES (
-            1, YEAR(GETDATE()), 'WEB', @NumeroPedido, 
-            (SELECT ISNULL(MAX(Orden), 0) + 1 FROM LineasPedidoCliente 
-              WHERE NumeroPedido = @NumeroPedido),
-            GETDATE(), GETDATE(), @CodigoArticulo, 
-            (SELECT DescripcionArticulo FROM Articulos WHERE CodigoArticulo = @CodigoArticulo),
-            @Cantidad, @Precio, 
-            (SELECT CodigoProveedor FROM Articulos WHERE CodigoArticulo = @CodigoArticulo)
+            1, YEAR(GETDATE()), 'PRUEBA', GETDATE(),
+            ISNULL((SELECT MAX(NumeroPedido) FROM CabeceraPedidoCliente WHERE EjercicioPedido = YEAR(GETDATE())) + 1, 1),
+            @CodigoCliente, 'ES', @CifDni, @RazonSocial
           )
         `);
+
+      // Obtener el ID del pedido recién creado
+      const pedidoResult = await transaction.request()
+        .input('CodigoCliente', items[0].CodigoCliente)
+        .query(`
+          SELECT TOP 1 NumeroPedido 
+          FROM CabeceraPedidoCliente 
+          WHERE CodigoCliente = @CodigoCliente 
+          ORDER BY FechaPedido DESC
+        `);
+
+      const numeroPedido = pedidoResult.recordset[0].NumeroPedido;
+
+      // 3. Insertar líneas de pedido
+      for (const [index, item] of items.entries()) {
+        await transaction.request()
+          .input('NumeroPedido', numeroPedido)
+          .input('Orden', index + 1)
+          .input('CodigoArticulo', item.CodigoArticulo)
+          .input('DescripcionArticulo', item.DescripcionArticulo)
+          .input('UnidadesPedidas', item.Cantidad)
+          .input('CodigoProveedor', item.CodigoProveedor)
+          .query(`
+            INSERT INTO LineasPedidoCliente (
+              CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido, Orden,
+              FechaRegistro, FechaPedido, CodigoArticulo, DescripcionArticulo,
+              UnidadesPedidas, CodigoProveedor
+            )
+            VALUES (
+              1, YEAR(GETDATE()), 'PRUEBA', @NumeroPedido, @Orden,
+              GETDATE(), GETDATE(), @CodigoArticulo, @DescripcionArticulo,
+              @UnidadesPedidas, @CodigoProveedor
+            )
+          `);
+      }
+
+      await transaction.commit();
+
+      res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+      res.header('Access-Control-Allow-Credentials', true);
+      
+      return res.status(201).json({
+        success: true,
+        orderId: numeroPedido,
+        message: 'Pedido creado correctamente'
+      });
+
+    } catch (error) {
+      await transaction.rollback();
+      console.error('Error en la transacción:', error);
+      throw error;
     }
 
-    res.status(201).json({ 
-      success: true, 
-      orderId: numeroPedido 
-    });
   } catch (error) {
     console.error('Error al crear pedido:', error);
-    res.status(500).json({ error: 'Error al crear pedido' });
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Error al procesar el pedido'
+    });
   }
 };
 
+// Función para obtener pedidos
 const getOrders = async (req, res) => {
-  if (!req.session.user) {
-    return res.status(401).json({ error: 'No autenticado' });
-  }
-
-  const { codigoCliente } = req.session.user;
-
   try {
     const pool = await getPool();
-    const result = await pool.request()
+    const { codigoCliente } = req.query; // Ahora viene por query params
+
+    if (!codigoCliente) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código de cliente no proporcionado'
+      });
+    }
+
+    // Obtener cabeceras de pedidos con conteo de líneas
+    const ordersResult = await pool.request()
       .input('CodigoCliente', codigoCliente)
       .query(`
         SELECT 
-          c.NumeroPedido, c.FechaPedido, c.NumeroLineas,
-          STRING_AGG(l.DescripcionArticulo, ', ') AS Productos
+          c.NumeroPedido,
+          c.FechaPedido,
+          c.RazonSocial,
+          COUNT(l.Orden) AS NumeroLineas
         FROM CabeceraPedidoCliente c
-        JOIN LineasPedidoCliente l ON c.NumeroPedido = l.NumeroPedido
+        LEFT JOIN LineasPedidoCliente l ON 
+          c.CodigoEmpresa = l.CodigoEmpresa AND
+          c.EjercicioPedido = l.EjercicioPedido AND
+          c.SeriePedido = l.SeriePedido AND
+          c.NumeroPedido = l.NumeroPedido
         WHERE c.CodigoCliente = @CodigoCliente
-        GROUP BY c.NumeroPedido, c.FechaPedido, c.NumeroLineas
+        GROUP BY 
+          c.NumeroPedido,
+          c.FechaPedido,
+          c.RazonSocial
         ORDER BY c.FechaPedido DESC
       `);
 
-    res.status(200).json(result.recordset);
+    // Obtener detalles de productos para cada pedido
+    const ordersWithDetails = await Promise.all(
+      ordersResult.recordset.map(async (order) => {
+        const detailsResult = await pool.request()
+          .input('NumeroPedido', order.NumeroPedido)
+          .query(`
+            SELECT 
+              CodigoArticulo,
+              DescripcionArticulo,
+              UnidadesPedidas
+            FROM LineasPedidoCliente
+            WHERE NumeroPedido = @NumeroPedido
+            ORDER BY Orden
+          `);
+
+        return {
+          ...order,
+          Productos: detailsResult.recordset
+        };
+      })
+    );
+
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.header('Access-Control-Allow-Credentials', true);
+    
+    return res.status(200).json({
+      success: true,
+      orders: ordersWithDetails
+    });
+
   } catch (error) {
     console.error('Error al obtener pedidos:', error);
-    res.status(500).json({ error: 'Error al obtener pedidos' });
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Error al obtener los pedidos'
+    });
   }
 };
 
-module.exports = { createOrder, getOrders };
+// Función para obtener detalles de un pedido específico
+const getOrderDetails = async (req, res) => {
+  try {
+    const pool = await getPool();
+    const { numeroPedido } = req.params;
+    const { codigoCliente } = req.query;
+
+    if (!codigoCliente) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código de cliente no proporcionado'
+      });
+    }
+
+    // Verificar que el pedido pertenece al cliente
+    const orderResult = await pool.request()
+      .input('NumeroPedido', numeroPedido)
+      .input('CodigoCliente', codigoCliente)
+      .query(`
+        SELECT TOP 1 
+          NumeroPedido,
+          FechaPedido,
+          RazonSocial
+        FROM CabeceraPedidoCliente
+        WHERE NumeroPedido = @NumeroPedido
+        AND CodigoCliente = @CodigoCliente
+      `);
+
+    if (orderResult.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Pedido no encontrado'
+      });
+    }
+
+    // Obtener líneas del pedido
+    const linesResult = await pool.request()
+      .input('NumeroPedido', numeroPedido)
+      .query(`
+        SELECT 
+          CodigoArticulo,
+          DescripcionArticulo,
+          UnidadesPedidas,
+          CodigoProveedor
+        FROM LineasPedidoCliente
+        WHERE NumeroPedido = @NumeroPedido
+        ORDER BY Orden
+      `);
+
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.header('Access-Control-Allow-Credentials', true);
+    
+    return res.status(200).json({
+      success: true,
+      order: {
+        ...orderResult.recordset[0],
+        Productos: linesResult.recordset
+      }
+    });
+
+  } catch (error) {
+    console.error('Error al obtener detalle del pedido:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Error al obtener el detalle del pedido'
+    });
+  }
+};
+
+module.exports = { createOrder, getOrders, getOrderDetails };

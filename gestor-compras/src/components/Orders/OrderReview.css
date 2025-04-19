@@ -1,0 +1,61 @@
+.order-review {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.order-review h2 {
+  font-size: 24px;
+  color: #2d3748;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.order-review p {
+  font-size: 16px;
+  color: #4a5568;
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+.order-id {
+  font-weight: 600;
+  color: #3182ce;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 32px;
+}
+
+.actions button {
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.new-order {
+  background-color: #4299e1;
+  color: white;
+  border: none;
+}
+
+.new-order:hover {
+  background-color: #3182ce;
+}
+
+.view-orders {
+  background-color: white;
+  color: #4299e1;
+  border: 1px solid #4299e1;
+}
+
+.view-orders:hover {
+  background-color: #ebf8ff;
+}

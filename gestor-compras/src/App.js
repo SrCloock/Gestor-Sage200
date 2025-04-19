@@ -6,6 +6,7 @@ import ProductCatalog from './components/Products/ProductCatalog';
 import OrderCreate from './components/Orders/OrderCreate';
 import OrderReview from './components/Orders/OrderReview';
 import OrderList from './components/Orders/OrderList';
+import OrderDetail from './components/Orders/OrderDetail';
 import Layout from './components/Layout/Layout';
 import ProtectedRoute from './components/Layout/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
@@ -24,6 +25,7 @@ function App() {
             <Route path="/crear-pedido" element={<OrderCreate />} />
             <Route path="/revisar-pedido" element={<OrderReview />} />
             <Route path="/mis-pedidos" element={<OrderList />} />
+            <Route path="/mis-pedidos/:orderId" element={<OrderDetail />} />
           </Route>
         </Route>
         

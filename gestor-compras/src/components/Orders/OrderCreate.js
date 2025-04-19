@@ -1,38 +1,42 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
+import { AuthContext } from '../../context/AuthContext';
+import api from '../../api';
 import './OrderCreate.css';
 
 const OrderCreate = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
   const [orderItems, setOrderItems] = useState([]);
   const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState({ products: true, submit: false });
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    // Si viene de seleccionar un producto, lo añadimos
-    if (location.state?.selectedProduct) {
-      setOrderItems([{
-        ...location.state.selectedProduct,
-        Cantidad: 1
-      }]);
-    }
-
-    // Cargar todos los productos
     const fetchProducts = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/products');
+        const response = await api.get('/api/products');
         setProducts(response.data);
       } catch (err) {
-        console.error('Error al cargar productos:', err);
+        setError('Error al cargar productos');
+        console.error(err);
       } finally {
-        setLoading(false);
+        setLoading(prev => ({ ...prev, products: false }));
       }
     };
 
     fetchProducts();
-  }, [location]);
+
+    if (location.state?.selectedProduct) {
+      setOrderItems([{
+        ...location.state.selectedProduct,
+        Cantidad: 1,
+        CodigoCliente: user?.codigoCliente,
+        CifDni: user?.cifDni
+      }]);
+    }
+  }, [location, user]);
 
   const handleAddItem = (product) => {
     setOrderItems(prev => {
@@ -44,54 +48,76 @@ const OrderCreate = () => {
             : item
         );
       } else {
-        return [...prev, { ...product, Cantidad: 1 }];
+        return [...prev, { 
+          ...product, 
+          Cantidad: 1,
+          CodigoCliente: user?.codigoCliente,
+          CifDni: user?.cifDni
+        }];
       }
     });
   };
 
-  const handleQuantityChange = (codigoArticulo, cantidad) => {
-    setOrderItems(prev =>
-      prev.map(item =>
-        item.CodigoArticulo === codigoArticulo
-          ? { ...item, Cantidad: Math.max(1, cantidad) }
-          : item
-      )
-    );
-  };
-
-  const handleRemoveItem = (codigoArticulo) => {
-    setOrderItems(prev => prev.filter(item => item.CodigoArticulo !== codigoArticulo));
-  };
-
   const handleSubmitOrder = async () => {
     try {
-      const response = await axios.post(
-        'http://localhost:5000/api/orders',
-        { items: orderItems },
-        { withCredentials: true }
-      );
+      setError('');
+      setLoading(prev => ({ ...prev, submit: true }));
+
+      if (!user?.codigoCliente || !user?.cifDni) {
+        throw new Error('Datos de usuario incompletos. Por favor, inicie sesión nuevamente.');
+      }
+
+      const itemsToSend = orderItems.map(item => ({
+        CodigoArticulo: item.CodigoArticulo,
+        DescripcionArticulo: item.DescripcionArticulo,
+        Cantidad: Number(item.Cantidad), // El backend lo mapeará a UnidadesPedidas
+        CodigoProveedor: item.CodigoProveedor,
+        CodigoCliente: user.codigoCliente,
+        CifDni: user.cifDni
+      }));
+
+      const response = await api.post('/api/orders', { items: itemsToSend });
       
-      navigate('/revisar-pedido', { state: { orderId: response.data.orderId } });
+      navigate('/revisar-pedido', { 
+        state: { 
+          orderId: response.data.orderId,
+          success: true 
+        } 
+      });
     } catch (err) {
-      console.error('Error al crear pedido:', err);
-      alert('Error al crear el pedido');
+      console.error('Error al crear pedido:', {
+        message: err.message,
+        response: err.response?.data
+      });
+      setError(err.response?.data?.message || err.message || 'Error al crear el pedido');
+    } finally {
+      setLoading(prev => ({ ...prev, submit: false }));
     }
   };
 
-  if (loading) return <div className="loading">Cargando...</div>;
+  if (loading.products) return <div className="loading">Cargando productos...</div>;
+  if (error) return <div className="error">{error}</div>;
 
   return (
     <div className="order-create">
       <h2>Crear Nuevo Pedido</h2>
       
+      {error && (
+        <div className="error-message">
+          <p>{error}</p>
+          <button onClick={() => setError('')}>×</button>
+        </div>
+      )}
+
       <div className="order-container">
         <div className="product-selection">
           <h3>Seleccionar Productos</h3>
           <div className="product-list">
             {products.map(product => (
-              <div key={product.CodigoArticulo} className="product-item">
-                <span>{product.DescripcionArticulo}</span>
-                <button onClick={() => handleAddItem(product)}>+</button>
+              <div key={`${product.CodigoArticulo}-${product.CodigoProveedor}`} className="product-item">
+                <h3>{product.DescripcionArticulo}</h3>
+                <p>Proveedor: {product.NombreProveedor}</p>
+                <button onClick={() => handleAddItem(product)}>Añadir</button>
               </div>
             ))}
           </div>
@@ -104,8 +130,8 @@ const OrderCreate = () => {
           ) : (
             <>
               <ul className="order-items">
-                {orderItems.map(item => (
-                  <li key={item.CodigoArticulo}>
+                {orderItems.map((item, index) => (
+                  <li key={`${item.CodigoArticulo}-${index}`}>
                     <div className="item-info">
                       <span>{item.DescripcionArticulo}</span>
                       <span>Proveedor: {item.NombreProveedor}</span>
@@ -114,23 +140,34 @@ const OrderCreate = () => {
                       <input
                         type="number"
                         value={item.Cantidad}
-                        onChange={(e) => handleQuantityChange(item.CodigoArticulo, parseInt(e.target.value))}
+                        onChange={(e) => {
+                          const newValue = parseInt(e.target.value) || 1;
+                          setOrderItems(prev =>
+                            prev.map(i =>
+                              i.CodigoArticulo === item.CodigoArticulo
+                                ? { ...i, Cantidad: newValue }
+                                : i
+                            )
+                          );
+                        }}
                         min="1"
                       />
-                      <span>{item.PrecioCompra * item.Cantidad} €</span>
-                      <button onClick={() => handleRemoveItem(item.CodigoArticulo)}>×</button>
+                      <button 
+                        onClick={() => setOrderItems(prev => prev.filter(i => i.CodigoArticulo !== item.CodigoArticulo))}
+                        className="remove-button"
+                      >
+                        Eliminar
+                      </button>
                     </div>
                   </li>
                 ))}
               </ul>
-              <div className="order-total">
-                Total: {orderItems.reduce((sum, item) => sum + (item.PrecioCompra * item.Cantidad), 0)} €
-              </div>
-              <button 
+              <button
                 onClick={handleSubmitOrder}
                 className="submit-order"
+                disabled={orderItems.length === 0 || loading.submit}
               >
-                Confirmar Pedido
+                {loading.submit ? 'Procesando...' : 'Confirmar Pedido'}
               </button>
             </>
           )}

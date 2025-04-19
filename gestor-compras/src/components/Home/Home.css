@@ -1,15 +1,55 @@
 .home-container {
-    padding: 20px;
-    text-align: center;
-    margin-top: 50px;
-  }
-  
-  .home-container h1 {
-    color: #333;
-    margin-bottom: 20px;
-  }
-  
-  .home-container p {
-    color: #666;
-    font-size: 18px;
-  }
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 60px); /* para dejar espacio a una navbar fija si tienes */
+  background: linear-gradient(to right, #e0f7fa, #ffffff);
+  padding: 20px;
+}
+
+.home-card {
+  background-color: white;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  max-width: 600px;
+  width: 100%;
+}
+
+.home-card h1 {
+  font-size: 28px;
+  color: #00796b;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.home-card p {
+  font-size: 18px;
+  margin-bottom: 20px;
+  color: #555;
+}
+
+.home-options {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+}
+
+.home-options li {
+  font-size: 16px;
+  color: #333;
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.icon {
+  color: #00796b;
+  font-size: 18px;
+}
