@@ -9,7 +9,11 @@ const login = async (req, res) => {
       .input('username', username)
       .input('password', password)
       .query(`
-        SELECT CodigoCliente, CifDni, UsuarioLogicNet 
+        SELECT 
+          CodigoCliente, 
+          CifDni, 
+          UsuarioLogicNet,
+          RazonSocial
         FROM CLIENTES 
         WHERE UsuarioLogicNet = @username 
         AND ContraseñaLogicNet = @password
@@ -17,15 +21,22 @@ const login = async (req, res) => {
       `);
 
     if (result.recordset.length > 0) {
+      const userData = result.recordset[0];
       return res.status(200).json({ 
         success: true, 
-        user: result.recordset[0] 
+        user: {
+          codigoCliente: userData.CodigoCliente.trim(),
+          cifDni: userData.CifDni.trim(),
+          username: userData.UsuarioLogicNet,
+          razonSocial: userData.RazonSocial
+        }
+      });
+    } else {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Credenciales incorrectas o no tiene permisos' 
       });
     }
-    return res.status(200).json({ 
-      success: false, 
-      message: 'Credenciales incorrectas' 
-    });
   } catch (error) {
     console.error('Error en login:', error);
     return res.status(500).json({ 
@@ -35,4 +46,14 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { login }; // Asegúrate de exportar la función
+const logout = (req, res) => {
+  req.session.destroy(err => {
+    if (err) {
+      return res.status(500).json({ success: false });
+    }
+    res.clearCookie('connect.sid');
+    return res.status(200).json({ success: true });
+  });
+};
+
+module.exports = { login, logout };

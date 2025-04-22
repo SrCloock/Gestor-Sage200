@@ -1,11 +1,19 @@
 import React from 'react';
 import './Home.css';
+import { FaShoppingCart, FaBoxOpen, FaHistory } from 'react-icons/fa';
 
 const Home = () => {
   return (
     <div className="home-container">
-      <h1>Bienvenido al Gestor de Compras</h1>
-      <p>Seleccione una opción del menú lateral para comenzar</p>
+      <div className="home-card">
+        <h1><FaShoppingCart /> Bienvenido al Gestor de Compras</h1>
+        <p>Utilice el menú de navegación para acceder a las siguientes secciones:</p>
+        <ul className="home-options">
+          <li><FaBoxOpen className="icon" /> Catálogo de Productos</li>
+          <li><FaShoppingCart className="icon" /> Realizar Pedido</li>
+          <li><FaHistory className="icon" /> Historial de Pedidos</li>
+        </ul>
+      </div>
     </div>
   );
 };

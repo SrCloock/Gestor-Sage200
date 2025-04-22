@@ -1,0 +1,87 @@
+/* OrderDetail.css */
+
+.order-detail {
+  padding: 30px;
+  background-color: #f7f9fc;
+  min-height: 100vh;
+}
+
+.order-detail h2 {
+  color: #00796b;
+  margin-bottom: 20px;
+}
+
+.order-detail h3 {
+  color: #00796b;
+  margin-top: 30px;
+  margin-bottom: 10px;
+}
+
+.back-button {
+  padding: 10px 18px;
+  margin-bottom: 20px;
+  background-color: #e0f2f1;
+  color: #00796b;
+  border: 1px solid #00796b;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.back-button:hover {
+  background-color: #b2dfdb;
+}
+
+.order-info {
+  margin-bottom: 20px;
+  font-size: 15px;
+  color: #444;
+}
+
+.order-info p {
+  margin: 5px 0;
+}
+
+.products-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  background-color: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.products-table th,
+.products-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+  text-align: left;
+  font-size: 14px;
+}
+
+.products-table th {
+  background-color: #e0f2f1;
+  color: #00796b;
+  font-weight: 600;
+}
+
+.products-table tr:last-child td {
+  border-bottom: none;
+}
+
+.loading,
+.error {
+  text-align: center;
+  font-size: 16px;
+  margin-top: 30px;
+  color: #d32f2f;
+}
+
+.error {
+  background-color: #ffebee;
+  border: 1px solid #ef9a9a;
+  padding: 12px;
+  border-radius: 8px;
+}
