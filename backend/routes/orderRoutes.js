@@ -11,7 +11,7 @@ router.use((req, res, next) => {
 
 // Rutas
 router.post('/', createOrder);
-router.get('/', getOrders); // Ahora espera codigoCliente como query param
-router.get('/:numeroPedido', getOrderDetails); // Espera codigoCliente como query param
+router.get('/', getOrders);
+router.get('/:numeroPedido', getOrderDetails);
 
 module.exports = router;

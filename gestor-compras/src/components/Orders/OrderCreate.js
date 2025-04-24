@@ -8,6 +8,7 @@ const OrderCreate = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
+
   const [orderItems, setOrderItems] = useState([]);
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
@@ -18,24 +19,25 @@ const OrderCreate = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = 20;
 
-  const generateProductKey = (product) => {
-    return `${product.CodigoArticulo}-${product.CodigoProveedor}`;
+  // Función para generar claves únicas
+  const generateProductKey = (product, index) => {
+    return `${product.CodigoArticulo}-${product.CodigoProveedor || 'NOPROV'}-${index}`;
   };
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const response = await api.get('/api/products');
-        const sortedProducts = [...response.data].sort((a, b) => 
+        const sortedProducts = response.data.sort((a, b) =>
           a.DescripcionArticulo.localeCompare(b.DescripcionArticulo)
         );
         setProducts(sortedProducts);
         setFilteredProducts(sortedProducts);
       } catch (err) {
-        setError('Error al cargar productos');
         console.error(err);
+        setError('Error al cargar productos');
       } finally {
-        setLoading(prev => ({ ...prev, products: false }));
+        setLoading((prev) => ({ ...prev, products: false }));
       }
     };
 
@@ -53,24 +55,22 @@ const OrderCreate = () => {
 
   useEffect(() => {
     let result = [...products];
-    
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(product => 
-        (product.DescripcionArticulo && product.DescripcionArticulo.toLowerCase().includes(term)) ||
-        (product.NombreProveedor && product.NombreProveedor.toLowerCase().includes(term)) ||
-        (product.CodigoArticulo && product.CodigoArticulo.toLowerCase().includes(term))
+      result = result.filter(product =>
+        product.DescripcionArticulo?.toLowerCase().includes(term) ||
+        product.NombreProveedor?.toLowerCase().includes(term) ||
+        product.CodigoArticulo?.toLowerCase().includes(term)
       );
     }
-    
-    result.sort((a, b) => {
-      if (sortOrder === 'asc') {
-        return a.DescripcionArticulo.localeCompare(b.DescripcionArticulo);
-      } else {
-        return b.DescripcionArticulo.localeCompare(a.DescripcionArticulo);
-      }
-    });
-    
+
+    result.sort((a, b) =>
+      sortOrder === 'asc'
+        ? a.DescripcionArticulo.localeCompare(b.DescripcionArticulo)
+        : b.DescripcionArticulo.localeCompare(a.DescripcionArticulo)
+    );
+
     setFilteredProducts(result);
     setCurrentPage(1);
   }, [searchTerm, sortOrder, products]);
@@ -87,26 +87,29 @@ const OrderCreate = () => {
   };
 
   const handleAddItem = (product) => {
-    setOrderItems(prev => {
-      const existingItem = prev.find(item => 
-        item.CodigoArticulo === product.CodigoArticulo && 
+    setOrderItems((prev) => {
+      const existingItem = prev.find(item =>
+        item.CodigoArticulo === product.CodigoArticulo &&
         item.CodigoProveedor === product.CodigoProveedor
       );
-      
+
       if (existingItem) {
         return prev.map(item =>
-          item.CodigoArticulo === product.CodigoArticulo && 
+          item.CodigoArticulo === product.CodigoArticulo &&
           item.CodigoProveedor === product.CodigoProveedor
             ? { ...item, Cantidad: item.Cantidad + 1 }
             : item
         );
       } else {
-        return [...prev, { 
-          ...product, 
-          Cantidad: 1,
-          CodigoCliente: user?.codigoCliente,
-          CifDni: user?.cifDni
-        }];
+        return [
+          ...prev,
+          {
+            ...product,
+            Cantidad: 1,
+            CodigoCliente: user?.codigoCliente,
+            CifDni: user?.cifDni
+          }
+        ];
       }
     });
   };
@@ -114,7 +117,7 @@ const OrderCreate = () => {
   const handleSubmitOrder = async () => {
     try {
       setError('');
-      setLoading(prev => ({ ...prev, submit: true }));
+      setLoading((prev) => ({ ...prev, submit: true }));
 
       if (!user?.codigoCliente || !user?.cifDni) {
         throw new Error('Datos de usuario incompletos. Por favor, inicie sesión nuevamente.');
@@ -124,46 +127,40 @@ const OrderCreate = () => {
         CodigoArticulo: item.CodigoArticulo,
         DescripcionArticulo: item.DescripcionArticulo,
         Cantidad: Number(item.Cantidad),
-        CodigoProveedor: item.CodigoProveedor,
+        PrecioCompra: item.PrecioCompra,
+        CodigoProveedor: null,
         CodigoCliente: user.codigoCliente,
         CifDni: user.cifDni
       }));
 
       const response = await api.post('/api/orders', { items: itemsToSend });
-      
-      navigate('/revisar-pedido', { 
-        state: { 
+
+      navigate('/revisar-pedido', {
+        state: {
           orderId: response.data.orderId,
-          success: true 
-        } 
+          seriePedido: response.data.seriePedido,
+          success: true
+        }
       });
     } catch (err) {
-      console.error('Error al crear pedido:', {
-        message: err.message,
-        response: err.response?.data
-      });
+      console.error('Error al crear pedido:', err);
       setError(err.response?.data?.message || err.message || 'Error al crear el pedido');
     } finally {
-      setLoading(prev => ({ ...prev, submit: false }));
+      setLoading((prev) => ({ ...prev, submit: false }));
     }
   };
 
   const createPageNumbers = () => {
     const pageNumbers = [];
-    const maxPage = totalPages;
 
-    if (maxPage <= 5) {
-      for (let i = 1; i <= maxPage; i++) {
-        pageNumbers.push(i);
-      }
+    if (totalPages <= 5) {
+      for (let i = 1; i <= totalPages; i++) pageNumbers.push(i);
+    } else if (currentPage <= 3) {
+      pageNumbers.push(1, 2, 3, '...', totalPages);
+    } else if (currentPage >= totalPages - 2) {
+      pageNumbers.push(1, '...', totalPages - 2, totalPages - 1, totalPages);
     } else {
-      if (currentPage <= 3) {
-        pageNumbers.push(1, 2, 3, '...', maxPage);
-      } else if (currentPage >= maxPage - 2) {
-        pageNumbers.push(1, '...', maxPage - 2, maxPage - 1, maxPage);
-      } else {
-        pageNumbers.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', maxPage);
-      }
+      pageNumbers.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
     }
 
     return pageNumbers;
@@ -175,7 +172,7 @@ const OrderCreate = () => {
   return (
     <div className="oc-container">
       <h2>Crear Nuevo Pedido</h2>
-      
+
       {error && (
         <div className="oc-error-message">
           <p>{error}</p>
@@ -192,13 +189,10 @@ const OrderCreate = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        
+
         <div className="oc-sort-options">
           <label>Ordenar:</label>
-          <select 
-            value={sortOrder} 
-            onChange={(e) => setSortOrder(e.target.value)}
-          >
+          <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
             <option value="asc">A-Z</option>
             <option value="desc">Z-A</option>
           </select>
@@ -214,7 +208,7 @@ const OrderCreate = () => {
             <>
               <ul className="oc-order-items">
                 {orderItems.map((item, index) => (
-                  <li key={`${generateProductKey(item)}-${index}`}>
+                  <li key={generateProductKey(item, index)}>
                     <div className="oc-item-info">
                       <span>{item.DescripcionArticulo}</span>
                       <span>Código: {item.CodigoArticulo}</span>
@@ -223,26 +217,33 @@ const OrderCreate = () => {
                     <div className="oc-item-actions">
                       <input
                         type="number"
+                        min="1"
                         value={item.Cantidad}
                         onChange={(e) => {
-                          const newValue = parseInt(e.target.value) || 1;
-                          setOrderItems(prev =>
-                            prev.map(i =>
+                          const value = Math.max(1, parseInt(e.target.value) || 1);
+                          setOrderItems((prev) =>
+                            prev.map((i) =>
                               i.CodigoArticulo === item.CodigoArticulo &&
                               i.CodigoProveedor === item.CodigoProveedor
-                                ? { ...i, Cantidad: newValue }
+                                ? { ...i, Cantidad: value }
                                 : i
                             )
                           );
                         }}
-                        min="1"
                       />
-                      <button 
-                        onClick={() => setOrderItems(prev => prev.filter(i => 
-                          !(i.CodigoArticulo === item.CodigoArticulo && 
-                            i.CodigoProveedor === item.CodigoProveedor)
-                        ))}
+                      <button
                         className="oc-remove-button"
+                        onClick={() =>
+                          setOrderItems((prev) =>
+                            prev.filter(
+                              (i) =>
+                                !(
+                                  i.CodigoArticulo === item.CodigoArticulo &&
+                                  i.CodigoProveedor === item.CodigoProveedor
+                                )
+                            )
+                          )
+                        }
                       >
                         Eliminar
                       </button>
@@ -251,8 +252,8 @@ const OrderCreate = () => {
                 ))}
               </ul>
               <button
-                onClick={handleSubmitOrder}
                 className="oc-submit-order"
+                onClick={handleSubmitOrder}
                 disabled={orderItems.length === 0 || loading.submit}
               >
                 {loading.submit ? 'Procesando...' : 'Confirmar Pedido'}
@@ -260,21 +261,23 @@ const OrderCreate = () => {
             </>
           )}
         </div>
-        
+
         <div className="oc-product-selection">
           <h3>Seleccionar Productos ({filteredProducts.length} disponibles)</h3>
-          
+
           <div className="oc-product-grid">
             {currentProducts.length > 0 ? (
-              currentProducts.map(product => (
-                <div 
-                  key={generateProductKey(product)}
+              currentProducts.map((product, index) => (
+                <div
+                  key={generateProductKey(product, index)}
                   className="oc-product-item"
                   onClick={() => handleAddItem(product)}
                 >
                   <h3>{product.DescripcionArticulo}</h3>
                   <p><strong>Código:</strong> {product.CodigoArticulo}</p>
-                  {product.NombreProveedor && <p><strong>Proveedor:</strong> {product.NombreProveedor}</p>}
+                  {product.NombreProveedor && (
+                    <p><strong>Proveedor:</strong> {product.NombreProveedor}</p>
+                  )}
                   <button className="oc-add-button">Añadir al pedido</button>
                 </div>
               ))
@@ -284,28 +287,28 @@ const OrderCreate = () => {
               </div>
             )}
           </div>
-          
+
           {filteredProducts.length > productsPerPage && (
             <div className="oc-pagination">
-              <button 
+              <button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
               >
                 Anterior
               </button>
-              
+
               {createPageNumbers().map((page, index) => (
                 <button
                   key={index}
-                  onClick={() => handlePageChange(page === '...' ? currentPage : page)}
+                  onClick={() => page !== '...' && handlePageChange(page)}
                   className={currentPage === page ? 'oc-active' : ''}
                   disabled={page === '...'}
                 >
                   {page}
                 </button>
               ))}
-              
-              <button 
+
+              <button
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
               >
