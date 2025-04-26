@@ -17,9 +17,9 @@ const OrderCreate = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState('asc');
   const [currentPage, setCurrentPage] = useState(1);
+  const [deliveryDate, setDeliveryDate] = useState('');
   const productsPerPage = 20;
 
-  // Función para generar claves únicas
   const generateProductKey = (product, index) => {
     return `${product.CodigoArticulo}-${product.CodigoProveedor || 'NOPROV'}-${index}`;
   };
@@ -133,12 +133,18 @@ const OrderCreate = () => {
         CifDni: user.cifDni
       }));
 
-      const response = await api.post('/api/orders', { items: itemsToSend });
+      const orderData = {
+        items: itemsToSend,
+        deliveryDate: deliveryDate || null
+      };
+
+      const response = await api.post('/api/orders', orderData);
 
       navigate('/revisar-pedido', {
         state: {
           orderId: response.data.orderId,
           seriePedido: response.data.seriePedido,
+          deliveryDate: deliveryDate,
           success: true
         }
       });
@@ -180,6 +186,25 @@ const OrderCreate = () => {
         </div>
       )}
 
+      <div className="oc-delivery-date">
+        <label htmlFor="deliveryDate">Fecha de entrega deseada (opcional):</label>
+        <input
+          type="date"
+          id="deliveryDate"
+          value={deliveryDate}
+          onChange={(e) => setDeliveryDate(e.target.value)}
+          min={new Date().toISOString().split('T')[0]}
+        />
+        {deliveryDate && (
+          <button 
+            className="oc-clear-date"
+            onClick={() => setDeliveryDate('')}
+          >
+            Limpiar fecha
+          </button>
+        )}
+      </div>
+
       <div className="oc-filters">
         <div className="oc-search-box">
           <input
@@ -202,6 +227,13 @@ const OrderCreate = () => {
       <div className="oc-order-container">
         <div className="oc-order-summary">
           <h3>Resumen del Pedido ({orderItems.length} productos)</h3>
+          
+          {deliveryDate && (
+            <div className="oc-delivery-info">
+              <strong>Fecha de entrega:</strong> {new Date(deliveryDate).toLocaleDateString()}
+            </div>
+          )}
+
           {orderItems.length === 0 ? (
             <p>No hay productos en el pedido</p>
           ) : (
