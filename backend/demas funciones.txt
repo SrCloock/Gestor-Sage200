@@ -1,0 +1,156 @@
+const getOrders = async (req, res) => {
+  try {
+    const pool = await getPool();
+    const { codigoCliente } = req.query;
+
+    if (!codigoCliente) {
+      return res.status(400).json({ success: false, message: 'Código de cliente no proporcionado' });
+    }
+
+    const ordersResult = await pool.request()
+      .input('CodigoCliente', codigoCliente)
+      .query(`
+        SELECT 
+          c.NumeroPedido,
+          c.FechaPedido,
+          c.RazonSocial,
+          c.NumeroLineas,
+          c.StatusAprobado,
+          c.SeriePedido,
+          c.BaseImponible,
+          c.TotalIVA,
+          c.ImporteLiquido,
+          c.FechaEntrega,
+          c.Usuario,
+          c.Domicilio,
+          c.CodigoPostal,
+          c.Municipio,
+          c.Provincia,
+          c.Nacion,
+          c.CodigoContable
+        FROM CabeceraPedidoCliente c
+        WHERE c.CodigoCliente = @CodigoCliente
+        ORDER BY c.FechaPedido DESC
+      `);
+
+    const ordersWithDetails = await Promise.all(
+      ordersResult.recordset.map(async (order) => {
+        const detailsResult = await pool.request()
+          .input('NumeroPedido', order.NumeroPedido)
+          .input('SeriePedido', order.SeriePedido)
+          .query(`
+            SELECT 
+              CodigoArticulo, 
+              DescripcionArticulo,
+              DescripcionLinea,
+              UnidadesPedidas,
+              Precio,
+              ImporteBruto,
+              ImporteNeto,
+              ImporteLiquido,
+              TotalIva
+            FROM LineasPedidoCliente
+            WHERE NumeroPedido = @NumeroPedido
+            AND SeriePedido = @SeriePedido
+            ORDER BY Orden
+          `);
+
+        return {
+          ...order,
+          Estado: order.StatusAprobado === 0 ? 'Pendiente' : 'Aprobado',
+          Productos: detailsResult.recordset
+        };
+      })
+    );
+
+    return res.status(200).json({ success: true, orders: ordersWithDetails });
+
+  } catch (error) {
+    console.error('Error al obtener pedidos:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Error al obtener los pedidos' });
+  }
+};
+
+const getOrderDetails = async (req, res) => {
+  try {
+    const pool = await getPool();
+    const { numeroPedido } = req.params;
+    const { codigoCliente, seriePedido } = req.query;
+
+    if (!codigoCliente || !seriePedido) {
+      return res.status(400).json({ success: false, message: 'Parámetros incompletos' });
+    }
+
+    const orderResult = await pool.request()
+      .input('NumeroPedido', numeroPedido)
+      .input('CodigoCliente', codigoCliente)
+      .input('SeriePedido', seriePedido)
+      .query(`
+        SELECT 
+          NumeroPedido, 
+          FechaPedido, 
+          RazonSocial,
+          StatusAprobado,
+          SeriePedido,
+          BaseImponible,
+          TotalIVA,
+          ImporteLiquido,
+          NumeroLineas,
+          FechaEntrega,
+          Usuario,
+          Domicilio,
+          CodigoPostal,
+          Municipio,
+          Provincia,
+          Nacion,
+          CodigoContable
+        FROM CabeceraPedidoCliente
+        WHERE NumeroPedido = @NumeroPedido
+        AND CodigoCliente = @CodigoCliente
+        AND SeriePedido = @SeriePedido
+      `);
+
+    if (orderResult.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: 'Pedido no encontrado' });
+    }
+
+    const linesResult = await pool.request()
+      .input('NumeroPedido', numeroPedido)
+      .input('SeriePedido', seriePedido)
+      .query(`
+        SELECT 
+          CodigoArticulo, 
+          DescripcionArticulo,
+          DescripcionLinea,
+          UnidadesPedidas,
+          Precio,
+          ImporteBruto,
+          ImporteNeto,
+          ImporteLiquido,
+          TotalIva
+        FROM LineasPedidoCliente
+        WHERE NumeroPedido = @NumeroPedido
+        AND SeriePedido = @SeriePedido
+        ORDER BY Orden
+      `);
+
+    return res.status(200).json({
+      success: true,
+      order: {
+        ...orderResult.recordset[0],
+        Estado: orderResult.recordset[0].StatusAprobado === 0 ? 'Pendiente' : 'Aprobado',
+        Productos: linesResult.recordset
+      }
+    });
+
+  } catch (error) {
+    console.error('Error al obtener detalle del pedido:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Error al obtener el detalle del pedido' });
+  }
+};
+
+module.exports = { 
+  createOrder, 
+  getOrders, 
+  getOrderDetails 
+};

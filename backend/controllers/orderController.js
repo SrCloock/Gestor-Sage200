@@ -22,7 +22,7 @@ const createOrder = async (req, res) => {
         throw new Error('Datos de cliente incompletos en los items');
       }
 
-      // Obtener información completa del cliente
+      // Obtener información del cliente
       const clienteResult = await transaction.request()
         .input('CodigoCliente', primerItem.CodigoCliente)
         .query(`
@@ -30,11 +30,8 @@ const createOrder = async (req, res) => {
             c.CodigoEmpresa, c.RazonSocial, c.CodigoContable, c.IdDelegacion,
             c.Domicilio, c.CodigoPostal, c.Municipio, c.Provincia, c.Nacion,
             c.CodigoNacion, c.CodigoProvincia, c.CodigoMunicipio,
-            cp.Domicilio AS DomicilioCompleto, cp.CodigoPostal AS CPCompleto,
-            cp.Municipio AS MunicipioCompleto, cp.Provincia AS ProvinciaCompleto,
-            cp.Nacion AS NacionCompleto
+            c.SiglaNacion, c.CifDni
           FROM CLIENTES c
-          LEFT JOIN ClientesProveedores cp ON c.CifDni = cp.CifDni AND c.SiglaNacion = cp.SiglaNacion
           WHERE c.CodigoCliente = @CodigoCliente
         `);
 
@@ -45,7 +42,38 @@ const createOrder = async (req, res) => {
       const cliente = clienteResult.recordset[0];
       const codigoEmpresa = cliente.CodigoEmpresa || '9999';
 
-      // Obtener condiciones de pago del cliente
+      // Obtener datos extendidos desde ClientesProveedores (si existen)
+      const cpResult = await transaction.request()
+        .input('CifDni', cliente.CifDni)
+        .input('SiglaNacion', cliente.SiglaNacion)
+        .query(`
+          SELECT 
+            ViaPublica, Numero1, Numero2, Escalera, Piso, Puerta, Letra,
+            CodigoPostal, Municipio, Provincia, Nacion,
+            CodigoNacion, CodigoProvincia, CodigoMunicipio
+          FROM ClientesProveedores
+          WHERE CifDni = @CifDni AND SiglaNacion = @SiglaNacion
+        `);
+
+      const cp = cpResult.recordset[0] || {};
+
+      // Usar datos de ClientesProveedores si están presentes y no vacíos
+      const getDatoPreferente = (cpDato, cDato) =>
+        cpDato !== null && cpDato !== undefined && cpDato !== '' ? cpDato : cDato;
+
+      const domicilio = [
+        cp.ViaPublica, cp.Numero1, cp.Numero2, cp.Escalera, cp.Piso, cp.Puerta, cp.Letra
+      ].filter(Boolean).join(' ') || cliente.Domicilio || '';
+
+      const codigoPostal = getDatoPreferente(cp.CodigoPostal, cliente.CodigoPostal || '');
+      const municipio = getDatoPreferente(cp.Municipio, cliente.Municipio || '');
+      const provincia = getDatoPreferente(cp.Provincia, cliente.Provincia || '');
+      const nacion = getDatoPreferente(cp.Nacion, cliente.Nacion || '');
+      const codigoNacion = getDatoPreferente(cp.CodigoNacion, cliente.CodigoNacion || 'ES');
+      const codigoProvincia = getDatoPreferente(cp.CodigoProvincia, cliente.CodigoProvincia || '');
+      const codigoMunicipio = getDatoPreferente(cp.CodigoMunicipio, cliente.CodigoMunicipio || '');
+
+      // Obtener condiciones de pago
       const clienteContaResult = await transaction.request()
         .input('CodigoCuenta', cliente.CodigoContable)
         .input('CodigoEmpresa', codigoEmpresa)
@@ -96,17 +124,16 @@ const createOrder = async (req, res) => {
       const codigoAlmacen = almacenes['AlmacenDefecto'] || 'CEN';
       const codigoAlmacenAnterior = almacenes['AlmacenFabrica'] || 'CEN';
 
-      // Configurar fechas
+      // Fechas
       const fechaActual = new Date();
       const fechaPedido = `${fechaActual.toISOString().split('T')[0]} 00:00:00.000`;
       const fechaEntrega = deliveryDate 
         ? `${deliveryDate} 00:00:00.000`
         : fechaPedido;
 
-      // Obtener usuario actual (simulado - ajustar según tu sistema de autenticación)
       const usuarioActual = req.user?.username || 'WEB';
 
-      // Insertar cabecera del pedido con todos los campos
+      // Insertar cabecera
       await transaction.request()
         .input('CodigoEmpresa', codigoEmpresa)
         .input('EjercicioPedido', fechaActual.getFullYear())
@@ -120,14 +147,14 @@ const createOrder = async (req, res) => {
         .input('CifDni', primerItem.CifDni)
         .input('RazonSocial', cliente.RazonSocial || '')
         .input('IdDelegacion', cliente.IdDelegacion || '')
-        .input('Domicilio', cliente.DomicilioCompleto || cliente.Domicilio || '')
-        .input('CodigoPostal', cliente.CPCompleto || cliente.CodigoPostal || '')
-        .input('Municipio', cliente.MunicipioCompleto || cliente.Municipio || '')
-        .input('Provincia', cliente.ProvinciaCompleto || cliente.Provincia || '')
-        .input('Nacion', cliente.NacionCompleto || cliente.Nacion || '')
-        .input('CodigoNacion', cliente.CodigoNacion || 'ES')
-        .input('CodigoProvincia', cliente.CodigoProvincia || '')
-        .input('CodigoMunicipio', cliente.CodigoMunicipio || '')
+        .input('Domicilio', domicilio)
+        .input('CodigoPostal', codigoPostal)
+        .input('Municipio', municipio)
+        .input('Provincia', provincia)
+        .input('Nacion', nacion)
+        .input('CodigoNacion', codigoNacion)
+        .input('CodigoProvincia', codigoProvincia)
+        .input('CodigoMunicipio', codigoMunicipio)
         .input('CodigoContable', cliente.CodigoContable || '')
         .input('StatusAprobado', 0)
         .input('MantenerCambio_', -1)
@@ -139,7 +166,6 @@ const createOrder = async (req, res) => {
         .input('TotalIva', 0)
         .input('ImporteLiquido', 0)
         .input('NumeroLineas', 0)
-        .input('Usuario', usuarioActual)
         .query(`
           INSERT INTO CabeceraPedidoCliente (
             CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido,
@@ -151,7 +177,7 @@ const createOrder = async (req, res) => {
             SiglaNacion,
             NumeroPlazos, DiasPrimerPlazo, DiasEntrePlazos,
             BaseImponible, TotalIva, ImporteLiquido,
-            NumeroLineas, Usuario
+            NumeroLineas
           )
           VALUES (
             @CodigoEmpresa, @EjercicioPedido, @SeriePedido, @NumeroPedido,
@@ -163,10 +189,11 @@ const createOrder = async (req, res) => {
             @SiglaNacion,
             @NumeroPlazos, @DiasPrimerPlazo, @DiasEntrePlazos,
             @BaseImponible, @TotalIva, @ImporteLiquido,
-            @NumeroLineas, @Usuario
+            @NumeroLineas
           )
         `);
 
+        
       // Insertar cada línea del pedido
       for (const [index, item] of items.entries()) {
         const articuloResult = await transaction.request()
@@ -363,6 +390,7 @@ const getOrders = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Código de cliente no proporcionado' });
     }
 
+    // Consulta principal de pedidos con paginación básica
     const ordersResult = await pool.request()
       .input('CodigoCliente', codigoCliente)
       .query(`
@@ -387,8 +415,10 @@ const getOrders = async (req, res) => {
         FROM CabeceraPedidoCliente c
         WHERE c.CodigoCliente = @CodigoCliente
         ORDER BY c.FechaPedido DESC
+        OFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY
       `);
 
+    // Obtener detalles de cada pedido
     const ordersWithDetails = await Promise.all(
       ordersResult.recordset.map(async (order) => {
         const detailsResult = await pool.request()
@@ -419,11 +449,19 @@ const getOrders = async (req, res) => {
       })
     );
 
-    return res.status(200).json({ success: true, orders: ordersWithDetails });
+    return res.status(200).json({ 
+      success: true, 
+      orders: ordersWithDetails,
+      total: ordersWithDetails.length,
+      message: 'Pedidos obtenidos correctamente'
+    });
 
   } catch (error) {
     console.error('Error al obtener pedidos:', error);
-    return res.status(500).json({ success: false, message: error.message || 'Error al obtener los pedidos' });
+    return res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Error al obtener los pedidos' 
+    });
   }
 };
 
@@ -434,9 +472,13 @@ const getOrderDetails = async (req, res) => {
     const { codigoCliente, seriePedido } = req.query;
 
     if (!codigoCliente || !seriePedido) {
-      return res.status(400).json({ success: false, message: 'Parámetros incompletos' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Parámetros incompletos (se requieren codigoCliente y seriePedido)' 
+      });
     }
 
+    // Consulta de la cabecera del pedido
     const orderResult = await pool.request()
       .input('NumeroPedido', numeroPedido)
       .input('CodigoCliente', codigoCliente)
@@ -467,9 +509,13 @@ const getOrderDetails = async (req, res) => {
       `);
 
     if (orderResult.recordset.length === 0) {
-      return res.status(404).json({ success: false, message: 'Pedido no encontrado' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Pedido no encontrado' 
+      });
     }
 
+    // Consulta de las líneas del pedido
     const linesResult = await pool.request()
       .input('NumeroPedido', numeroPedido)
       .input('SeriePedido', seriePedido)
@@ -496,12 +542,16 @@ const getOrderDetails = async (req, res) => {
         ...orderResult.recordset[0],
         Estado: orderResult.recordset[0].StatusAprobado === 0 ? 'Pendiente' : 'Aprobado',
         Productos: linesResult.recordset
-      }
+      },
+      message: 'Detalle del pedido obtenido correctamente'
     });
 
   } catch (error) {
     console.error('Error al obtener detalle del pedido:', error);
-    return res.status(500).json({ success: false, message: error.message || 'Error al obtener el detalle del pedido' });
+    return res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Error al obtener el detalle del pedido' 
+    });
   }
 };
 

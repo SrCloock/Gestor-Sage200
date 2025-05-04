@@ -13,7 +13,15 @@ const login = async (req, res) => {
           CodigoCliente, 
           CifDni, 
           UsuarioLogicNet,
-          RazonSocial
+          RazonSocial,
+          Domicilio,
+          CodigoPostal,
+          Municipio,
+          Provincia,
+          CodigoProvincia,
+          CodigoNacion,
+          Nacion,
+          SiglaNacion
         FROM CLIENTES 
         WHERE UsuarioLogicNet = @username 
         AND ContraseñaLogicNet = @password
@@ -28,7 +36,15 @@ const login = async (req, res) => {
           codigoCliente: userData.CodigoCliente.trim(),
           cifDni: userData.CifDni.trim(),
           username: userData.UsuarioLogicNet,
-          razonSocial: userData.RazonSocial
+          razonSocial: userData.RazonSocial,
+          domicilio: userData.Domicilio || '',
+          codigoPostal: userData.CodigoPostal || '',
+          municipio: userData.Municipio || '',
+          provincia: userData.Provincia || '',
+          codigoProvincia: userData.CodigoProvincia || '',
+          codigoNacion: userData.CodigoNacion || 'ES',
+          nacion: userData.Nacion || '',
+          siglaNacion: userData.SiglaNacion || 'ES'
         }
       });
     } else {
