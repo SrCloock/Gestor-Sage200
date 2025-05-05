@@ -2,9 +2,9 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api';
-import './OrderDetail.css';
+import './OrderSupplierDetail.css';
 
-const OrderDetail = () => {
+const OrderSupplierDetail = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
@@ -17,9 +17,9 @@ const OrderDetail = () => {
       try {
         setLoading(true);
         setError('');
-        const response = await api.get(`/api/orders/${orderId}`, {
+        const response = await api.get(`/api/supplier-orders/${orderId}`, {
           params: {
-            codigoCliente: user?.codigoCliente,
+            codigoProveedor: user?.codigoProveedor,
             seriePedido: 'Web' 
           }
         });
@@ -32,7 +32,7 @@ const OrderDetail = () => {
       }
     };
   
-    if (user?.codigoCliente) {
+    if (user?.codigoProveedor) {
       fetchOrderDetails();
     }
   }, [orderId, user]);
@@ -48,9 +48,9 @@ const OrderDetail = () => {
       </button>
       
       <div className="order-header">
-        <h2>Pedido #{order.NumeroPedido}</h2>
-        <span className={`status-badge ${order.Estado === 'Aprobado' ? 'approved' : 'pending'}`}>
-          {order.Estado || 'Pendiente'}
+        <h2>Pedido a Proveedor #{order.NumeroPedido}</h2>
+        <span className={`status-badge ${order.StatusAprobado ? 'approved' : 'pending'}`}>
+          {order.StatusAprobado ? 'Aprobado' : 'Pendiente'}
         </span>
       </div>
       
@@ -61,20 +61,20 @@ const OrderDetail = () => {
             <span className="info-label">Fecha de Pedido:</span>
             <span>{new Date(order.FechaPedido).toLocaleDateString()}</span>
           </div>
-          {order.FechaNecesaria && (
+          {order.FechaEntrega && (
             <div className="info-row">
-              <span className="info-label">Fecha Necesaria:</span>
-              <span>{new Date(order.FechaNecesaria).toLocaleDateString()}</span>
+              <span className="info-label">Fecha de Entrega:</span>
+              <span>{new Date(order.FechaEntrega).toLocaleDateString()}</span>
             </div>
           )}
           <div className="info-row">
             <span className="info-label">Total Artículos:</span>
-            <span>{order.Productos.length}</span>
+            <span>{order.lineas.length}</span>
           </div>
         </div>
         
         <div className="info-card">
-          <h3>Información del Cliente</h3>
+          <h3>Información del Proveedor</h3>
           <div className="info-row">
             <span className="info-label">Razón Social:</span>
             <span>{order.RazonSocial}</span>
@@ -94,14 +94,18 @@ const OrderDetail = () => {
               <th>Código</th>
               <th>Descripción</th>
               <th>Cantidad</th>
+              <th>Precio</th>
+              <th>Total</th>
             </tr>
           </thead>
           <tbody>
-            {order.Productos.map((product, index) => (
+            {order.lineas.map((product, index) => (
               <tr key={index}>
                 <td>{product.CodigoArticulo}</td>
                 <td>{product.DescripcionArticulo}</td>
                 <td>{product.UnidadesPedidas}</td>
+                <td>{product.Precio.toFixed(2)} €</td>
+                <td>{product.ImporteTotal.toFixed(2)} €</td>
               </tr>
             ))}
           </tbody>
@@ -111,4 +115,4 @@ const OrderDetail = () => {
   );
 };
 
-export default OrderDetail;
+export default OrderSupplierDetail;

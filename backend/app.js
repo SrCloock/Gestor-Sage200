@@ -3,6 +3,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/productRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const supplierOrderController = require('./routes/orderSupplierRoutes');
 const { connect } = require('./db/Sage200db');
 
 const app = express();
@@ -52,6 +53,7 @@ connect().then(() => {
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/supplier-orders', supplierOrderController); // Nueva ruta para proveedores
 
 // Middleware de errores
 app.use((err, req, res, next) => {

@@ -2,9 +2,9 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api';
-import './OrderCreate.css';
+import './OrderSupplierCreate.css';
 
-const OrderCreate = () => {
+const OrderSupplierCreate = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
@@ -151,19 +151,20 @@ const OrderCreate = () => {
         deliveryDate: deliveryDate || null
       };
 
-      const response = await api.post('/api/orders', orderData);
+      const response = await api.post('/api/supplier-orders', orderData);
 
-      navigate('/revisar-pedido', {
+      navigate('/revisar-pedido-proveedor', {
         state: {
           orderId: response.data.orderId,
           seriePedido: response.data.seriePedido,
           deliveryDate: deliveryDate,
+          items: orderItems,
           success: true
         }
       });
     } catch (err) {
-      console.error('Error al crear pedido:', err);
-      setError(err.response?.data?.message || err.message || 'Error al crear el pedido');
+      console.error('Error al crear pedido a proveedor:', err);
+      setError(err.response?.data?.message || err.message || 'Error al crear el pedido a proveedor');
     } finally {
       setLoading((prev) => ({ ...prev, submit: false }));
     }
@@ -188,12 +189,12 @@ const OrderCreate = () => {
   if (reviewMode) {
     return (
       <div className="review-container">
-        <h2>Revisar Pedido</h2>
-        <p>Por favor revise los detalles de su pedido antes de confirmar</p>
+        <h2>Revisar Pedido a Proveedor</h2>
+        <p>Por favor revise los detalles de su pedido a proveedor antes de confirmar</p>
         
         <div className="review-summary">
           <div className="review-header">
-            <h3>Resumen del Pedido</h3>
+            <h3>Resumen del Pedido a Proveedor</h3>
             <p><strong>Número de productos:</strong> {orderItems.length}</p>
             {deliveryDate && (
               <p><strong>Fecha de entrega:</strong> {new Date(deliveryDate).toLocaleDateString()}</p>
@@ -219,7 +220,7 @@ const OrderCreate = () => {
               Editar Pedido
             </button>
             <button onClick={handleSubmitOrder} className="confirm-button">
-              Confirmar Pedido
+              {loading.submit ? 'Enviando...' : 'Confirmar Pedido a Proveedor'}
             </button>
           </div>
         </div>
@@ -232,7 +233,7 @@ const OrderCreate = () => {
 
   return (
     <div className="oc-container">
-      <h2>Crear Nuevo Pedido</h2>
+      <h2>Crear Nuevo Pedido a Proveedor</h2>
 
       {error && (
         <div className="oc-error-message">
@@ -290,7 +291,7 @@ const OrderCreate = () => {
           )}
 
           {orderItems.length === 0 ? (
-            <p>No hay productos en el pedido</p>
+            <p>No hay productos en el pedido a proveedor</p>
           ) : (
             <>
               <ul className="oc-order-items">
@@ -343,7 +344,7 @@ const OrderCreate = () => {
                 onClick={handleReviewOrder}
                 disabled={orderItems.length === 0 || loading.submit}
               >
-                {loading.submit ? 'Procesando...' : 'Revisar Pedido'}
+                {loading.submit ? 'Procesando...' : 'Revisar Pedido a Proveedor'}
               </button>
             </>
           )}
@@ -407,4 +408,4 @@ const OrderCreate = () => {
   );
 };
 
-export default OrderCreate;
+export default OrderSupplierCreate;

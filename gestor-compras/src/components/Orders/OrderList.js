@@ -78,14 +78,14 @@ const OrderList = () => {
   if (error) return <div className="error">{error}</div>;
 
   return (
-    <div className="order-list">
-      <h2>Mis Pedidos</h2>
+    <div className="order-list-container">
+      <h2>Historial de Pedidos</h2>
       
       <div className="order-filters">
         <div className="search-box">
           <input
             type="text"
-            placeholder="Buscar por número de pedido..."
+            placeholder="Buscar por #Pedido..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -96,56 +96,58 @@ const OrderList = () => {
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
             <option value="recent">Más recientes primero</option>
             <option value="oldest">Más antiguos primero</option>
-            <option value="id-asc">Número de pedido (ascendente)</option>
-            <option value="id-desc">Número de pedido (descendente)</option>
+            <option value="id-asc">#Pedido (ascendente)</option>
+            <option value="id-desc">#Pedido (descendente)</option>
           </select>
         </div>
       </div>
       
       {filteredOrders.length === 0 ? (
-        <p>No se encontraron pedidos con los filtros aplicados</p>
+        <div className="no-orders">
+          No se encontraron pedidos con los filtros aplicados
+        </div>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Número</th>
-              <th>Fecha</th>
-              <th>Productos</th>
-              <th>Total Items</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredOrders.map(order => (
-              <tr key={order.NumeroPedido}>
-                <td>{order.NumeroPedido}</td>
-                <td>{new Date(order.FechaPedido).toLocaleDateString()}</td>
-                <td>
-                  <ul className="product-list">
-                    {order.Productos.slice(0, 3).map((product, index) => (
-                      <li key={index}>
-                        {product.CodigoArticulo} - {product.DescripcionArticulo} 
-                        (x{product.UnidadesPedidas})
-                      </li>
-                    ))}
-                    {order.Productos.length > 3 && (
-                      <li>... y {order.Productos.length - 3} más</li>
-                    )}
-                  </ul>
-                </td>
-                <td>{order.NumeroLineas}</td>
-                <td>
-                  <button 
-                    onClick={() => handleViewDetails(order.NumeroPedido)}
-                    className="view-button"
-                  >
-                    Ver Detalle
-                  </button>
-                </td>
+        <div className="orders-table-container">
+          <table className="orders-table">
+            <thead>
+              <tr>
+                <th>#Pedido</th>
+                <th>Fecha Pedido</th>
+                <th>Fecha Necesaria</th>
+                <th>Artículos</th>
+                <th>Estado</th>
+                <th>Acciones</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredOrders.map(order => (
+                <tr key={order.NumeroPedido}>
+                  <td>{order.NumeroPedido}</td>
+                  <td>{new Date(order.FechaPedido).toLocaleDateString()}</td>
+                  <td>
+                    {order.FechaNecesaria 
+                      ? new Date(order.FechaNecesaria).toLocaleDateString() 
+                      : 'No especificada'}
+                  </td>
+                  <td>{order.NumeroLineas}</td>
+                  <td>
+                    <span className={`status-badge ${order.Estado === 'Aprobado' ? 'approved' : 'pending'}`}>
+                      {order.Estado || 'Pendiente'}
+                    </span>
+                  </td>
+                  <td>
+                    <button 
+                      onClick={() => handleViewDetails(order.NumeroPedido)}
+                      className="view-button"
+                    >
+                      Ver Detalle
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

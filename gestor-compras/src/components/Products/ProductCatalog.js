@@ -117,26 +117,30 @@ const ProductCatalog = () => {
 
   return (
     <div className="pc-container">
-      <h2>Catálogo de Productos</h2>
+      <div className="pc-header">
+        <h2>Catálogo de Productos</h2>
+        <p>{filteredProducts.length} productos disponibles</p>
+      </div>
       
-      <div className="pc-filters">
+      <div className="pc-controls">
         <div className="pc-search-box">
           <input
             type="text"
-            placeholder="Buscar por nombre o proveedor..."
+            placeholder="Buscar productos..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          <span className="search-icon">🔍</span>
         </div>
         
         <div className="pc-sort-options">
-          <label>Ordenar:</label>
           <select 
             value={sortOrder} 
             onChange={(e) => setSortOrder(e.target.value)}
+            className="styled-select"
           >
-            <option value="asc">A-Z</option>
-            <option value="desc">Z-A</option>
+            <option value="asc">Ordenar A-Z</option>
+            <option value="desc">Ordenar Z-A</option>
           </select>
         </div>
       </div>
@@ -146,12 +150,23 @@ const ProductCatalog = () => {
           currentProducts.map(product => (
             <div 
               key={generateProductKey(product)}
-              className="pc-product-item"
+              className="pc-product-card"
               onClick={() => handleProductClick(product)}
             >
-              <h3>{product.DescripcionArticulo}</h3>
-              <p><strong>Código:</strong> {product.CodigoArticulo}</p>
-              {product.NombreProveedor && <p><strong>Proveedor:</strong> {product.NombreProveedor}</p>}
+              <div className="product-header">
+                <h3>{product.DescripcionArticulo}</h3>
+                <span className="product-code">{product.CodigoArticulo}</span>
+              </div>
+              {product.NombreProveedor && (
+                <div className="product-supplier">
+                  <span>Proveedor:</span> {product.NombreProveedor}
+                </div>
+              )}
+              <div className="product-actions">
+                <button className="add-button">
+                  Añadir al pedido
+                </button>
+              </div>
             </div>
           ))
         ) : (

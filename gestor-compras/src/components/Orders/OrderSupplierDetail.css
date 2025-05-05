@@ -1,0 +1,134 @@
+.order-supplier-detail-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  
+  .order-supplier-back-button {
+    background: none;
+    border: none;
+    color: #00796b;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 1.5rem;
+    padding: 8px 0;
+  }
+  
+  .order-supplier-back-button:hover {
+    text-decoration: underline;
+  }
+  
+  .order-supplier-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  
+  .order-supplier-header h2 {
+    color: #00796b;
+    margin: 0;
+  }
+  
+  .order-supplier-status-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+  
+  .order-supplier-status-badge.approved {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+  }
+  
+  .order-supplier-status-badge.pending {
+    background-color: #fff8e1;
+    color: #f57f17;
+  }
+  
+  .order-supplier-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  
+  .order-supplier-info-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .order-supplier-info-card h3 {
+    color: #00796b;
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  
+  .order-supplier-info-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  
+  .order-supplier-info-label {
+    font-weight: 500;
+    color: #00796b;
+  }
+  
+  .order-supplier-products-title {
+    color: #00796b;
+    margin: 2rem 0 1rem;
+  }
+  
+  .order-supplier-products-container {
+    overflow-x: auto;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+  }
+  
+  .order-supplier-products-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .order-supplier-products-table th {
+    background-color: #e0f2f1;
+    color: #00796b;
+    padding: 12px 15px;
+    text-align: left;
+  }
+  
+  .order-supplier-products-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .order-supplier-products-table tr:last-child td {
+    border-bottom: none;
+  }
+  
+  .order-supplier-products-table tr:hover {
+    background-color: #f5f5f5;
+  }
+  
+  .order-supplier-loading, 
+  .order-supplier-error {
+    text-align: center;
+    padding: 2rem;
+    font-size: 1.2rem;
+  }
+  
+  .order-supplier-error {
+    color: #d32f2f;
+  }
