@@ -141,9 +141,9 @@ const createSupplierOrder = async (req, res) => {
         .input('NumeroPedido', numeroPedido)
         .input('FechaPedido', fechaPedido)
         .input('FechaNecesaria', fechaEntrega)
-        .input('FechaEntrega', fechaEntrega)
+
         .input('FechaTope', fechaEntrega)
-        .input('CodigoCliente', primerItem.CodigoCliente)
+
         .input('CifDni', primerItem.CifDni)
         .input('RazonSocial', cliente.RazonSocial || '')
         .input('IdDelegacion', cliente.IdDelegacion || '')
@@ -169,8 +169,8 @@ const createSupplierOrder = async (req, res) => {
         .query(`
           INSERT INTO CabeceraPedidoProveedor (
             CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido,
-            FechaPedido, FechaNecesaria, FechaEntrega, FechaTope,
-            CodigoCliente, CifDni, RazonSocial, IdDelegacion,
+            FechaPedido, FechaNecesaria, FechaTope,
+             CifDni, RazonSocial, IdDelegacion,
             Domicilio, CodigoPostal, Municipio, Provincia, Nacion,
             CodigoNacion, CodigoProvincia, CodigoMunicipio, CodigoContable,
             StatusAprobado, MantenerCambio_,
@@ -181,8 +181,8 @@ const createSupplierOrder = async (req, res) => {
           )
           VALUES (
             @CodigoEmpresa, @EjercicioPedido, @SeriePedido, @NumeroPedido,
-            @FechaPedido, @FechaNecesaria, @FechaEntrega, @FechaTope,
-            @CodigoCliente, @CifDni, @RazonSocial, @IdDelegacion,
+            @FechaPedido, @FechaNecesaria, @FechaTope,
+             @CifDni, @RazonSocial, @IdDelegacion,
             @Domicilio, @CodigoPostal, @Municipio, @Provincia, @Nacion,
             @CodigoNacion, @CodigoProvincia, @CodigoMunicipio, @CodigoContable,
             @StatusAprobado, @MantenerCambio_,

@@ -23,14 +23,12 @@ const Navbar = () => {
           </li>
           <li>
             <Link to="/crear-pedido" className={location.pathname === '/crear-pedido' ? 'active' : ''}>
-              <FaShoppingCart className="icon" /> Pedido Cliente
+              <FaShoppingCart className="icon" /> Nuevo Pedido
             </Link>
           </li>
-          <li>
-            <Link to="/crear-pedido-proveedor" className={location.pathname === '/crear-pedido-proveedor' ? 'active' : ''}>
+          <Link to="/crear-pedido-proveedor" className={location.pathname === '/crear-pedido-proveedor' ? 'active' : ''}>
               <FaTruck className="icon" /> Pedido Proveedor
             </Link>
-          </li>
           <li>
             <Link to="/mis-pedidos" className={location.pathname === '/mis-pedidos' ? 'active' : ''}>
               <FaHistory className="icon" /> Historial
