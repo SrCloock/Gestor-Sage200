@@ -1,15 +1,19 @@
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
+const path = require('path');
+const fs = require('fs');
 const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/productRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const supplierOrderController = require('./routes/orderSupplierRoutes');
-const { connect } = require('./db/Sage200db');
+const { getPool, connect, close } = require('./db/Sage200db');
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 
-// Configuración CORS detallada
+// Configuración CORS
 const allowedOrigins = ['http://localhost:3000'];
 
 const corsOptions = {
@@ -26,8 +30,6 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-// Manejo de preflight requests
 app.options('*', cors(corsOptions));
 
 // Middleware para headers
@@ -42,20 +44,83 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Conectar a la base de datos
-connect().then(() => {
-  console.log('✅ Base de datos conectada');
-}).catch(err => {
-  console.error('❌ Error al conectar a la base de datos:', err);
+// Servir archivos estáticos
+app.use('/images', express.static(path.join(__dirname, 'public', 'images')));
+
+// Conectar a la base de datos e inicializar imágenes
+let dbConnected = false;
+
+const initializeImagePaths = async () => {
+  const pool = await getPool();
+  const imagesDir = path.join(__dirname, 'public', 'images');
+  
+  if (!fs.existsSync(imagesDir)) {
+    fs.mkdirSync(imagesDir, { recursive: true });
+    console.log('📁 Carpeta de imágenes creada');
+    return;
+  }
+
+  const imageFiles = fs.readdirSync(imagesDir)
+    .filter(file => /\.(jpg|jpeg|png|gif|webp)$/i.test(file) && file !== 'default-product.jpg');
+
+  console.log(`🖼️ Encontradas ${imageFiles.length} imágenes para registrar`);
+
+  for (const file of imageFiles) {
+    const codigoArticulo = path.parse(file).name;
+    
+    try {
+      const updateResult = await pool.request()
+        .input('codigo', codigoArticulo)
+        .input('ruta', file)
+        .query(`
+          UPDATE Articulos 
+          SET RutaImagen = @ruta 
+          WHERE CodigoArticulo = @codigo
+          AND (RutaImagen IS NULL OR RutaImagen != @ruta)
+        `);
+
+      if (updateResult.rowsAffected[0] > 0) {
+        console.log(`✅ Imagen registrada: ${file} → Artículo ${codigoArticulo}`);
+      }
+    } catch (error) {
+      console.error(`❌ Error al registrar ${file}:`, error.message);
+    }
+  }
+};
+
+connect()
+  .then(async () => {
+    dbConnected = true;
+    console.log('✅ Base de datos conectada');
+    
+    try {
+      await initializeImagePaths();
+      console.log('🔄 Migración de imágenes completada');
+    } catch (err) {
+      console.error('⚠️ Error en migración de imágenes:', err.message);
+    }
+  })
+  .catch(err => {
+    console.error('❌ Error al conectar a la base de datos:', err);
+    process.exit(1);
+  });
+
+// Health Check
+app.get('/health', (req, res) => {
+  res.status(dbConnected ? 200 : 503).json({
+    status: dbConnected ? 'OK' : 'ERROR',
+    database: dbConnected ? 'CONNECTED' : 'DISCONNECTED',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Rutas
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/supplier-orders', supplierOrderController); // Nueva ruta para proveedores
+app.use('/api/supplier-orders', supplierOrderController);
 
-// Middleware de errores
+// Manejo de errores
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
@@ -65,6 +130,35 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+// Cierre limpio
+const gracefulShutdown = () => {
+  console.log('\n🛑 Recibida señal de apagado...');
+  
+  server.close(async () => {
+    console.log('🔴 Servidor detenido');
+    
+    try {
+      await close();
+      console.log('🔌 Conexión a BD cerrada');
+      process.exit(0);
+    } catch (err) {
+      console.error('❌ Error al cerrar conexión a BD:', err);
+      process.exit(1);
+    }
+  });
+
+  setTimeout(() => {
+    console.error('⌛ Forzando cierre por timeout');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
+// Iniciar servidor
+server.listen(PORT, () => {
+  console.log(`🚀 Servidor escuchando en http://localhost:${PORT}`);
 });
+
+module.exports = { app, server };

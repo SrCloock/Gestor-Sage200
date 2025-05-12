@@ -22,7 +22,7 @@ const createSupplierOrder = async (req, res) => {
         throw new Error('Datos de cliente incompletos en los items');
       }
 
-      // Obtener información del cliente (igual que en orderController)
+      // Obtener información del cliente
       const clienteResult = await transaction.request()
         .input('CodigoCliente', primerItem.CodigoCliente)
         .query(`
@@ -42,7 +42,7 @@ const createSupplierOrder = async (req, res) => {
       const cliente = clienteResult.recordset[0];
       const codigoEmpresa = cliente.CodigoEmpresa || '9999';
 
-      // Obtener datos extendidos desde ClientesProveedores (igual que en orderController)
+      // Obtener datos extendidos desde ClientesProveedores (si existen)
       const cpResult = await transaction.request()
         .input('CifDni', cliente.CifDni)
         .input('SiglaNacion', cliente.SiglaNacion)
@@ -57,7 +57,7 @@ const createSupplierOrder = async (req, res) => {
 
       const cp = cpResult.recordset[0] || {};
 
-      // Usar datos de ClientesProveedores si están presentes (igual que en orderController)
+      // Usar datos de ClientesProveedores si están presentes y no vacíos
       const getDatoPreferente = (cpDato, cDato) =>
         cpDato !== null && cpDato !== undefined && cpDato !== '' ? cpDato : cDato;
 
@@ -73,7 +73,7 @@ const createSupplierOrder = async (req, res) => {
       const codigoProvincia = getDatoPreferente(cp.CodigoProvincia, cliente.CodigoProvincia || '');
       const codigoMunicipio = getDatoPreferente(cp.CodigoMunicipio, cliente.CodigoMunicipio || '');
 
-      // Obtener condiciones de pago (igual que en orderController)
+      // Obtener condiciones de pago
       const clienteContaResult = await transaction.request()
         .input('CodigoCuenta', cliente.CodigoContable)
         .input('CodigoEmpresa', codigoEmpresa)
@@ -87,14 +87,14 @@ const createSupplierOrder = async (req, res) => {
         ? clienteContaResult.recordset[0]
         : { NumeroPlazos: 3, DiasPrimerPlazo: 30, DiasEntrePlazos: 30 };
 
-      // Obtener próximo número de pedido (igual que en orderController)
+      // Obtener próximo número de pedido
       const contadorResult = await transaction.request()
         .input('sysGrupo', codigoEmpresa)
         .query(`
           SELECT sysContadorValor 
           FROM LSYSCONTADORES
           WHERE sysGrupo = @sysGrupo
-          AND sysNombreContador = 'PEDIDOS_CLI'
+          AND sysNombreContador = 'PEDIDOS_PROV'
           AND (sysNumeroSerie = 'Web' OR sysNumeroSerie IS NULL)
         `);
 
@@ -103,7 +103,7 @@ const createSupplierOrder = async (req, res) => {
         numeroPedido = contadorResult.recordset[0].sysContadorValor + 1;
       }
 
-      // Obtener almacenes por defecto (igual que en orderController)
+      // Obtener almacenes por defecto
       const almacenesResult = await transaction.request()
         .input('sysGrupo', codigoEmpresa)
         .input('sysContenidoIni', 'cen')
@@ -124,7 +124,7 @@ const createSupplierOrder = async (req, res) => {
       const codigoAlmacen = almacenes['AlmacenDefecto'] || 'CEN';
       const codigoAlmacenAnterior = almacenes['AlmacenFabrica'] || 'CEN';
 
-      // Fechas (igual que en orderController)
+      // Fechas
       const fechaActual = new Date();
       const fechaPedido = `${fechaActual.toISOString().split('T')[0]} 00:00:00.000`;
       const fechaEntrega = deliveryDate 
@@ -133,7 +133,7 @@ const createSupplierOrder = async (req, res) => {
 
       const usuarioActual = req.user?.username || 'WEB';
 
-      // Insertar cabecera (CAMBIADO a CabeceraPedidoProveedor)
+      // Insertar cabecera con las columnas correctas
       await transaction.request()
         .input('CodigoEmpresa', codigoEmpresa)
         .input('EjercicioPedido', fechaActual.getFullYear())
@@ -141,27 +141,22 @@ const createSupplierOrder = async (req, res) => {
         .input('NumeroPedido', numeroPedido)
         .input('FechaPedido', fechaPedido)
         .input('FechaNecesaria', fechaEntrega)
-
-        .input('FechaTope', fechaEntrega)
-
         .input('CifDni', primerItem.CifDni)
         .input('RazonSocial', cliente.RazonSocial || '')
         .input('IdDelegacion', cliente.IdDelegacion || '')
         .input('Domicilio', domicilio)
         .input('CodigoPostal', codigoPostal)
-        .input('Municipio', municipio)
-        .input('Provincia', provincia)
-        .input('Nacion', nacion)
-        .input('CodigoNacion', codigoNacion)
-        .input('CodigoProvincia', codigoProvincia)
         .input('CodigoMunicipio', codigoMunicipio)
-        .input('CodigoContable', cliente.CodigoContable || '')
-        .input('StatusAprobado', 0)
-        .input('MantenerCambio_', -1)
+        .input('Municipio', municipio)
+        .input('CodigoProvincia', codigoProvincia)
+        .input('Provincia', provincia)
+        .input('CodigoNacion', codigoNacion)
+        .input('Nacion', nacion)
         .input('SiglaNacion', 'ES')
         .input('NumeroPlazos', condicionesPago.NumeroPlazos)
         .input('DiasPrimerPlazo', condicionesPago.DiasPrimerPlazo)
         .input('DiasEntrePlazos', condicionesPago.DiasEntrePlazos)
+        .input('StatusAprobado', 0)
         .input('BaseImponible', 0)
         .input('TotalIva', 0)
         .input('ImporteLiquido', 0)
@@ -169,31 +164,29 @@ const createSupplierOrder = async (req, res) => {
         .query(`
           INSERT INTO CabeceraPedidoProveedor (
             CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido,
-            FechaPedido, FechaNecesaria, FechaTope,
-             CifDni, RazonSocial, IdDelegacion,
-            Domicilio, CodigoPostal, Municipio, Provincia, Nacion,
-            CodigoNacion, CodigoProvincia, CodigoMunicipio, CodigoContable,
-            StatusAprobado, MantenerCambio_,
-            SiglaNacion,
+            FechaPedido, FechaNecesaria,
+            CifDni, RazonSocial, IdDelegacion,
+            Domicilio, CodigoPostal, CodigoMunicipio, Municipio, 
+            CodigoProvincia, Provincia, CodigoNacion, Nacion, SiglaNacion,
             NumeroPlazos, DiasPrimerPlazo, DiasEntrePlazos,
+            StatusAprobado,
             BaseImponible, TotalIva, ImporteLiquido,
             NumeroLineas
           )
           VALUES (
             @CodigoEmpresa, @EjercicioPedido, @SeriePedido, @NumeroPedido,
-            @FechaPedido, @FechaNecesaria, @FechaTope,
-             @CifDni, @RazonSocial, @IdDelegacion,
-            @Domicilio, @CodigoPostal, @Municipio, @Provincia, @Nacion,
-            @CodigoNacion, @CodigoProvincia, @CodigoMunicipio, @CodigoContable,
-            @StatusAprobado, @MantenerCambio_,
-            @SiglaNacion,
+            @FechaPedido, @FechaNecesaria,
+            @CifDni, @RazonSocial, @IdDelegacion,
+            @Domicilio, @CodigoPostal, @CodigoMunicipio, @Municipio,
+            @CodigoProvincia, @Provincia, @CodigoNacion, @Nacion, @SiglaNacion,
             @NumeroPlazos, @DiasPrimerPlazo, @DiasEntrePlazos,
+            @StatusAprobado,
             @BaseImponible, @TotalIva, @ImporteLiquido,
             @NumeroLineas
           )
         `);
 
-      // Insertar cada línea del pedido (CAMBIADO a LineasPedidoProveedor)
+      // Insertar cada línea del pedido con las columnas correctas
       for (const [index, item] of items.entries()) {
         const articuloResult = await transaction.request()
           .input('CodigoArticulo', item.CodigoArticulo)
@@ -245,55 +238,45 @@ const createSupplierOrder = async (req, res) => {
           .input('DescripcionArticulo', articulo.DescripcionArticulo)
           .input('DescripcionLinea', descripcionLinea)
           .input('UnidadesPedidas', unidadesPedidas)
-          .input('UnidadesPendientes', unidadesPedidas)
-          .input('Unidades2_', unidadesPedidas)
-          .input('UnidadesPendientesFabricar', unidadesPedidas)
           .input('Precio', precio)
           .input('ImporteBruto', baseImponible)
           .input('ImporteNeto', baseImponible)
-          .input('ImporteParcial', baseImponible)
           .input('BaseImponible', baseImponible)
-          .input('BaseIva', baseImponible)
           .input('CuotaIva', cuotaIva)
           .input('TotalIva', cuotaIva)
           .input('ImporteLiquido', importeLiquido)
           .input('CodigoIva', tipoIva.CodigoIva)
           .input('PorcentajeIva', porcentajeIva)
-          .input('GrupoIva', tipoIva.CodigoTerritorio)
           .input('CodigoAlmacen', codigoAlmacen)
           .input('CodigoAlmacenAnterior', codigoAlmacenAnterior)
           .input('FechaRegistro', `${fechaActual.toISOString().split('T')[0]} 00:00:00.000`)
-          .input('CodigoDelCliente', '')
-          .input('CodigoProveedor', '')
           .query(`
             INSERT INTO LineasPedidoProveedor (
               CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido, Orden,
               CodigoArticulo, DescripcionArticulo, DescripcionLinea,
-              UnidadesPedidas, UnidadesPendientes, Unidades2_, UnidadesPendientesFabricar,
+              UnidadesPedidas,
               Precio,
-              ImporteBruto, ImporteNeto, ImporteParcial,
-              BaseImponible, BaseIva,
+              ImporteBruto, ImporteNeto,
+              BaseImponible,
               CuotaIva, TotalIva, ImporteLiquido,
-              CodigoIva, [%Iva], GrupoIva,
-              CodigoAlmacen, CodigoAlmacenAnterior, FechaRegistro,
-              CodigoDelCliente, CodigoProveedor
+              CodigoIva, [%Iva],
+              CodigoAlmacen, CodigoAlmacenAnterior, FechaRegistro
             )
             VALUES (
               @CodigoEmpresa, @EjercicioPedido, @SeriePedido, @NumeroPedido, @Orden,
               @CodigoArticulo, @DescripcionArticulo, @DescripcionLinea,
-              @UnidadesPedidas, @UnidadesPendientes, @Unidades2_, @UnidadesPendientesFabricar,
+              @UnidadesPedidas,
               @Precio,
-              @ImporteBruto, @ImporteNeto, @ImporteParcial,
-              @BaseImponible, @BaseIva,
+              @ImporteBruto, @ImporteNeto,
+              @BaseImponible,
               @CuotaIva, @TotalIva, @ImporteLiquido,
-              @CodigoIva, @PorcentajeIva, @GrupoIva,
-              @CodigoAlmacen, @CodigoAlmacenAnterior, @FechaRegistro,
-              @CodigoDelCliente, @CodigoProveedor
+              @CodigoIva, @PorcentajeIva,
+              @CodigoAlmacen, @CodigoAlmacenAnterior, @FechaRegistro
             )
           `);
       }
 
-      // Calcular totales del pedido (CAMBIADO a LineasPedidoProveedor)
+      // Calcular totales del pedido
       const totalesResult = await transaction.request()
         .input('CodigoEmpresa', codigoEmpresa)
         .input('EjercicioPedido', fechaActual.getFullYear())
@@ -316,7 +299,7 @@ const createSupplierOrder = async (req, res) => {
       const importeLiquidoTotal = baseImponibleTotal + totalIVATotal;
       const numeroLineas = parseInt(totalesResult.recordset[0].NumeroLineas) || 0;
 
-      // Actualizar cabecera con los totales calculados (CAMBIADO a CabeceraPedidoProveedor)
+      // Actualizar cabecera con los totales calculados
       await transaction.request()
         .input('CodigoEmpresa', codigoEmpresa)
         .input('EjercicioPedido', fechaActual.getFullYear())
@@ -340,7 +323,7 @@ const createSupplierOrder = async (req, res) => {
             NumeroPedido = @NumeroPedido
         `);
 
-      // Actualizar contador de pedidos (igual que en orderController)
+      // Actualizar contador de pedidos
       await transaction.request()
         .input('sysGrupo', codigoEmpresa)
         .input('sysContadorValor', numeroPedido)
@@ -348,13 +331,12 @@ const createSupplierOrder = async (req, res) => {
           UPDATE LSYSCONTADORES 
           SET sysContadorValor = @sysContadorValor
           WHERE sysGrupo = @sysGrupo
-          AND sysNombreContador = 'PEDIDOS_CLI'
+          AND sysNombreContador = 'PEDIDOS_PROV'
           AND (sysNumeroSerie = 'Web' OR sysNumeroSerie IS NULL)
         `);
 
       await transaction.commit();
 
-      // Misma respuesta que en orderController
       return res.status(201).json({
         success: true,
         orderId: numeroPedido,
@@ -390,7 +372,7 @@ const getSupplierOrders = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Código de cliente no proporcionado' });
     }
 
-    // Consulta principal de pedidos (CAMBIADO a CabeceraPedidoProveedor)
+    // Consulta principal de pedidos
     const ordersResult = await pool.request()
       .input('CodigoCliente', codigoCliente)
       .query(`
@@ -402,9 +384,9 @@ const getSupplierOrders = async (req, res) => {
           c.StatusAprobado,
           c.SeriePedido,
           c.BaseImponible,
-          c.TotalIVA,
+          c.TotalIva,
           c.ImporteLiquido,
-          c.FechaEntrega,
+          c.FechaNecesaria,
           c.Usuario,
           c.Domicilio,
           c.CodigoPostal,
@@ -418,7 +400,7 @@ const getSupplierOrders = async (req, res) => {
         OFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY
       `);
 
-    // Obtener detalles de cada pedido (CAMBIADO a LineasPedidoProveedor)
+    // Obtener detalles de cada pedido
     const ordersWithDetails = await Promise.all(
       ordersResult.recordset.map(async (order) => {
         const detailsResult = await pool.request()
@@ -449,7 +431,6 @@ const getSupplierOrders = async (req, res) => {
       })
     );
 
-    // Misma respuesta que en orderController
     return res.status(200).json({ 
       success: true, 
       orders: ordersWithDetails,
@@ -479,7 +460,7 @@ const getSupplierOrdersDetails = async (req, res) => {
       });
     }
 
-    // Consulta de la cabecera del pedido (CAMBIADO a CabeceraPedidoProveedor)
+    // Consulta de la cabecera del pedido
     const orderResult = await pool.request()
       .input('NumeroPedido', numeroPedido)
       .input('CodigoCliente', codigoCliente)
@@ -495,7 +476,7 @@ const getSupplierOrdersDetails = async (req, res) => {
           TotalIVA,
           ImporteLiquido,
           NumeroLineas,
-          FechaEntrega,
+          FechaNecesaria,
           Usuario,
           Domicilio,
           CodigoPostal,
@@ -516,7 +497,7 @@ const getSupplierOrdersDetails = async (req, res) => {
       });
     }
 
-    // Consulta de las líneas del pedido (CAMBIADO a LineasPedidoProveedor)
+    // Consulta de las líneas del pedido
     const linesResult = await pool.request()
       .input('NumeroPedido', numeroPedido)
       .input('SeriePedido', seriePedido)
@@ -537,7 +518,6 @@ const getSupplierOrdersDetails = async (req, res) => {
         ORDER BY Orden
       `);
 
-    // Misma respuesta que en orderController
     return res.status(200).json({
       success: true,
       order: {

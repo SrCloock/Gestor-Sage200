@@ -60,7 +60,8 @@ const ProductCatalog = () => {
       const term = searchTerm.toLowerCase();
       result = result.filter(product => 
         product.DescripcionArticulo.toLowerCase().includes(term) ||
-        (product.NombreProveedor && product.NombreProveedor.toLowerCase().includes(term))
+        (product.NombreProveedor && product.NombreProveedor.toLowerCase().includes(term)) ||
+        (product.CodigoArticulo && product.CodigoArticulo.toLowerCase().includes(term))
       );
     }
     
@@ -126,7 +127,7 @@ const ProductCatalog = () => {
         <div className="pc-search-box">
           <input
             type="text"
-            placeholder="Buscar productos..."
+            placeholder="Buscar productos por nombre, código o proveedor..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -153,6 +154,16 @@ const ProductCatalog = () => {
               className="pc-product-card"
               onClick={() => handleProductClick(product)}
             >
+              <div className="product-image-container">
+                <img 
+                  src={product.imageUrl || '/images/default-product.jpg'} 
+                  alt={product.DescripcionArticulo}
+                  className="product-image"
+                  onError={(e) => {
+                    e.target.src = '/images/default-product.jpg';
+                  }}
+                />
+              </div>
               <div className="product-header">
                 <h3>{product.DescripcionArticulo}</h3>
                 <span className="product-code">{product.CodigoArticulo}</span>
