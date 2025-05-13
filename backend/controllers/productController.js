@@ -1,6 +1,22 @@
-const { getPool } = require('../db/Sage200db');
-const path = require('path');
+// backend/controllers/productController.js
+
 const fs = require('fs');
+const path = require('path');
+const { getPool } = require('../db/Sage200db');
+
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp'];
+const IMAGE_FOLDER = path.join(__dirname, '../public/images');
+
+const buscarImagenFisica = (codigoArticulo) => {
+  for (const ext of IMAGE_EXTENSIONS) {
+    const fileName = `${codigoArticulo}${ext}`;
+    const filePath = path.join(IMAGE_FOLDER, fileName);
+    if (fs.existsSync(filePath)) {
+      return fileName;
+    }
+  }
+  return null;
+};
 
 const getProducts = async (req, res) => {
   try {
@@ -17,71 +33,77 @@ const getProducts = async (req, res) => {
       JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor
       ORDER BY a.DescripcionArticulo
     `);
-    
-    const productsWithImages = await Promise.all(
-      result.recordset.map(async (product) => {
-        const imagesDir = path.join(__dirname, '../../public/images');
-        let finalImageUrl = '/images/default-product.jpg';
-        let finalImageName = null;
 
-        // 1. Verificar imagen registrada en BD
-        if (product.RutaImagen) {
-          const dbImagePath = path.join(imagesDir, product.RutaImagen);
-          if (fs.existsSync(dbImagePath)) {
-            return { 
-              ...product, 
-              imageUrl: `/images/${product.RutaImagen}` 
-            };
-          }
+    const serverUrl = `${req.protocol}://${req.get('host')}`;
+    const updatedProducts = [];
+
+    for (const product of result.recordset) {
+      const codigo = product.CodigoArticulo;
+      const dbImage = product.RutaImagen;
+      const imagenFisica = buscarImagenFisica(codigo);
+
+      let finalImage = 'default.jpg'; // Valor por defecto
+
+      if (imagenFisica) {
+        finalImage = imagenFisica;
+
+        // Si la imagen física es diferente a la de la BD, actualizamos la BD
+        if (imagenFisica !== dbImage) {
+          await pool.request()
+            .input('RutaImagen', imagenFisica)
+            .input('CodigoArticulo', codigo)
+            .query(`
+              UPDATE Articulos
+              SET RutaImagen = @RutaImagen
+              WHERE CodigoArticulo = @CodigoArticulo
+            `);
         }
+      } else if (dbImage) {
+        finalImage = dbImage;
+      }
 
-        // 2. Buscar por código de artículo
-        const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-        for (const ext of validExtensions) {
-          const imageName = `${product.CodigoArticulo}${ext}`;
-          const imagePath = path.join(imagesDir, imageName);
-          
-          if (fs.existsSync(imagePath)) {
-            finalImageUrl = `/images/${imageName}`;
-            finalImageName = imageName;
-            
-            // Actualizar BD si no estaba registrada
-            if (!product.RutaImagen || product.RutaImagen !== imageName) {
-              try {
-                await pool.request()
-                  .input('codigo', product.CodigoArticulo)
-                  .input('ruta', imageName)
-                  .query(`
-                    UPDATE Articulos 
-                    SET RutaImagen = @ruta 
-                    WHERE CodigoArticulo = @codigo
-                  `);
-                console.log(`🔄 Actualizada ruta imagen para ${product.CodigoArticulo}`);
-              } catch (updateError) {
-                console.error(`⚠️ No se pudo actualizar ruta para ${product.CodigoArticulo}:`, updateError.message);
-              }
-            }
-            
-            break;
-          }
-        }
+      updatedProducts.push({
+        ...product,
+        RutaImagen: `${serverUrl}/images/${finalImage}`
+      });
+    }
 
-        return { 
-          ...product, 
-          imageUrl: finalImageUrl,
-          RutaImagen: finalImageName || product.RutaImagen
-        };
-      })
-    );
-
-    res.status(200).json(productsWithImages);
+    res.status(200).json(updatedProducts);
   } catch (error) {
     console.error('Error al obtener productos:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error al obtener productos',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
 
-module.exports = { getProducts };
+// Esta función se puede ejecutar al iniciar el servidor si lo necesitas
+const syncImagesWithDB = async () => {
+  const files = fs.readdirSync(IMAGE_FOLDER);
+  const pool = await getPool();
+
+  for (const file of files) {
+    const ext = path.extname(file).toLowerCase();
+    if (!IMAGE_EXTENSIONS.includes(ext)) continue;
+
+    const codigoArticulo = path.basename(file, ext);
+
+    // Siempre sincroniza con la última imagen encontrada
+    await pool.request()
+      .input('RutaImagen', file)
+      .input('CodigoArticulo', codigoArticulo)
+      .query(`
+        UPDATE Articulos
+        SET RutaImagen = @RutaImagen
+        WHERE CodigoArticulo = @CodigoArticulo
+      `);
+  }
+
+  console.log('✅ Imágenes sincronizadas con la base de datos');
+};
+
+module.exports = {
+  getProducts,
+  syncImagesWithDB
+};

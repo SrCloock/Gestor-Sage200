@@ -32,14 +32,40 @@ const ProductCatalog = () => {
     });
   };
 
+  const checkImageExists = (url) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = url;
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+    });
+  };
+
+  const getProductImage = async (product) => {
+    const localImagePath = `/images/${product.CodigoArticulo}.jpg`;
+    const exists = await checkImageExists(localImagePath);
+
+    if (exists) return localImagePath;
+    if (product.RutaImagen) return product.RutaImagen;
+
+    return '/images/default.jpg';
+  };
+
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const response = await api.get('/api/products');
         const uniqueProducts = removeDuplicates(response.data);
-        const sortedProducts = [...uniqueProducts].sort((a, b) => 
+
+        const productsWithImages = await Promise.all(uniqueProducts.map(async (product) => {
+          const imagePath = await getProductImage(product);
+          return { ...product, FinalImage: imagePath };
+        }));
+
+        const sortedProducts = [...productsWithImages].sort((a, b) =>
           a.DescripcionArticulo.localeCompare(b.DescripcionArticulo)
         );
+
         setProducts(sortedProducts);
         setFilteredProducts(sortedProducts);
       } catch (err) {
@@ -55,16 +81,16 @@ const ProductCatalog = () => {
 
   useEffect(() => {
     let result = [...products];
-    
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(product => 
+      result = result.filter(product =>
         product.DescripcionArticulo.toLowerCase().includes(term) ||
         (product.NombreProveedor && product.NombreProveedor.toLowerCase().includes(term)) ||
         (product.CodigoArticulo && product.CodigoArticulo.toLowerCase().includes(term))
       );
     }
-    
+
     result.sort((a, b) => {
       if (sortOrder === 'asc') {
         return a.DescripcionArticulo.localeCompare(b.DescripcionArticulo);
@@ -72,7 +98,7 @@ const ProductCatalog = () => {
         return b.DescripcionArticulo.localeCompare(a.DescripcionArticulo);
       }
     });
-    
+
     setFilteredProducts(result);
     setCurrentPage(1);
   }, [searchTerm, sortOrder, products]);
@@ -122,7 +148,7 @@ const ProductCatalog = () => {
         <h2>Catálogo de Productos</h2>
         <p>{filteredProducts.length} productos disponibles</p>
       </div>
-      
+
       <div className="pc-controls">
         <div className="pc-search-box">
           <input
@@ -133,10 +159,10 @@ const ProductCatalog = () => {
           />
           <span className="search-icon">🔍</span>
         </div>
-        
+
         <div className="pc-sort-options">
-          <select 
-            value={sortOrder} 
+          <select
+            value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value)}
             className="styled-select"
           >
@@ -145,34 +171,32 @@ const ProductCatalog = () => {
           </select>
         </div>
       </div>
-      
+
       <div className="pc-product-grid">
         {currentProducts.length > 0 ? (
           currentProducts.map(product => (
-            <div 
+            <div
               key={generateProductKey(product)}
               className="pc-product-card"
               onClick={() => handleProductClick(product)}
             >
-              <div className="product-image-container">
-                <img 
-                  src={product.imageUrl || '/images/default-product.jpg'} 
-                  alt={product.DescripcionArticulo}
-                  className="product-image"
-                  onError={(e) => {
-                    e.target.src = '/images/default-product.jpg';
-                  }}
-                />
-              </div>
+              <img
+                src={product.FinalImage}
+                alt={product.DescripcionArticulo}
+                className="product-image"
+              />
+
               <div className="product-header">
                 <h3>{product.DescripcionArticulo}</h3>
                 <span className="product-code">{product.CodigoArticulo}</span>
               </div>
+
               {product.NombreProveedor && (
                 <div className="product-supplier">
                   <span>Proveedor:</span> {product.NombreProveedor}
                 </div>
               )}
+
               <div className="product-actions">
                 <button className="add-button">
                   Añadir al pedido
@@ -186,16 +210,16 @@ const ProductCatalog = () => {
           </div>
         )}
       </div>
-      
+
       {filteredProducts.length > productsPerPage && (
         <div className="pc-pagination">
-          <button 
+          <button
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
           >
             Anterior
           </button>
-          
+
           {createPageNumbers().map((page, index) => (
             <button
               key={index}
@@ -206,8 +230,8 @@ const ProductCatalog = () => {
               {page}
             </button>
           ))}
-          
-          <button 
+
+          <button
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
           >
