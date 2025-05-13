@@ -329,3 +329,38 @@
 .confirm-button:hover {
   background: #00695c;
 }
+/* Añade esto al final del archivo */
+.oc-filters {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.oc-filters .pc-search-box {
+  flex-grow: 1;
+  max-width: 500px;
+  margin-bottom: 0;
+}
+
+.oc-filters .pc-sort-options {
+  margin-bottom: 0;
+}
+
+.pc-no-results[style*="gridColumn"] {
+  text-align: center;
+  padding: 2rem;
+  color: #757575;
+  width: 100%;
+}
+
+.pc-product-grid {
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.pc-product-grid.updating {
+  opacity: 0.5;
+}

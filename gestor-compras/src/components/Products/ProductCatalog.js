@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api';
+import ProductGrid from '../Shared/ProductGrid';
 import './ProductCatalog.css';
 
 const ProductCatalog = () => {
@@ -118,27 +119,6 @@ const ProductCatalog = () => {
     }
   };
 
-  const createPageNumbers = () => {
-    const pageNumbers = [];
-    const maxPage = totalPages;
-
-    if (maxPage <= 5) {
-      for (let i = 1; i <= maxPage; i++) {
-        pageNumbers.push(i);
-      }
-    } else {
-      if (currentPage <= 3) {
-        pageNumbers.push(1, 2, 3, '...', maxPage);
-      } else if (currentPage >= maxPage - 2) {
-        pageNumbers.push(1, '...', maxPage - 2, maxPage - 1, maxPage);
-      } else {
-        pageNumbers.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', maxPage);
-      }
-    }
-
-    return pageNumbers;
-  };
-
   if (loading) return <div className="pc-loading">Cargando productos...</div>;
   if (error) return <div className="pc-error">{error}</div>;
 
@@ -172,73 +152,13 @@ const ProductCatalog = () => {
         </div>
       </div>
 
-      <div className="pc-product-grid">
-        {currentProducts.length > 0 ? (
-          currentProducts.map(product => (
-            <div
-              key={generateProductKey(product)}
-              className="pc-product-card"
-              onClick={() => handleProductClick(product)}
-            >
-              <img
-                src={product.FinalImage}
-                alt={product.DescripcionArticulo}
-                className="product-image"
-              />
-
-              <div className="product-header">
-                <h3>{product.DescripcionArticulo}</h3>
-                <span className="product-code">{product.CodigoArticulo}</span>
-              </div>
-
-              {product.NombreProveedor && (
-                <div className="product-supplier">
-                  <span>Proveedor:</span> {product.NombreProveedor}
-                </div>
-              )}
-
-              <div className="product-actions">
-                <button className="add-button">
-                  Añadir al pedido
-                </button>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="pc-no-results">
-            No se encontraron productos con los filtros aplicados
-          </div>
-        )}
-      </div>
-
-      {filteredProducts.length > productsPerPage && (
-        <div className="pc-pagination">
-          <button
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-          >
-            Anterior
-          </button>
-
-          {createPageNumbers().map((page, index) => (
-            <button
-              key={index}
-              onClick={() => handlePageChange(page === '...' ? currentPage : page)}
-              className={currentPage === page ? 'pc-active' : ''}
-              disabled={page === '...'}
-            >
-              {page}
-            </button>
-          ))}
-
-          <button
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-          >
-            Siguiente
-          </button>
-        </div>
-      )}
+      <ProductGrid
+        products={currentProducts}
+        onAddProduct={handleProductClick}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={handlePageChange}
+      />
     </div>
   );
 };

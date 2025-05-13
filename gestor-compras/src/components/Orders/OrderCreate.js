@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api';
+import ProductGrid from '../Shared/ProductGrid';
 import './OrderCreate.css';
 
 const OrderCreate = () => {
@@ -21,17 +22,42 @@ const OrderCreate = () => {
   const [reviewMode, setReviewMode] = useState(false);
   const productsPerPage = 20;
 
-  const generateProductKey = (product, index) => {
-    return `${product.CodigoArticulo}-${product.CodigoProveedor || 'NOPROV'}-${index}`;
+  const generateProductKey = (product) => {
+    return `${product.CodigoArticulo}-${product.CodigoProveedor || 'NOPROV'}`;
+  };
+
+  const checkImageExists = (url) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = url;
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+    });
+  };
+
+  const getProductImage = async (product) => {
+    const localImagePath = `/images/${product.CodigoArticulo}.jpg`;
+    const exists = await checkImageExists(localImagePath);
+
+    if (exists) return localImagePath;
+    if (product.RutaImagen) return product.RutaImagen;
+
+    return '/images/default.jpg';
   };
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const response = await api.get('/api/products');
-        const sortedProducts = response.data.sort((a, b) =>
+        const productsWithImages = await Promise.all(response.data.map(async (product) => {
+          const imagePath = await getProductImage(product);
+          return { ...product, FinalImage: imagePath };
+        }));
+        
+        const sortedProducts = productsWithImages.sort((a, b) =>
           a.DescripcionArticulo.localeCompare(b.DescripcionArticulo)
         );
+        
         setProducts(sortedProducts);
         setFilteredProducts(sortedProducts);
       } catch (err) {
@@ -57,23 +83,36 @@ const OrderCreate = () => {
   useEffect(() => {
     let result = [...products];
 
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter(product =>
-        product.DescripcionArticulo?.toLowerCase().includes(term) ||
-        product.NombreProveedor?.toLowerCase().includes(term) ||
-        product.CodigoArticulo?.toLowerCase().includes(term)
-      );
+    if (searchTerm.trim() !== '') {
+      const term = searchTerm.toLowerCase().trim();
+      result = result.filter(product => {
+        const matchesCode = product.CodigoArticulo?.toLowerCase().includes(term);
+        const matchesDesc = product.DescripcionArticulo?.toLowerCase().includes(term);
+        const matchesSupplier = product.NombreProveedor?.toLowerCase().includes(term);
+        
+        return matchesCode || matchesDesc || matchesSupplier;
+      });
     }
 
-    result.sort((a, b) =>
+    const uniqueProducts = [];
+    const seenCodes = new Set();
+    
+    result.forEach(product => {
+      if (!seenCodes.has(product.CodigoArticulo)) {
+        seenCodes.add(product.CodigoArticulo);
+        uniqueProducts.push(product);
+      }
+    });
+
+    uniqueProducts.sort((a, b) =>
       sortOrder === 'asc'
         ? a.DescripcionArticulo.localeCompare(b.DescripcionArticulo)
         : b.DescripcionArticulo.localeCompare(a.DescripcionArticulo)
     );
 
-    setFilteredProducts(result);
+    setFilteredProducts(uniqueProducts);
     setCurrentPage(1);
+    setProducts(prev => [...prev]); // Forzar actualización
   }, [searchTerm, sortOrder, products]);
 
   const indexOfLastProduct = currentPage * productsPerPage;
@@ -169,22 +208,6 @@ const OrderCreate = () => {
     }
   };
 
-  const createPageNumbers = () => {
-    const pageNumbers = [];
-
-    if (totalPages <= 5) {
-      for (let i = 1; i <= totalPages; i++) pageNumbers.push(i);
-    } else if (currentPage <= 3) {
-      pageNumbers.push(1, 2, 3, '...', totalPages);
-    } else if (currentPage >= totalPages - 2) {
-      pageNumbers.push(1, '...', totalPages - 2, totalPages - 1, totalPages);
-    } else {
-      pageNumbers.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
-    }
-
-    return pageNumbers;
-  };
-
   if (reviewMode) {
     return (
       <div className="review-container">
@@ -261,20 +284,32 @@ const OrderCreate = () => {
       </div>
 
       <div className="oc-filters">
-        <div className="oc-search-box">
+        <div className="pc-search-box">
           <input
             type="text"
-            placeholder="Buscar por nombre, proveedor o código..."
+            placeholder="Buscar productos por nombre, código o proveedor..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                setProducts(prev => [...prev]);
+              }
+            }}
           />
+          <span className="search-icon">🔍</span>
         </div>
 
-        <div className="oc-sort-options">
-          <label>Ordenar:</label>
-          <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
-            <option value="asc">A-Z</option>
-            <option value="desc">Z-A</option>
+        <div className="pc-sort-options">
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            className="styled-select"
+          >
+            <option value="asc">Ordenar A-Z</option>
+            <option value="desc">Ordenar Z-A</option>
           </select>
         </div>
       </div>
@@ -294,8 +329,8 @@ const OrderCreate = () => {
           ) : (
             <>
               <ul className="oc-order-items">
-                {orderItems.map((item, index) => (
-                  <li key={generateProductKey(item, index)}>
+                {orderItems.map((item) => (
+                  <li key={generateProductKey(item)}>
                     <div className="oc-item-info">
                       <span>{item.DescripcionArticulo}</span>
                       <span>Código: {item.CodigoArticulo}</span>
@@ -352,55 +387,14 @@ const OrderCreate = () => {
         <div className="oc-product-selection">
           <h3>Seleccionar Productos ({filteredProducts.length} disponibles)</h3>
 
-          <div className="oc-product-grid">
-            {currentProducts.length > 0 ? (
-              currentProducts.map((product, index) => (
-                <div
-                  key={generateProductKey(product, index)}
-                  className="oc-product-item"
-                  onClick={() => handleAddItem(product)}
-                >
-                  <h3>{product.DescripcionArticulo}</h3>
-                  <p><strong>Código:</strong> {product.CodigoArticulo}</p>
-                  {product.NombreProveedor && <p><strong>Proveedor:</strong> {product.NombreProveedor}</p>}
-                  <button className="oc-add-button">Añadir al pedido</button>
-                </div>
-              ))
-            ) : (
-              <div className="oc-no-results">
-                No se encontraron productos con los filtros aplicados
-              </div>
-            )}
-          </div>
-
-          {filteredProducts.length > productsPerPage && (
-            <div className="oc-pagination">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-              >
-                Anterior
-              </button>
-
-              {createPageNumbers().map((page, index) => (
-                <button
-                  key={index}
-                  onClick={() => page !== '...' && handlePageChange(page)}
-                  className={currentPage === page ? 'oc-active' : ''}
-                  disabled={page === '...'}
-                >
-                  {page}
-                </button>
-              ))}
-
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-              >
-                Siguiente
-              </button>
-            </div>
-          )}
+          <ProductGrid
+            products={currentProducts}
+            onAddProduct={handleAddItem}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            searchTerm={searchTerm}
+          />
         </div>
       </div>
     </div>
