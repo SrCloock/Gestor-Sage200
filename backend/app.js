@@ -120,6 +120,20 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/supplier-orders', supplierOrderController);
 
+// Endpoint para refrescar imágenes manualmente
+app.get('/api/refresh-images', async (req, res) => {
+  if (!dbConnected) {
+    return res.status(503).json({ success: false, error: 'Database not connected' });
+  }
+
+  try {
+    await initializeImagePaths();
+    res.json({ success: true, message: 'Rutas de imágenes actualizadas' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Manejo de errores
 app.use((err, req, res, next) => {
   console.error(err.stack);

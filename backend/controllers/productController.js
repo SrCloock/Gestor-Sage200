@@ -22,49 +22,55 @@ const getProducts = async (req, res) => {
       result.recordset.map(async (product) => {
         const imagesDir = path.join(__dirname, '../../public/images');
         let finalImageUrl = '/images/default-product.jpg';
+        let finalImageName = null;
 
         // 1. Verificar imagen registrada en BD
         if (product.RutaImagen) {
           const dbImagePath = path.join(imagesDir, product.RutaImagen);
           if (fs.existsSync(dbImagePath)) {
-            finalImageUrl = `/images/${product.RutaImagen}`;
-            return { ...product, imageUrl: finalImageUrl };
+            return { 
+              ...product, 
+              imageUrl: `/images/${product.RutaImagen}` 
+            };
           }
         }
 
         // 2. Buscar por código de artículo
-        const codeBasedImages = [
-          `${product.CodigoArticulo}.jpg`,
-          `${product.CodigoArticulo}.jpeg`,
-          `${product.CodigoArticulo}.png`,
-          `${product.CodigoArticulo}.webp`
-        ];
-
-        for (const filename of codeBasedImages) {
-          const imagePath = path.join(imagesDir, filename);
+        const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+        for (const ext of validExtensions) {
+          const imageName = `${product.CodigoArticulo}${ext}`;
+          const imagePath = path.join(imagesDir, imageName);
+          
           if (fs.existsSync(imagePath)) {
-            finalImageUrl = `/images/${filename}`;
+            finalImageUrl = `/images/${imageName}`;
+            finalImageName = imageName;
             
-            // Actualizar BD para futuras consultas
-            try {
-              await pool.request()
-                .input('codigo', product.CodigoArticulo)
-                .input('ruta', filename)
-                .query(`
-                  UPDATE Articulos 
-                  SET RutaImagen = @ruta 
-                  WHERE CodigoArticulo = @codigo
-                `);
-              console.log(`🔄 Actualizada ruta imagen para ${product.CodigoArticulo}`);
-            } catch (updateError) {
-              console.error(`⚠️ No se pudo actualizar ruta para ${product.CodigoArticulo}:`, updateError.message);
+            // Actualizar BD si no estaba registrada
+            if (!product.RutaImagen || product.RutaImagen !== imageName) {
+              try {
+                await pool.request()
+                  .input('codigo', product.CodigoArticulo)
+                  .input('ruta', imageName)
+                  .query(`
+                    UPDATE Articulos 
+                    SET RutaImagen = @ruta 
+                    WHERE CodigoArticulo = @codigo
+                  `);
+                console.log(`🔄 Actualizada ruta imagen para ${product.CodigoArticulo}`);
+              } catch (updateError) {
+                console.error(`⚠️ No se pudo actualizar ruta para ${product.CodigoArticulo}:`, updateError.message);
+              }
             }
             
             break;
           }
         }
 
-        return { ...product, imageUrl: finalImageUrl };
+        return { 
+          ...product, 
+          imageUrl: finalImageUrl,
+          RutaImagen: finalImageName || product.RutaImagen
+        };
       })
     );
 
