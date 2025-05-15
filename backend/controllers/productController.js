@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { getPool } = require('../db/Sage200db');
 
-const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp'];
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'];
 const IMAGE_FOLDER = path.join(__dirname, '../public/images');
 
 const buscarImagenFisica = (codigoArticulo) => {
