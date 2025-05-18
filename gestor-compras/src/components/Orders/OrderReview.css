@@ -1,3 +1,4 @@
+/* src/components/Orders/OrderReview.css */
 .order-review {
   display: flex;
   justify-content: center;
@@ -8,7 +9,7 @@
 }
 
 .review-card {
-  background: white;
+  background: #ffffff;
   border-radius: 12px;
   padding: 3rem;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
@@ -75,7 +76,7 @@
 
 .another-order {
   background-color: #00796b;
-  color: white;
+  color: #ffffff;
 }
 
 .another-order:hover {

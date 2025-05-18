@@ -1,3 +1,4 @@
+/* src/components/Orders/OrderList.css */
 .order-list-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -58,15 +59,14 @@
 .orders-table {
   width: 100%;
   border-collapse: collapse;
-  background: white;
+  background: #ffffff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   border-radius: 8px;
-  overflow: hidden;
 }
 
 .orders-table th {
   background-color: #00796b;
-  color: white;
+  color: #ffffff;
   padding: 12px 15px;
   text-align: left;
 }
@@ -74,10 +74,6 @@
 .orders-table td {
   padding: 12px 15px;
   border-bottom: 1px solid #f0f0f0;
-}
-
-.orders-table tr:last-child td {
-  border-bottom: none;
 }
 
 .orders-table tr:hover {
@@ -104,25 +100,13 @@
 
 .view-button {
   background-color: #00796b;
-  color: white;
+  color: #ffffff;
   border: none;
   padding: 8px 12px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.9rem;
-  transition: background-color 0.3s;
 }
 
 .view-button:hover {
   background-color: #00695c;
-}
-
-.loading, .error {
-  text-align: center;
-  padding: 2rem;
-  font-size: 1.2rem;
-}
-
-.error {
-  color: #d32f2f;
 }

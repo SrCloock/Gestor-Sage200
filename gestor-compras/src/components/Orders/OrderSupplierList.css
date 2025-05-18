@@ -1,113 +1,94 @@
+/* src/components/Orders/OrderSupplierList.css */
 .order-supplier-list-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem;
-  }
-  
-  .order-supplier-list-container h2 {
-    color: #00796b;
-    margin-bottom: 1.5rem;
-    text-align: center;
-  }
-  
-  .order-supplier-no-orders {
-    text-align: center;
-    padding: 2rem;
-    background: #f5f5f5;
-    border-radius: 8px;
-    color: #757575;
-  }
-  
-  .order-supplier-create-button {
-    background-color: #00796b;
-    color: white;
-    padding: 12px 24px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    margin-top: 1rem;
-    font-size: 1rem;
-    transition: background-color 0.3s;
-  }
-  
-  .order-supplier-create-button:hover {
-    background-color: #00695c;
-  }
-  
-  .order-supplier-table-container {
-    overflow-x: auto;
-    margin-top: 1.5rem;
-  }
-  
-  .order-supplier-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: white;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  
-  .order-supplier-table th {
-    background-color: #00796b;
-    color: white;
-    padding: 12px 15px;
-    text-align: left;
-  }
-  
-  .order-supplier-table td {
-    padding: 12px 15px;
-    border-bottom: 1px solid #f0f0f0;
-  }
-  
-  .order-supplier-table tr:last-child td {
-    border-bottom: none;
-  }
-  
-  .order-supplier-table tr:hover {
-    background-color: #f5f5f5;
-  }
-  
-  .order-supplier-status-badge {
-    display: inline-block;
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    font-weight: 500;
-  }
-  
-  .order-supplier-status-badge.approved {
-    background-color: #e8f5e9;
-    color: #2e7d32;
-  }
-  
-  .order-supplier-status-badge.pending {
-    background-color: #fff8e1;
-    color: #f57f17;
-  }
-  
-  .order-supplier-view-button {
-    background-color: #00796b;
-    color: white;
-    border: none;
-    padding: 8px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: background-color 0.3s;
-  }
-  
-  .order-supplier-view-button:hover {
-    background-color: #00695c;
-  }
-  
-  .order-supplier-loading, 
-  .order-supplier-error {
-    text-align: center;
-    padding: 2rem;
-    font-size: 1.2rem;
-  }
-  
-  .order-supplier-error {
-    color: #d32f2f;
-  }
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.order-supplier-list-container h2 {
+  color: #00796b;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.order-supplier-no-orders {
+  text-align: center;
+  padding: 2rem;
+  background: #f5f5f5;
+  border-radius: 8px;
+  color: #757575;
+}
+
+.order-supplier-create-button {
+  background-color: #00796b;
+  color: #ffffff;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 1rem;
+}
+
+.order-supplier-create-button:hover {
+  background-color: #00695c;
+}
+
+.order-supplier-table-container {
+  overflow-x: auto;
+  margin-top: 1.5rem;
+}
+
+.order-supplier-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+.order-supplier-table th {
+  background-color: #00796b;
+  color: #ffffff;
+  padding: 12px 15px;
+  text-align: left;
+}
+
+.order-supplier-table td {
+  padding: 12px 15px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.order-supplier-table tr:hover {
+  background-color: #f5f5f5;
+}
+
+.order-supplier-status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.order-supplier-status-badge.approved {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.order-supplier-status-badge.pending {
+  background-color: #fff8e1;
+  color: #f57f17;
+}
+
+.order-supplier-view-button {
+  background-color: #00796b;
+  color: #ffffff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.order-supplier-view-button:hover {
+  background-color: #00695c;
+}

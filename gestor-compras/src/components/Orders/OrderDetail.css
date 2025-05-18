@@ -1,3 +1,4 @@
+/* src/components/Orders/OrderDetail.css */
 .order-detail-container {
   max-width: 1000px;
   margin: 0 auto;
@@ -13,8 +14,6 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  margin-bottom: 1.5rem;
-  padding: 8px 0;
 }
 
 .back-button:hover {
@@ -59,7 +58,7 @@
 }
 
 .info-card {
-  background: white;
+  background: #ffffff;
   border-radius: 8px;
   padding: 1.5rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -91,7 +90,7 @@
 
 .products-table-container {
   overflow-x: auto;
-  background: white;
+  background: #ffffff;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   padding: 1rem;
@@ -114,20 +113,6 @@
   border-bottom: 1px solid #f0f0f0;
 }
 
-.products-table tr:last-child td {
-  border-bottom: none;
-}
-
 .products-table tr:hover {
   background-color: #f5f5f5;
-}
-
-.loading, .error {
-  text-align: center;
-  padding: 2rem;
-  font-size: 1.2rem;
-}
-
-.error {
-  color: #d32f2f;
 }

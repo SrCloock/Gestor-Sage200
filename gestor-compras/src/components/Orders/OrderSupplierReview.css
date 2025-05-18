@@ -1,14 +1,15 @@
+/* src/components/Orders/OrderSupplierReview.css */
 .osr-container {
   max-width: 1000px;
   margin: 2rem auto;
   padding: 2rem;
-  background-color: #fff;
+  background-color: #ffffff;
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 .osr-success-message {
-  color: #28a745;
+  color: #2e7d32;
   font-size: 1.1rem;
   margin-bottom: 2rem;
 }
@@ -75,30 +76,19 @@
 }
 
 .osr-print-btn {
-  background-color: #007bff;
-  color: white;
+  background-color: #00796b;
+  color: #ffffff;
 }
 
 .osr-print-btn:hover {
-  background-color: #0069d9;
+  background-color: #00695c;
 }
 
 .osr-back-btn {
-  background-color: #6c757d;
-  color: white;
+  background-color: #757575;
+  color: #ffffff;
 }
 
 .osr-back-btn:hover {
-  background-color: #5a6268;
-}
-
-@media print {
-  .osr-actions {
-    display: none;
-  }
-  
-  .osr-container {
-    box-shadow: none;
-    padding: 0;
-  }
+  background-color: #616161;
 }
