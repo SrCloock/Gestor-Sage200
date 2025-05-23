@@ -1,94 +1,135 @@
-/* src/components/Orders/OrderSupplierReview.css */
-.osr-container {
-  max-width: 1000px;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+.order-supplier-review {
+  max-width: 1200px;
   margin: 2rem auto;
   padding: 2rem;
-  background-color: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  font-family: 'Inter', sans-serif;
 }
 
-.osr-success-message {
-  color: #2e7d32;
-  font-size: 1.1rem;
+.order-supplier-review__container {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  padding: 2rem;
+}
+
+.order-supplier-review__header {
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 1.5rem;
   margin-bottom: 2rem;
 }
 
-.osr-order-summary {
-  margin-top: 2rem;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 1.5rem;
+.order-supplier-review__title {
+  color: #004d40;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
 }
 
-.osr-order-header {
+.order-supplier-review__success {
+  color: #2e7d32;
+  background: #e8f5e9;
+  padding: 1rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 2rem;
+}
+
+.order-supplier-review__meta {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #eee;
 }
 
-.osr-order-meta p {
-  margin: 0.3rem 0;
-  text-align: right;
+.order-supplier-review__details {
+  display: grid;
+  gap: 0.5rem;
 }
 
-.osr-order-items {
-  margin-top: 1.5rem;
+.order-supplier-review__detail {
+  font-size: 0.875rem;
+  color: #757575;
 }
 
-.osr-items-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1rem;
-}
-
-.osr-items-table th,
-.osr-items-table td {
-  padding: 0.75rem;
-  text-align: left;
-  border-bottom: 1px solid #eee;
-}
-
-.osr-items-table th {
-  background-color: #f8f9fa;
+.order-supplier-review__detail strong {
+  color: #004d40;
   font-weight: 600;
 }
 
-.osr-actions {
+.order-supplier-review__products {
+  margin: 2rem 0;
+}
+
+.order-supplier-review__table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.order-supplier-review__thead th {
+  background: #e0f2f1;
+  color: #004d40;
+  padding: 0.8rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.order-supplier-review__tbody td {
+  padding: 0.8rem;
+  border-bottom: 1px solid #f5f5f5;
+  font-size: 0.875rem;
+}
+
+.order-supplier-review__actions {
   display: flex;
-  justify-content: space-between;
+  gap: 1rem;
   margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #eee;
+  padding-top: 2rem;
+  border-top: 1px solid #e0e0e0;
 }
 
-.osr-print-btn,
-.osr-back-btn {
-  padding: 0.75rem 1.5rem;
+.order-supplier-review__button {
+  padding: 0.8rem 1.5rem;
   border: none;
-  border-radius: 4px;
-  font-weight: 500;
+  border-radius: 8px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background-color 0.1s ease-in-out;
 }
 
-.osr-print-btn {
-  background-color: #00796b;
+.order-supplier-review__button--print {
+  background: #00796b;
   color: #ffffff;
 }
 
-.osr-print-btn:hover {
-  background-color: #00695c;
+.order-supplier-review__button--print:hover {
+  background: #00695c;
 }
 
-.osr-back-btn {
-  background-color: #757575;
-  color: #ffffff;
+.order-supplier-review__button--back {
+  background: #f5f5f5;
+  color: #424242;
 }
 
-.osr-back-btn:hover {
-  background-color: #616161;
+.order-supplier-review__button--back:hover {
+  background: #e0e0e0;
+}
+
+.order-supplier-review__error {
+  background: #ffebee;
+  color: #d32f2f;
+  padding: 1.5rem;
+  border-radius: 8px;
+  text-align: center;
+  margin: 2rem 0;
 }

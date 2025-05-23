@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { FaCheckCircle, FaFileInvoice, FaArrowLeft, FaShoppingCart } from 'react-icons/fa';
 import './OrderReview.css';
 
 const OrderReview = () => {
@@ -18,20 +19,31 @@ const OrderReview = () => {
     <div className="order-review">
       <div className="review-card">
         <div className="review-header">
-          <h2>Pedido Confirmado</h2>
-          <div className="success-icon">✓</div>
+          <h2><FaFileInvoice /> Confirmación de Pedido</h2>
+          <div className="success-icon">
+            <FaCheckCircle />
+          </div>
         </div>
         
         <div className="review-content">
-          <p>Tu pedido <strong>#{seriePedido}-{orderId}</strong> ha sido registrado correctamente.</p>
+          <p>
+            Su pedido de suministros dentales <strong>#{seriePedido}-{orderId}</strong><br />
+            ha sido registrado exitosamente en nuestro sistema.
+          </p>
           
           {deliveryDate && (
-            <p className="delivery-info">
-              <strong>Fecha de entrega solicitada:</strong> {new Date(deliveryDate).toLocaleDateString()}
-            </p>
+            <div className="delivery-info">
+              <FaCalendarCheck />
+              <span>
+                <strong>Fecha solicitada:</strong> {new Date(deliveryDate).toLocaleDateString()}
+              </span>
+            </div>
           )}
           
-          <p>Recibirás una confirmación por correo electrónico con los detalles.</p>
+          <p>
+            Recibirá una confirmación por correo electrónico con<br />
+            los detalles de su pedido y seguimiento.
+          </p>
         </div>
         
         <div className="review-actions">
@@ -39,13 +51,13 @@ const OrderReview = () => {
             onClick={() => navigate('/crear-pedido')} 
             className="action-button another-order"
           >
-            Hacer otro pedido
+            <FaShoppingCart /> Nuevo Pedido
           </button>
           <button 
             onClick={() => navigate('/mis-pedidos')} 
             className="action-button view-orders"
           >
-            Ver mis pedidos
+            <FaArrowLeft /> Ver Historial
           </button>
         </div>
       </div>

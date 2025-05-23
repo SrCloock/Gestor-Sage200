@@ -39,13 +39,13 @@ const Login = () => {
   return (
     <div className="login-container">
       <div className="login-branding">
-        
-        <h1>Gestor de Compras</h1>
-        <p>Sistema profesional de gestión de pedidos</p>
+        <img src={logo} alt="AlAndalus Feeling" className="login-logo" />
+        <h1>ClearDent Gestor</h1>
+        <p>Sistema integrado con Sage200 - Suministros dentales</p>
       </div>
       
       <form className="login-form" onSubmit={handleSubmit}>
-        <h2>Iniciar Sesión</h2>
+        <h2>Acceso Clínicas</h2>
         {error && <div className="login-error">{error}</div>}
 
         <div className="input-group">
@@ -71,16 +71,19 @@ const Login = () => {
         </div>
 
         <div className="remember-me">
-          <input
-            type="checkbox"
-            id="remember"
-            checked={rememberMe}
-            onChange={(e) => setRememberMe(e.target.checked)}
-          />
-          <label htmlFor="remember">Recordar mis credenciales</label>
+          <label>
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+            />
+            <span>Recordar usuario</span>
+          </label>
         </div>
 
-        <button type="submit" className="login-button">Entrar</button>
+        <button type="submit" className="login-button">
+          Acceder al panel
+        </button>
       </form>
     </div>
   );

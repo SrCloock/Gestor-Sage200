@@ -1,34 +1,46 @@
-/* src/components/Auth/Login.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
 .login-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background-color: #e0f2f1;
   padding: 2rem;
+  font-family: 'Inter', sans-serif;
 }
 
 .login-branding {
   text-align: center;
   margin-bottom: 2rem;
+  max-width: 400px;
+}
+
+.login-logo {
+  width: 180px;
+  margin-bottom: 1.5rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 77, 64, 0.1));
 }
 
 .login-branding h1 {
   color: #004d40;
   margin-bottom: 0.5rem;
+  font-size: 1.5rem;
+  font-weight: 600;
 }
 
 .login-branding p {
-  color: #546e7a;
-  font-size: 0.9rem;
+  color: #757575;
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 
 .login-form {
   background: #ffffff;
-  padding: 2rem;
+  padding: 1.5rem;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   width: 100%;
   max-width: 400px;
 }
@@ -37,53 +49,63 @@
   color: #00796b;
   text-align: center;
   margin-bottom: 1.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
 }
 
 .input-group {
   position: relative;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .input-icon {
   position: absolute;
-  left: 15px;
+  left: 1rem;
   top: 50%;
   transform: translateY(-50%);
   color: #00796b;
+  font-size: 0.9rem;
 }
 
 .input-group input {
   width: 100%;
-  padding: 12px 12px 12px 40px;
+  padding: 0.8rem 1rem 0.8rem 2.5rem;
   border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  font-size: 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  transition: border-color 0.1s ease-in-out;
 }
 
 .input-group input:focus {
-  outline: none;
   border-color: #00796b;
+  outline: 2px solid rgba(0, 121, 107, 0.2);
 }
 
 .remember-me {
+  margin: 1rem 0;
   display: flex;
   align-items: center;
-  margin: 1rem 0;
+  gap: 0.5rem;
+  color: #757575;
+  font-size: 0.875rem;
 }
 
 .remember-me input {
-  margin-right: 8px;
+  width: 1rem;
+  height: 1rem;
+  accent-color: #00796b;
 }
 
 .login-button {
   width: 100%;
-  padding: 12px;
+  padding: 0.8rem;
   background-color: #00796b;
   color: #ffffff;
   border: none;
-  border-radius: 4px;
-  font-size: 1rem;
+  border-radius: 8px;
+  font-weight: 600;
   cursor: pointer;
+  transition: background-color 0.1s ease-in-out;
 }
 
 .login-button:hover {
@@ -93,8 +115,9 @@
 .login-error {
   color: #d32f2f;
   background-color: #ffebee;
-  padding: 10px;
-  border-radius: 4px;
+  padding: 0.8rem;
+  border-radius: 6px;
   margin-bottom: 1rem;
+  font-size: 0.875rem;
   text-align: center;
 }

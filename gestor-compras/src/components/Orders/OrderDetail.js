@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api';
+import { FaArrowLeft, FaCheckCircle, FaClock } from 'react-icons/fa';
 import './OrderDetail.css';
 
 const OrderDetail = () => {
@@ -44,49 +45,50 @@ const OrderDetail = () => {
   return (
     <div className="order-detail-container">
       <button onClick={() => navigate(-1)} className="back-button">
-        &larr; Volver al Historial
+        <FaArrowLeft /> Volver al Historial
       </button>
       
       <div className="order-header">
-        <h2>Pedido #{order.NumeroPedido}</h2>
+        <h2>Pedido Dental #{order.NumeroPedido}</h2>
         <span className={`status-badge ${order.Estado === 'Aprobado' ? 'approved' : 'pending'}`}>
+          {order.Estado === 'Aprobado' ? <FaCheckCircle /> : <FaClock />}
           {order.Estado || 'Pendiente'}
         </span>
       </div>
       
       <div className="order-info-grid">
         <div className="info-card">
-          <h3>Información General</h3>
+          <h3>Detalles del Pedido</h3>
           <div className="info-row">
-            <span className="info-label">Fecha de Pedido:</span>
+            <span className="info-label">Fecha de creación:</span>
             <span>{new Date(order.FechaPedido).toLocaleDateString()}</span>
           </div>
           {order.FechaNecesaria && (
             <div className="info-row">
-              <span className="info-label">Fecha Necesaria:</span>
+              <span className="info-label">Fecha requerida:</span>
               <span>{new Date(order.FechaNecesaria).toLocaleDateString()}</span>
             </div>
           )}
           <div className="info-row">
-            <span className="info-label">Total Artículos:</span>
+            <span className="info-label">Total artículos:</span>
             <span>{order.Productos.length}</span>
           </div>
         </div>
         
         <div className="info-card">
-          <h3>Información del Cliente</h3>
+          <h3>Información de la Clínica</h3>
           <div className="info-row">
-            <span className="info-label">Razón Social:</span>
+            <span className="info-label">Clínica:</span>
             <span>{order.RazonSocial}</span>
           </div>
           <div className="info-row">
-            <span className="info-label">CIF/DNI:</span>
+            <span className="info-label">Identificador:</span>
             <span>{order.CifDni}</span>
           </div>
         </div>
       </div>
       
-      <h3 className="products-title">Artículos del Pedido</h3>
+      <h3 className="products-title">Instrumental y Suministros</h3>
       <div className="products-table-container">
         <table className="products-table">
           <thead>

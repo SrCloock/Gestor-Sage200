@@ -1,16 +1,15 @@
-/* src/components/Layout/Navbar.css */
 .navbar {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #2c3e50;
-  color: #ffffff;
+  background-color: #004d40; /* Verde oscuro */
   height: 60px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  padding: 0 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  padding: 0 2rem;
   position: sticky;
   top: 0;
   z-index: 100;
+  font-family: 'Inter', sans-serif;
 }
 
 .navbar-container {
@@ -18,13 +17,20 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  max-width: 1200px;
+  max-width: 1400px;
+}
+
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
 }
 
 .app-title {
   margin: 0;
-  font-size: 20px;
+  font-size: 1.25rem;
   color: #ffffff;
+  font-weight: 600;
 }
 
 .navbar-links {
@@ -32,51 +38,96 @@
   list-style: none;
   padding: 0;
   margin: 0;
-  gap: 10px;
+  gap: 0.5rem;
 }
 
 .navbar-links li {
   display: flex;
-  align-items: center;
 }
 
 .navbar-links a {
   display: flex;
   align-items: center;
-  justify-content: center;
   color: #ffffff;
   text-decoration: none;
-  padding: 12px 16px;
-  font-size: 16px;
-  transition: background-color 0.2s ease;
-}
-
-.navbar-links a .icon {
-  margin-right: 8px;
-  font-size: 18px;
+  padding: 0.8rem 1rem;
+  font-size: 0.875rem;
+  border-radius: 6px;
+  transition: background-color 0.1s ease-in-out;
+  gap: 0.5rem;
 }
 
 .navbar-links a:hover {
-  background-color: #34495e;
-  border-radius: 4px;
+  background-color: #00796b; /* Verde principal */
 }
 
 .navbar-links a.active {
   background-color: #00796b;
-  font-weight: bold;
-  border-bottom: 3px solid #ffffff;
-  border-radius: 4px 4px 0 0;
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: 20px;
-  color: #ffffff;
   font-weight: 500;
 }
 
+.icon {
+  font-size: 1rem;
+}
+
+.user-section {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  position: relative;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  transition: background-color 0.1s ease-in-out;
+}
+
+.user-section:hover {
+  background-color: #00796b;
+}
+
 .user-icon {
-  font-size: 16px;
+  font-size: 1.2rem;
+  color: #ffffff;
+}
+
+.username {
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  min-width: 180px;
+  display: none;
+  z-index: 1000;
+}
+
+.user-section:hover .dropdown-menu {
+  display: block;
+}
+
+.logout-button {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  background: none;
+  border: none;
+  color: #424242;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  transition: background-color 0.1s ease-in-out;
+}
+
+.logout-button:hover {
+  background-color: #e0f2f1;
+  color: #d32f2f;
 }

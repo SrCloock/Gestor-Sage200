@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api';
+import { FaTruck, FaPlusCircle, FaCheckCircle, FaClock, FaEye } from 'react-icons/fa';
 import './OrderSupplierList.css';
 
 const OrderSupplierList = () => {
@@ -18,7 +19,8 @@ const OrderSupplierList = () => {
         setError('');
         const response = await api.get('/api/supplier-orders', {
           params: {
-            codigoProveedor: user?.codigoProveedor
+            codigoProveedor: user?.codigoProveedor,
+            seriePedido: 'Web'
           }
         });
         setOrders(response.data.orders);
@@ -43,48 +45,49 @@ const OrderSupplierList = () => {
   if (error) return <div className="error">{error}</div>;
 
   return (
-    <div className="order-list-container">
-      <h2>Mis Pedidos a Proveedores</h2>
+    <div className="order-supplier-list-container">
+      <h2><FaTruck /> Pedidos a Proveedores</h2>
       
       {orders.length === 0 ? (
-        <div className="no-orders">
-          <p>No tienes pedidos registrados</p>
+        <div className="order-supplier-no-orders">
+          <p>No hay pedidos registrados con proveedores</p>
           <button 
             onClick={() => navigate('/crear-pedido-proveedor')}
-            className="create-order-button"
+            className="order-supplier-create-button"
           >
-            Crear nuevo pedido
+            <FaPlusCircle /> Nuevo Pedido
           </button>
         </div>
       ) : (
-        <div className="orders-table-container">
-          <table className="orders-table">
+        <div className="order-supplier-table-container">
+          <table className="order-supplier-table">
             <thead>
               <tr>
-                <th>Número</th>
+                <th>N° Pedido</th>
                 <th>Fecha</th>
                 <th>Estado</th>
-                <th>Artículos</th>
+                <th>Suministros</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {orders.map(order => (
                 <tr key={order.NumeroPedido}>
-                  <td>{order.NumeroPedido}</td>
+                  <td>#{order.NumeroPedido}</td>
                   <td>{new Date(order.FechaPedido).toLocaleDateString()}</td>
                   <td>
-                    <span className={`status-badge ${order.StatusAprobado ? 'approved' : 'pending'}`}>
+                    <span className={`order-supplier-status-badge ${order.StatusAprobado ? 'approved' : 'pending'}`}>
+                      {order.StatusAprobado ? <FaCheckCircle /> : <FaClock />}
                       {order.StatusAprobado ? 'Aprobado' : 'Pendiente'}
                     </span>
                   </td>
-                  <td>{order.NumeroLineas}</td>
+                  <td>{order.NumeroLineas} artículos</td>
                   <td>
                     <button 
                       onClick={() => handleViewDetails(order.NumeroPedido)}
-                      className="view-details-button"
+                      className="order-supplier-view-button"
                     >
-                      Ver Detalles
+                      <FaEye /> Detalles
                     </button>
                   </td>
                 </tr>

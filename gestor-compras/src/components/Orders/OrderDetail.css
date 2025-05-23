@@ -1,23 +1,28 @@
-/* src/components/Orders/OrderDetail.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
 .order-detail-container {
-  max-width: 1000px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
+  font-family: 'Inter', sans-serif;
 }
 
 .back-button {
   background: none;
   border: none;
   color: #00796b;
-  font-size: 1rem;
+  font-size: 0.875rem;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  margin-bottom: 1.5rem;
+  transition: color 0.1s ease-in-out;
 }
 
 .back-button:hover {
-  text-decoration: underline;
+  color: #004d40;
 }
 
 .order-header {
@@ -28,16 +33,20 @@
 }
 
 .order-header h2 {
-  color: #00796b;
+  color: #004d40;
   margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
 }
 
 .status-badge {
-  display: inline-block;
-  padding: 6px 12px;
-  border-radius: 12px;
-  font-size: 0.9rem;
-  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .status-badge.approved {
@@ -52,7 +61,7 @@
 
 .order-info-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1.5rem;
   margin-bottom: 2rem;
 }
@@ -61,13 +70,14 @@
   background: #ffffff;
   border-radius: 8px;
   padding: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 .info-card h3 {
-  color: #00796b;
-  margin-top: 0;
-  margin-bottom: 1.5rem;
+  color: #004d40;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid #e0e0e0;
 }
@@ -75,44 +85,55 @@
 .info-row {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 1rem;
+  margin-bottom: 0.8rem;
+  font-size: 0.875rem;
 }
 
 .info-label {
   font-weight: 500;
-  color: #00796b;
+  color: #757575;
 }
 
 .products-title {
-  color: #00796b;
+  color: #004d40;
+  font-size: 1.25rem;
+  font-weight: 600;
   margin: 2rem 0 1rem;
 }
 
 .products-table-container {
-  overflow-x: auto;
   background: #ffffff;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   padding: 1rem;
+  overflow-x: auto;
 }
 
 .products-table {
   width: 100%;
+  min-width: 600px;
   border-collapse: collapse;
 }
 
 .products-table th {
   background-color: #e0f2f1;
-  color: #00796b;
-  padding: 12px 15px;
+  color: #004d40;
+  padding: 0.8rem;
+  font-size: 0.875rem;
+  font-weight: 600;
   text-align: left;
 }
 
 .products-table td {
-  padding: 12px 15px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 0.8rem;
+  border-bottom: 1px solid #f5f5f5;
+  font-size: 0.875rem;
+}
+
+.products-table tr:last-child td {
+  border-bottom: none;
 }
 
 .products-table tr:hover {
-  background-color: #f5f5f5;
+  background-color: #fafafa;
 }

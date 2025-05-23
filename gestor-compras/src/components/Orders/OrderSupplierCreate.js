@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api';
+import { FaTruck, FaEdit, FaCheckCircle, FaArrowLeft, FaBox } from 'react-icons/fa';
 import './OrderSupplierCreate.css';
 
 const OrderSupplierCreate = () => {
@@ -28,6 +29,8 @@ const OrderSupplierCreate = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
+        setLoading(true);
+        setError('');
         const response = await api.get('/api/products');
         const sortedProducts = response.data.sort((a, b) =>
           a.DescripcionArticulo.localeCompare(b.DescripcionArticulo)
@@ -172,8 +175,9 @@ const OrderSupplierCreate = () => {
 
   const createPageNumbers = () => {
     const pageNumbers = [];
+    const maxVisiblePages = 5;
 
-    if (totalPages <= 5) {
+    if (totalPages <= maxVisiblePages) {
       for (let i = 1; i <= totalPages; i++) pageNumbers.push(i);
     } else if (currentPage <= 3) {
       pageNumbers.push(1, 2, 3, '...', totalPages);
@@ -189,16 +193,22 @@ const OrderSupplierCreate = () => {
   if (reviewMode) {
     return (
       <div className="review-container">
-        <h2>Revisar Pedido a Proveedor</h2>
-        <p>Por favor revise los detalles de su pedido a proveedor antes de confirmar</p>
-        
+        <h2><FaTruck /> Revisar Pedido a Proveedor</h2>
         <div className="review-summary">
           <div className="review-header">
-            <h3>Resumen del Pedido a Proveedor</h3>
-            <p><strong>Número de productos:</strong> {orderItems.length}</p>
-            {deliveryDate && (
-              <p><strong>Fecha de entrega:</strong> {new Date(deliveryDate).toLocaleDateString()}</p>
-            )}
+            <h3>Detalles del Pedido</h3>
+            <div className="order-meta">
+              {deliveryDate && (
+                <div className="delivery-info">
+                  <FaCalendarCheck />
+                  <span>Fecha solicitada: {new Date(deliveryDate).toLocaleDateString()}</span>
+                </div>
+              )}
+              <div className="product-count">
+                <FaBox />
+                <span>{orderItems.length} suministros dentales</span>
+              </div>
+            </div>
           </div>
           
           <div className="review-items">
@@ -206,10 +216,13 @@ const OrderSupplierCreate = () => {
               <div key={index} className="review-item">
                 <div className="item-info">
                   <h4>{item.DescripcionArticulo}</h4>
-                  <p>Código: {item.CodigoArticulo}</p>
+                  <div className="item-details">
+                    <span>Código: {item.CodigoArticulo}</span>
+                    {item.NombreProveedor && <span>Proveedor: {item.NombreProveedor}</span>}
+                  </div>
                 </div>
                 <div className="item-quantity">
-                  <span>Cantidad: {item.Cantidad}</span>
+                  <span>{item.Cantidad} unidades</span>
                 </div>
               </div>
             ))}
@@ -217,10 +230,14 @@ const OrderSupplierCreate = () => {
           
           <div className="review-actions">
             <button onClick={handleBackToEdit} className="edit-button">
-              Editar Pedido
+              <FaEdit /> Modificar
             </button>
-            <button onClick={handleSubmitOrder} className="confirm-button">
-              {loading.submit ? 'Enviando...' : 'Confirmar Pedido a Proveedor'}
+            <button 
+              onClick={handleSubmitOrder} 
+              className="confirm-button"
+              disabled={loading.submit}
+            >
+              <FaCheckCircle /> {loading.submit ? 'Enviando...' : 'Confirmar Pedido'}
             </button>
           </div>
         </div>
@@ -233,7 +250,7 @@ const OrderSupplierCreate = () => {
 
   return (
     <div className="oc-container">
-      <h2>Crear Nuevo Pedido a Proveedor</h2>
+      <h2><FaTruck /> Nuevo Pedido a Proveedor</h2>
 
       {error && (
         <div className="oc-error-message">
@@ -272,10 +289,9 @@ const OrderSupplierCreate = () => {
         </div>
 
         <div className="oc-sort-options">
-          <label>Ordenar:</label>
           <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
-            <option value="asc">A-Z</option>
-            <option value="desc">Z-A</option>
+            <option value="asc">Ordenar A-Z</option>
+            <option value="desc">Ordenar Z-A</option>
           </select>
         </div>
       </div>
@@ -291,7 +307,7 @@ const OrderSupplierCreate = () => {
           )}
 
           {orderItems.length === 0 ? (
-            <p>No hay productos en el pedido a proveedor</p>
+            <p>No hay productos en el pedido</p>
           ) : (
             <>
               <ul className="oc-order-items">
@@ -344,7 +360,7 @@ const OrderSupplierCreate = () => {
                 onClick={handleReviewOrder}
                 disabled={orderItems.length === 0 || loading.submit}
               >
-                {loading.submit ? 'Procesando...' : 'Revisar Pedido a Proveedor'}
+                {loading.submit ? 'Procesando...' : 'Revisar Pedido'}
               </button>
             </>
           )}
@@ -369,7 +385,8 @@ const OrderSupplierCreate = () => {
               ))
             ) : (
               <div className="oc-no-results">
-                No se encontraron productos con los filtros aplicados
+                <FaBox />
+                <p>No se encontraron productos</p>
               </div>
             )}
           </div>
@@ -380,7 +397,7 @@ const OrderSupplierCreate = () => {
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
               >
-                Anterior
+                <FaArrowLeft />
               </button>
 
               {createPageNumbers().map((page, index) => (
@@ -398,7 +415,7 @@ const OrderSupplierCreate = () => {
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
               >
-                Siguiente
+                <FaArrowLeft style={{ transform: 'rotate(180deg)' }} />
               </button>
             </div>
           )}

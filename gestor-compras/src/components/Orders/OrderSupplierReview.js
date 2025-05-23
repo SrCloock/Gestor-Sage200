@@ -1,64 +1,70 @@
-import React, { useState } from 'react';
-
+import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import api from '../../api';
+import { FaPrint, FaArrowLeft, FaCheckCircle, FaBox } from 'react-icons/fa';
 import './OrderSupplierReview.css';
 
 const OrderSupplierReview = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { orderId, seriePedido, deliveryDate, items, success } = location.state || {};
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  
+  const handleBackToOrders = () => navigate('/lista-pedidos-proveedor');
+  const handlePrintOrder = () => window.print();
 
   if (!success) {
     return (
-      <div className="osr-container">
-        <h2>Error al procesar el pedido</h2>
-        <p>No se encontraron datos del pedido a proveedor</p>
-        <button onClick={() => navigate('/crear-pedido-proveedor')}>
-          Volver a crear pedido
-        </button>
+      <div className="order-supplier-review">
+        <div className="order-supplier-review__error">
+          <h2>Error en el pedido a proveedor</h2>
+          <p>No se encontraron datos válidos del pedido</p>
+          <button
+            className="order-supplier-review__button order-supplier-review__button--back"
+            onClick={() => navigate('/crear-pedido-proveedor')}
+          >
+            <FaArrowLeft /> Volver a intentar
+          </button>
+        </div>
       </div>
     );
   }
 
-  const handleBackToOrders = () => {
-    navigate('/lista-pedidos-proveedor');
-  };
-
-  const handlePrintOrder = () => {
-    window.print();
-  };
-
   return (
-    <div className="osr-container">
-      <h2>Pedido a Proveedor Confirmado</h2>
-      <p className="osr-success-message">¡Su pedido a proveedor ha sido creado exitosamente!</p>
+    <div className="order-supplier-review">
+      <div className="order-supplier-review__container">
+        <div className="order-supplier-review__header">
+          <h1 className="order-supplier-review__title">
+            <FaCheckCircle /> Pedido a Proveedor Confirmado
+          </h1>
+          <div className="order-supplier-review__success">
+            <FaCheckCircle size={20} />
+            <span>El pedido se ha registrado exitosamente en nuestro sistema</span>
+          </div>
+        </div>
 
-      <div className="osr-order-summary">
-        <div className="osr-order-header">
-          <h3>Detalles del Pedido</h3>
-          <div className="osr-order-meta">
-            <p><strong>Número de Pedido:</strong> {orderId}</p>
-            <p><strong>Serie:</strong> {seriePedido}</p>
+        <div className="order-supplier-review__meta">
+          <div className="order-supplier-review__details">
+            <p className="order-supplier-review__detail">
+              <strong>Número de pedido:</strong> {seriePedido}-{orderId}
+            </p>
             {deliveryDate && (
-              <p><strong>Fecha de entrega:</strong> {new Date(deliveryDate).toLocaleDateString()}</p>
+              <p className="order-supplier-review__detail">
+                <strong>Fecha de entrega solicitada:</strong> {new Date(deliveryDate).toLocaleDateString()}
+              </p>
             )}
           </div>
         </div>
 
-        <div className="osr-order-items">
-          <h4>Productos solicitados:</h4>
-          <table className="osr-items-table">
-            <thead>
+        <div className="order-supplier-review__products">
+          <h3>Suministros solicitados</h3>
+          <table className="order-supplier-review__table">
+            <thead className="order-supplier-review__thead">
               <tr>
                 <th>Producto</th>
                 <th>Código</th>
                 <th>Cantidad</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="order-supplier-review__tbody">
               {items.map((item, index) => (
                 <tr key={index}>
                   <td>{item.DescripcionArticulo}</td>
@@ -70,12 +76,18 @@ const OrderSupplierReview = () => {
           </table>
         </div>
 
-        <div className="osr-actions">
-          <button onClick={handlePrintOrder} className="osr-print-btn">
-            Imprimir Pedido
+        <div className="order-supplier-review__actions">
+          <button
+            className="order-supplier-review__button order-supplier-review__button--print"
+            onClick={handlePrintOrder}
+          >
+            <FaPrint /> Imprimir Pedido
           </button>
-          <button onClick={handleBackToOrders} className="osr-back-btn">
-            Ver todos mis pedidos
+          <button
+            className="order-supplier-review__button order-supplier-review__button--back"
+            onClick={handleBackToOrders}
+          >
+            <FaBox /> Ver Pedidos
           </button>
         </div>
       </div>
