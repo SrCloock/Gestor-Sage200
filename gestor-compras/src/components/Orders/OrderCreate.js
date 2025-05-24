@@ -3,13 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api';
 import ProductGrid from '../Shared/ProductGrid';
-import { 
-  FaPlusCircle, 
-  FaCalendarAlt, 
-  FaBox, 
-  FaEdit, 
-  FaCheckCircle 
-} from 'react-icons/fa';
 import './OrderCreate.css';
 
 const OrderCreate = () => {
@@ -119,7 +112,7 @@ const OrderCreate = () => {
 
     setFilteredProducts(uniqueProducts);
     setCurrentPage(1);
-    setProducts(prev => [...prev]);
+    setProducts(prev => [...prev]); // Forzar actualización
   }, [searchTerm, sortOrder, products]);
 
   const indexOfLastProduct = currentPage * productsPerPage;
@@ -218,24 +211,16 @@ const OrderCreate = () => {
   if (reviewMode) {
     return (
       <div className="review-container">
-        <h2>Revisar Pedido de Suministros</h2>
+        <h2>Revisar Pedido</h2>
+        <p>Por favor revise los detalles de su pedido antes de confirmar</p>
+        
         <div className="review-summary">
           <div className="review-header">
-            <div className="header-top">
-              <h3>Confirmación de Pedido</h3>
-              <p className="order-meta">
-                {deliveryDate && (
-                  <span className="delivery-date">
-                    <FaCalendarAlt className="meta-icon" />
-                    Entrega programada: {new Date(deliveryDate).toLocaleDateString()}
-                  </span>
-                )}
-                <span className="product-count">
-                  <FaBox className="meta-icon" />
-                  {orderItems.length} artículos dentales
-                </span>
-              </p>
-            </div>
+            <h3>Resumen del Pedido</h3>
+            <p><strong>Número de productos:</strong> {orderItems.length}</p>
+            {deliveryDate && (
+              <p><strong>Fecha de entrega:</strong> {new Date(deliveryDate).toLocaleDateString()}</p>
+            )}
           </div>
           
           <div className="review-items">
@@ -243,13 +228,10 @@ const OrderCreate = () => {
               <div key={index} className="review-item">
                 <div className="item-info">
                   <h4>{item.DescripcionArticulo}</h4>
-                  <div className="item-details">
-                    <span>Código: {item.CodigoArticulo}</span>
-                    {item.NombreProveedor && <span>Proveedor: {item.NombreProveedor}</span>}
-                  </div>
+                  <p>Código: {item.CodigoArticulo}</p>
                 </div>
                 <div className="item-quantity">
-                  <span>{item.Cantidad} unidades</span>
+                  <span>Cantidad: {item.Cantidad}</span>
                 </div>
               </div>
             ))}
@@ -257,10 +239,10 @@ const OrderCreate = () => {
           
           <div className="review-actions">
             <button onClick={handleBackToEdit} className="edit-button">
-              <FaEdit /> Modificar Pedido
+              Editar Pedido
             </button>
             <button onClick={handleSubmitOrder} className="confirm-button">
-              <FaCheckCircle /> Confirmar Pedido
+              Confirmar Pedido
             </button>
           </div>
         </div>
