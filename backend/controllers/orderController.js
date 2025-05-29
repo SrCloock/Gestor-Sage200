@@ -193,7 +193,6 @@ const createOrder = async (req, res) => {
           )
         `);
 
-        
       // Insertar cada línea del pedido
       for (const [index, item] of items.entries()) {
         const articuloResult = await transaction.request()
@@ -387,7 +386,10 @@ const getOrders = async (req, res) => {
     const { codigoCliente } = req.query;
 
     if (!codigoCliente) {
-      return res.status(400).json({ success: false, message: 'Código de cliente no proporcionado' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Código de cliente no proporcionado' 
+      });
     }
 
     // Consulta principal de pedidos con paginación básica
@@ -398,6 +400,7 @@ const getOrders = async (req, res) => {
           c.NumeroPedido,
           c.FechaPedido,
           c.RazonSocial,
+          c.CifDni,
           c.NumeroLineas,
           c.StatusAprobado,
           c.SeriePedido,
@@ -487,6 +490,7 @@ const getOrderDetails = async (req, res) => {
           NumeroPedido, 
           FechaPedido, 
           RazonSocial,
+          CifDni,
           StatusAprobado,
           SeriePedido,
           BaseImponible,

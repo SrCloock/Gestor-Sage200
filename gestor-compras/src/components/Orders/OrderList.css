@@ -1,18 +1,14 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-
+/* src/components/Orders/OrderList.css */
 .order-list-container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
-  font-family: 'Inter', sans-serif;
 }
 
 .order-list-container h2 {
-  color: #004d40;
+  color: #00796b;
   margin-bottom: 1.5rem;
-  font-size: 1.5rem;
-  font-weight: 600;
-  text-align: left;
+  text-align: center;
 }
 
 .order-filters {
@@ -22,51 +18,30 @@
   margin-bottom: 2rem;
   gap: 1rem;
   flex-wrap: wrap;
-  background: #ffffff;
-  padding: 1rem;
-  border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-}
-
-.search-box {
-  position: relative;
-  flex-grow: 1;
 }
 
 .search-box input {
-  width: 100%;
-  padding: 0.8rem 2rem 0.8rem 1rem;
+  padding: 10px 15px;
   border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 0.875rem;
-}
-
-.search-icon {
-  position: absolute;
-  right: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #757575;
+  border-radius: 6px;
+  min-width: 250px;
 }
 
 .sort-options {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
+  gap: 8px;
 }
 
 .sort-options label {
   font-weight: 500;
-  color: #757575;
-  font-size: 0.875rem;
+  color: #00796b;
 }
 
 .sort-options select {
-  padding: 0.8rem;
+  padding: 10px;
   border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  min-width: 200px;
+  border-radius: 6px;
 }
 
 .no-orders {
@@ -75,53 +50,42 @@
   background: #f5f5f5;
   border-radius: 8px;
   color: #757575;
-  font-size: 0.875rem;
 }
 
 .orders-table-container {
   overflow-x: auto;
-  background: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 .orders-table {
   width: 100%;
-  min-width: 800px;
   border-collapse: collapse;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
 }
 
 .orders-table th {
-  background-color: #e0f2f1;
-  color: #004d40;
-  padding: 0.8rem;
-  font-size: 0.875rem;
-  font-weight: 600;
+  background-color: #00796b;
+  color: #ffffff;
+  padding: 12px 15px;
   text-align: left;
 }
 
 .orders-table td {
-  padding: 0.8rem;
-  border-bottom: 1px solid #f5f5f5;
-  font-size: 0.875rem;
-}
-
-.orders-table tr:last-child td {
-  border-bottom: none;
+  padding: 12px 15px;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .orders-table tr:hover {
-  background-color: #fafafa;
+  background-color: #f5f5f5;
 }
 
 .status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.8rem;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
 }
 
 .status-badge.approved {
@@ -138,15 +102,9 @@
   background-color: #00796b;
   color: #ffffff;
   border: none;
-  padding: 0.6rem 1rem;
-  border-radius: 6px;
+  padding: 8px 12px;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 0.75rem;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: background-color 0.1s ease-in-out;
 }
 
 .view-button:hover {

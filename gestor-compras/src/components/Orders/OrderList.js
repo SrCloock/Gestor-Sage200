@@ -2,7 +2,6 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api';
-import { FaSearch, FaFileInvoice, FaCalendarCheck, FaEye } from 'react-icons/fa';
 import './OrderList.css';
 
 const OrderList = () => {
@@ -22,8 +21,7 @@ const OrderList = () => {
         setError('');
         const response = await api.get('/api/orders', {
           params: {
-            codigoCliente: user?.codigoCliente,
-            seriePedido: 'Web'
+            codigoCliente: user?.codigoCliente
           }
         });
         setOrders(response.data.orders);
@@ -81,17 +79,16 @@ const OrderList = () => {
 
   return (
     <div className="order-list-container">
-      <h2><FaFileInvoice /> Historial de Pedidos Dentales</h2>
+      <h2>Historial de Pedidos</h2>
       
       <div className="order-filters">
         <div className="search-box">
           <input
             type="text"
-            placeholder="Buscar por número de pedido..."
+            placeholder="Buscar por #Pedido..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <FaSearch className="search-icon" />
         </div>
         
         <div className="sort-options">
@@ -99,26 +96,25 @@ const OrderList = () => {
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
             <option value="recent">Más recientes primero</option>
             <option value="oldest">Más antiguos primero</option>
-            <option value="id-asc">Número de pedido (ascendente)</option>
-            <option value="id-desc">Número de pedido (descendente)</option>
+            <option value="id-asc">#Pedido (ascendente)</option>
+            <option value="id-desc">#Pedido (descendente)</option>
           </select>
         </div>
       </div>
       
       {filteredOrders.length === 0 ? (
         <div className="no-orders">
-          <FaCalendarCheck />
-          <p>No se encontraron pedidos con los filtros aplicados</p>
+          No se encontraron pedidos con los filtros aplicados
         </div>
       ) : (
         <div className="orders-table-container">
           <table className="orders-table">
             <thead>
               <tr>
-                <th>N° Pedido</th>
-                <th>Fecha de Creación</th>
-                <th>Fecha Requerida</th>
-                <th>Suministros</th>
+                <th>#Pedido</th>
+                <th>Fecha Pedido</th>
+                <th>Fecha Necesaria</th>
+                <th>Artículos</th>
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
@@ -126,14 +122,14 @@ const OrderList = () => {
             <tbody>
               {filteredOrders.map(order => (
                 <tr key={order.NumeroPedido}>
-                  <td>#{order.NumeroPedido}</td>
+                  <td>{order.NumeroPedido}</td>
                   <td>{new Date(order.FechaPedido).toLocaleDateString()}</td>
                   <td>
                     {order.FechaNecesaria 
                       ? new Date(order.FechaNecesaria).toLocaleDateString() 
-                      : 'Sin fecha específica'}
+                      : 'No especificada'}
                   </td>
-                  <td>{order.NumeroLineas} artículos</td>
+                  <td>{order.NumeroLineas}</td>
                   <td>
                     <span className={`status-badge ${order.Estado === 'Aprobado' ? 'approved' : 'pending'}`}>
                       {order.Estado || 'Pendiente'}
@@ -144,7 +140,7 @@ const OrderList = () => {
                       onClick={() => handleViewDetails(order.NumeroPedido)}
                       className="view-button"
                     >
-                      <FaEye /> Detalles
+                      Ver Detalle
                     </button>
                   </td>
                 </tr>
