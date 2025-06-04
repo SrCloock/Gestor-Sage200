@@ -14,6 +14,7 @@ import OrderSupplierDetail from './components/Orders/OrderSupplierDetail';
 import ProtectedRoute from './components/Layout/ProtectedRoute';
 import Navbar from './components/Layout/Navbar';
 import { AuthProvider } from './context/AuthContext';
+import OfferCreate from './components/Offers/OfferCreate';
 import './App.css';
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/catalogo" element={<ProductCatalog />} />
               <Route path="/crear-pedido" element={<OrderCreate />} />
+              <Route path="/crear-oferta" element={<OfferCreate />} />
               <Route path="/crear-pedido-proveedor" element={<OrderSupplierCreate />} />
               <Route path="/revisar-pedido" element={<OrderReview />} />
               <Route path="/revisar-pedido-proveedor" element={<OrderSupplierReview />} />

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FaCheckCircle, FaFileInvoice, FaArrowLeft, FaShoppingCart } from 'react-icons/fa';
+import { FaCheckCircle,FaCalendarCheck, FaFileInvoice, FaArrowLeft, FaShoppingCart } from 'react-icons/fa';
 import './OrderReview.css';
 
 const OrderReview = () => {

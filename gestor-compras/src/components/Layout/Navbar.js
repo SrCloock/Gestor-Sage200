@@ -3,7 +3,7 @@ import React, { useContext } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   FaShoppingCart, FaBoxOpen, FaHistory, FaHome, FaTruck,
-  FaUserCircle, FaSignOutAlt
+  FaUserCircle, FaSignOutAlt, FaFileContract
 } from 'react-icons/fa';
 import { AuthContext } from '../../context/AuthContext';
 import './Navbar.css';
@@ -39,6 +39,11 @@ const Navbar = () => {
           <li>
             <Link to="/crear-pedido" className={location.pathname === '/crear-pedido' ? 'active' : ''}>
               <FaShoppingCart className="icon" /> Nuevo Pedido
+            </Link>
+          </li>
+          <li>
+            <Link to="/crear-oferta" className={location.pathname === '/crear-oferta' ? 'active' : ''}>
+              <FaFileContract className="icon" /> Nueva Oferta
             </Link>
           </li>
           <li>
