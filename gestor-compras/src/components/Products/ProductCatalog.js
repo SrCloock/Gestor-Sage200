@@ -2,8 +2,9 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api';
-import { FaSearch, FaBoxOpen, FaPlusCircle } from 'react-icons/fa';
+import { FaSearch, FaBoxOpen, FaShoppingCart } from 'react-icons/fa';
 import ProductGrid from '../Shared/ProductGrid';
+import CartPreview from '../Shared/CartPreview';
 import './ProductCatalog.css';
 
 const ProductCatalog = () => {
@@ -14,10 +15,11 @@ const ProductCatalog = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const productsPerPage = 20;
-
+  const [selectedProducts, setSelectedProducts] = useState([]);
+  
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
+  const productsPerPage = 20;
 
   useEffect(() => {
     if (!user) navigate('/login');
@@ -100,8 +102,35 @@ const ProductCatalog = () => {
   const currentProducts = filteredProducts.slice(indexOfLast - productsPerPage, indexOfLast);
   const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
 
-  const handleProductClick = (product) => 
-    navigate('/crear-pedido', { state: { selectedProduct: product } });
+  const handleAddToCart = (product) => {
+    setSelectedProducts(prev => {
+      const existingIndex = prev.findIndex(p => 
+        p.CodigoArticulo === product.CodigoArticulo && 
+        p.CodigoProveedor === product.CodigoProveedor
+      );
+      
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          Cantidad: updated[existingIndex].Cantidad + 1
+        };
+        return updated;
+      } else {
+        return [...prev, { ...product, Cantidad: 1 }];
+      }
+    });
+  };
+
+  const handleRemoveFromCart = (productKey) => {
+    setSelectedProducts(prev => prev.filter(p => 
+      `${p.CodigoArticulo}-${p.CodigoProveedor}` !== productKey
+    ));
+  };
+
+  const handleGoToOrder = () => {
+    navigate('/crear-pedido', { state: { selectedProducts } });
+  };
 
   const handlePageChange = (newPage) => 
     newPage > 0 && newPage <= totalPages && setCurrentPage(newPage);
@@ -141,10 +170,17 @@ const ProductCatalog = () => {
 
       <ProductGrid
         products={currentProducts}
-        onAddProduct={handleProductClick}
+        onAddProduct={handleAddToCart}
         currentPage={currentPage}
         totalPages={totalPages}
         onPageChange={handlePageChange}
+        searchTerm={searchTerm}
+      />
+      
+      <CartPreview 
+        products={selectedProducts} 
+        onRemove={handleRemoveFromCart}
+        onGoToOrder={handleGoToOrder}
       />
 
       {!currentProducts.length && (

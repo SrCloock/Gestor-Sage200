@@ -1,5 +1,3 @@
-// backend/controllers/productController.js
-
 const fs = require('fs');
 const path = require('path');
 const { getPool } = require('../db/Sage200db');
@@ -7,12 +5,19 @@ const { getPool } = require('../db/Sage200db');
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'];
 const IMAGE_FOLDER = path.join(__dirname, '../public/images');
 
-const buscarImagenFisica = (codigoArticulo) => {
+const fileExists = (filePath) => {
+  return new Promise((resolve) => {
+    fs.access(filePath, fs.constants.F_OK, (err) => {
+      resolve(!err);
+    });
+  });
+};
+
+const getProductImage = async (codigoArticulo) => {
   for (const ext of IMAGE_EXTENSIONS) {
-    const fileName = `${codigoArticulo}${ext}`;
-    const filePath = path.join(IMAGE_FOLDER, fileName);
-    if (fs.existsSync(filePath)) {
-      return fileName;
+    const filePath = path.join(IMAGE_FOLDER, `${codigoArticulo}${ext}`);
+    if (await fileExists(filePath)) {
+      return `${codigoArticulo}${ext}`;
     }
   }
   return null;
@@ -40,14 +45,13 @@ const getProducts = async (req, res) => {
     for (const product of result.recordset) {
       const codigo = product.CodigoArticulo;
       const dbImage = product.RutaImagen;
-      const imagenFisica = buscarImagenFisica(codigo);
+      const imagenFisica = await getProductImage(codigo);
 
-      let finalImage = 'default.jpg'; // Valor por defecto
+      let finalImage = 'default.jpg';
 
       if (imagenFisica) {
         finalImage = imagenFisica;
 
-        // Si la imagen física es diferente a la de la BD, actualizamos la BD
         if (imagenFisica !== dbImage) {
           await pool.request()
             .input('RutaImagen', imagenFisica)
@@ -78,9 +82,8 @@ const getProducts = async (req, res) => {
   }
 };
 
-// Esta función se puede ejecutar al iniciar el servidor si lo necesitas
 const syncImagesWithDB = async () => {
-  const files = fs.readdirSync(IMAGE_FOLDER);
+  const files = await fs.promises.readdir(IMAGE_FOLDER);
   const pool = await getPool();
 
   for (const file of files) {
@@ -89,7 +92,6 @@ const syncImagesWithDB = async () => {
 
     const codigoArticulo = path.basename(file, ext);
 
-    // Siempre sincroniza con la última imagen encontrada
     await pool.request()
       .input('RutaImagen', file)
       .input('CodigoArticulo', codigoArticulo)

@@ -1,9 +1,7 @@
-// gestor-compras/src/components/Layout/Navbar.js
 import React, { useContext } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  FaShoppingCart, FaBoxOpen, FaHistory, FaHome, FaTruck,
-  FaUserCircle, FaSignOutAlt, FaFileContract
+  FaShoppingCart, FaBoxOpen, FaHistory, FaHome, FaUserCircle, FaSignOutAlt
 } from 'react-icons/fa';
 import { AuthContext } from '../../context/AuthContext';
 import './Navbar.css';
@@ -21,7 +19,7 @@ const Navbar = () => {
   return (
     <nav className="navbar">
       <div className="navbar-section navbar-left">
-        <h1 className="app-title">ClearDent Gestor</h1>
+        <h1 className="app-title">Gestor de Pedidos</h1>
       </div>
 
       <div className="navbar-section navbar-center">
@@ -41,7 +39,6 @@ const Navbar = () => {
               <FaShoppingCart className="icon" /> Nuevo Pedido
             </Link>
           </li>
-          
           <li>
             <Link to="/mis-pedidos" className={location.pathname === '/mis-pedidos' ? 'active' : ''}>
               <FaHistory className="icon" /> Historial

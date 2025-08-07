@@ -74,6 +74,10 @@ const OrderList = () => {
     navigate(`/mis-pedidos/${orderId}`);
   };
 
+  const handleEditOrder = (orderId) => {
+    navigate(`/editar-pedido/${orderId}`);
+  };
+
   if (loading) return <div className="loading">Cargando pedidos...</div>;
   if (error) return <div className="error">{error}</div>;
 
@@ -113,7 +117,7 @@ const OrderList = () => {
               <tr>
                 <th>#Pedido</th>
                 <th>Fecha Pedido</th>
-                <th>Fecha Necesaria</th>
+                <th>Fecha Entrega</th>
                 <th>Artículos</th>
                 <th>Estado</th>
                 <th>Acciones</th>
@@ -136,12 +140,22 @@ const OrderList = () => {
                     </span>
                   </td>
                   <td>
-                    <button 
-                      onClick={() => handleViewDetails(order.NumeroPedido)}
-                      className="view-button"
-                    >
-                      Ver Detalle
-                    </button>
+                    <div className="actions-container">
+                      <button 
+                        onClick={() => handleViewDetails(order.NumeroPedido)}
+                        className="view-button"
+                      >
+                        Ver Detalle
+                      </button>
+                      {order.Estado === 'Pendiente' && (
+                        <button 
+                          onClick={() => handleEditOrder(order.NumeroPedido)}
+                          className="edit-button"
+                        >
+                          Editar
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
