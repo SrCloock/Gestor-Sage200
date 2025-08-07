@@ -2,11 +2,24 @@ import React from 'react';
 import { FaArrowLeft, FaArrowRight } from 'react-icons/fa';
 import '../Products/ProductCatalog.css';
 
-const ProductGrid = ({ products, onAddProduct, currentPage, totalPages, onPageChange, searchTerm }) => {
-  const generateProductKey = (product) => {
-    return `${product.CodigoArticulo}-${product.CodigoProveedor || 'NOPROV'}`;
-  };
-
+const ProductGrid = ({ 
+  products, 
+  onAddProduct, 
+  currentPage, 
+  totalPages, 
+  onPageChange, 
+  searchTerm,
+  generateProductKey = (product) => {
+    const str = `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}`;
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convertir a 32bit entero
+    }
+    return hash.toString(36);
+  }
+}) => {
   const createPageNumbers = () => {
     const pageNumbers = [];
     const maxVisible = 5;
@@ -29,7 +42,7 @@ const ProductGrid = ({ products, onAddProduct, currentPage, totalPages, onPageCh
       <div className="pc-product-grid">
         {products.map(product => (
           <div
-            key={`${generateProductKey(product)}-${searchTerm}-${currentPage}`}
+            key={generateProductKey(product)}
             className="pc-product-card"
             onClick={() => onAddProduct(product)}
           >

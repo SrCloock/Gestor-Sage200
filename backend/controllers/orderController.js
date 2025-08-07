@@ -84,9 +84,12 @@ const createOrder = async (req, res) => {
           WHERE CodigoCuenta = @CodigoCuenta AND CodigoEmpresa = @CodigoEmpresa
         `);
 
-      const condicionesPago = clienteContaResult.recordset.length > 0 
-        ? clienteContaResult.recordset[0]
-        : { NumeroPlazos: 3, DiasPrimerPlazo: 30, DiasEntrePlazos: 30 };
+      // VALORES PREDETERMINADOS PARA CONDICIONES DE PAGO
+      const condicionesPago = {
+        NumeroPlazos: 3,
+        DiasPrimerPlazo: 30,
+        DiasEntrePlazos: 30
+      };
 
       const contadorResult = await transaction.request()
         .input('sysGrupo', codigoEmpresa)
@@ -144,6 +147,7 @@ const createOrder = async (req, res) => {
         .input('CifDni', primerItem.CifDni)
         .input('CifEuropeo', cliente.CifEuropeo || '')
         .input('RazonSocial', cliente.RazonSocial || '')
+        .input('Nombre', cliente.RazonSocial || '') // Añadido: Nombre igual que RazonSocial
         .input('IdDelegacion', cliente.IdDelegacion || '')
         .input('Domicilio', domicilio)
         .input('CodigoPostal', codigoPostal)
@@ -154,7 +158,7 @@ const createOrder = async (req, res) => {
         .input('CodigoProvincia', codigoProvincia)
         .input('CodigoMunicipio', codigoMunicipio)
         .input('CodigoContable', cliente.CodigoContable || '')
-        .input('StatusAprobado', 0)
+        .input('StatusAprobado', -1) // Cambiado a -1
         .input('MantenerCambio_', -1)
         .input('SiglaNacion', 'ES')
         .input('NumeroPlazos', condicionesPago.NumeroPlazos)
@@ -165,11 +169,13 @@ const createOrder = async (req, res) => {
         .input('ImporteLiquido', 0)
         .input('NumeroLineas', 0)
         .input('ObservacionesPedido', comment || '')
+        .input('CodigoCondiciones', 3) // Añadido
+        .input('FormadePago', 'Tres plazos a 30, 60 y 90') // Añadido
         .query(`
           INSERT INTO CabeceraPedidoCliente (
             CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido,
             FechaPedido, FechaNecesaria, FechaEntrega, FechaTope,
-            CodigoCliente, CifDni, CifEuropeo, RazonSocial, IdDelegacion,
+            CodigoCliente, CifDni, CifEuropeo, RazonSocial, Nombre, IdDelegacion,
             Domicilio, CodigoPostal, Municipio, Provincia, Nacion,
             CodigoNacion, CodigoProvincia, CodigoMunicipio, CodigoContable,
             StatusAprobado, MantenerCambio_,
@@ -177,12 +183,13 @@ const createOrder = async (req, res) => {
             NumeroPlazos, DiasPrimerPlazo, DiasEntrePlazos,
             BaseImponible, TotalIva, ImporteLiquido,
             NumeroLineas,
-            ObservacionesPedido
+            ObservacionesPedido,
+            CodigoCondiciones, FormadePago
           )
           VALUES (
             @CodigoEmpresa, @EjercicioPedido, @SeriePedido, @NumeroPedido,
             @FechaPedido, @FechaNecesaria, @FechaEntrega, @FechaTope,
-            @CodigoCliente, @CifDni, @CifEuropeo, @RazonSocial, @IdDelegacion,
+            @CodigoCliente, @CifDni, @CifEuropeo, @RazonSocial, @Nombre, @IdDelegacion,
             @Domicilio, @CodigoPostal, @Municipio, @Provincia, @Nacion,
             @CodigoNacion, @CodigoProvincia, @CodigoMunicipio, @CodigoContable,
             @StatusAprobado, @MantenerCambio_,
@@ -190,7 +197,8 @@ const createOrder = async (req, res) => {
             @NumeroPlazos, @DiasPrimerPlazo, @DiasEntrePlazos,
             @BaseImponible, @TotalIva, @ImporteLiquido,
             @NumeroLineas,
-            @ObservacionesPedido
+            @ObservacionesPedido,
+            @CodigoCondiciones, @FormadePago
           )
         `);
 
@@ -382,21 +390,23 @@ const createOrder = async (req, res) => {
 const getOrders = async (req, res) => {
   try {
     const pool = await getPool();
-    const { codigoCliente } = req.query;
+    const { codigoCliente, seriePedido } = req.query;
 
-    if (!codigoCliente) {
+    if (!codigoCliente || !seriePedido) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Código de cliente no proporcionado' 
+        message: 'Código de cliente o serie de pedido no proporcionado' 
       });
     }
 
     const ordersResult = await pool.request()
       .input('CodigoCliente', codigoCliente)
+      .input('SeriePedido', seriePedido)
       .query(`
         SELECT 
           c.NumeroPedido,
           c.FechaPedido,
+          c.FechaNecesaria,
           c.RazonSocial,
           c.CifDni,
           c.NumeroLineas,
@@ -414,6 +424,7 @@ const getOrders = async (req, res) => {
           c.CodigoContable
         FROM CabeceraPedidoCliente c
         WHERE c.CodigoCliente = @CodigoCliente
+        AND c.SeriePedido = @SeriePedido
         ORDER BY c.FechaPedido DESC
         OFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY
       `);
@@ -442,7 +453,8 @@ const getOrders = async (req, res) => {
 
         return {
           ...order,
-          Estado: order.StatusAprobado === 0 ? 'Pendiente' : 'Aprobado',
+          Estado: order.StatusAprobado === 0 ? 'Pendiente' : 
+                 order.StatusAprobado === -1 ? 'Pendiente' : 'Aprobado',
           Productos: detailsResult.recordset
         };
       })
@@ -493,6 +505,7 @@ const getOrderDetails = async (req, res) => {
           TotalIVA,
           ImporteLiquido,
           NumeroLineas,
+          FechaNecesaria,
           FechaEntrega,
           Domicilio,
           CodigoPostal,
@@ -537,7 +550,8 @@ const getOrderDetails = async (req, res) => {
       success: true,
       order: {
         ...orderResult.recordset[0],
-        Estado: orderResult.recordset[0].StatusAprobado === 0 ? 'Pendiente' : 'Aprobado',
+        Estado: orderResult.recordset[0].StatusAprobado === 0 ? 'Pendiente' : 
+               orderResult.recordset[0].StatusAprobado === -1 ? 'Pendiente' : 'Aprobado',
         Productos: linesResult.recordset
       },
       message: 'Detalle del pedido obtenido correctamente'

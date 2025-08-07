@@ -20,11 +20,19 @@ const OrderCreate = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [deliveryDate, setDeliveryDate] = useState('');
   const [reviewMode, setReviewMode] = useState(false);
-  const [comment, setComment] = useState(''); // Nuevo estado para comentario
+  const [comment, setComment] = useState('');
   const productsPerPage = 20;
 
+  // Función hash estable para generar claves únicas
   const generateProductKey = (product) => {
-    return `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}`; // Clave única con proveedor
+    const str = `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}`;
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convertir a 32bit entero
+    }
+    return hash.toString(36);
   };
 
   const checkImageExists = (url) => {
@@ -55,7 +63,19 @@ const OrderCreate = () => {
           return { ...product, FinalImage: imagePath };
         }));
         
-        const sortedProducts = productsWithImages.sort((a, b) =>
+        // Eliminar duplicados usando la función hash
+        const uniqueProducts = [];
+        const seenKeys = new Set();
+        
+        productsWithImages.forEach(product => {
+          const key = generateProductKey(product);
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            uniqueProducts.push(product);
+          }
+        });
+        
+        const sortedProducts = uniqueProducts.sort((a, b) =>
           a.DescripcionArticulo.localeCompare(b.DescripcionArticulo)
         );
         
@@ -95,12 +115,14 @@ const OrderCreate = () => {
       });
     }
 
+    // Eliminar duplicados usando la función hash
     const uniqueProducts = [];
-    const seenCodes = new Set();
+    const seenKeys = new Set();
     
     result.forEach(product => {
-      if (!seenCodes.has(product.CodigoArticulo)) {
-        seenCodes.add(product.CodigoArticulo);
+      const key = generateProductKey(product);
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
         uniqueProducts.push(product);
       }
     });
@@ -113,7 +135,6 @@ const OrderCreate = () => {
 
     setFilteredProducts(uniqueProducts);
     setCurrentPage(1);
-    setProducts(prev => [...prev]); // Forzar actualización
   }, [searchTerm, sortOrder, products]);
 
   const indexOfLastProduct = currentPage * productsPerPage;
@@ -130,14 +151,12 @@ const OrderCreate = () => {
   const handleAddItem = (product) => {
     setOrderItems((prev) => {
       const existingItem = prev.find(item =>
-        item.CodigoArticulo === product.CodigoArticulo &&
-        item.CodigoProveedor === product.CodigoProveedor
+        generateProductKey(item) === generateProductKey(product)
       );
 
       if (existingItem) {
         return prev.map(item =>
-          item.CodigoArticulo === product.CodigoArticulo &&
-          item.CodigoProveedor === product.CodigoProveedor
+          generateProductKey(item) === generateProductKey(product)
             ? { ...item, Cantidad: item.Cantidad + 1 }
             : item
         );
@@ -181,7 +200,7 @@ const OrderCreate = () => {
         DescripcionArticulo: item.DescripcionArticulo,
         Cantidad: Number(item.Cantidad),
         PrecioCompra: item.PrecioCompra,
-        CodigoProveedor: item.CodigoProveedor || null, // Incluir proveedor
+        CodigoProveedor: item.CodigoProveedor || null,
         CodigoCliente: user.codigoCliente,
         CifDni: user.cifDni
       }));
@@ -189,7 +208,7 @@ const OrderCreate = () => {
       const orderData = {
         items: itemsToSend,
         deliveryDate: deliveryDate || null,
-        comment: comment // Incluir comentario
+        comment: comment
       };
 
       const response = await api.post('/api/orders', orderData);
@@ -227,7 +246,7 @@ const OrderCreate = () => {
           </div>
           
           <div className="review-items">
-            {orderItems.map((item, index) => (
+            {orderItems.map((item) => (
               <div key={generateProductKey(item)} className="review-item">
                 <div className="item-info">
                   <h4>{item.DescripcionArticulo}</h4>
@@ -241,7 +260,6 @@ const OrderCreate = () => {
             ))}
           </div>
           
-          {/* Sección para comentario */}
           <div className="review-comment">
             <label>Comentarios para el pedido:</label>
             <textarea 
@@ -310,7 +328,7 @@ const OrderCreate = () => {
             }}
             onKeyPress={(e) => {
               if (e.key === 'Enter') {
-                setProducts(prev => [...prev]);
+                // Actualización eliminada para evitar loop
               }
             }}
           />
@@ -360,8 +378,7 @@ const OrderCreate = () => {
                           const value = Math.max(1, parseInt(e.target.value) || 1);
                           setOrderItems((prev) =>
                             prev.map((i) =>
-                              i.CodigoArticulo === item.CodigoArticulo &&
-                              i.CodigoProveedor === item.CodigoProveedor
+                              generateProductKey(i) === generateProductKey(item)
                                 ? { ...i, Cantidad: value }
                                 : i
                             )
@@ -373,13 +390,8 @@ const OrderCreate = () => {
                         onClick={() =>
                           setOrderItems((prev) =>
                             prev.filter(
-                              (i) =>
-                                !(
-                                  i.CodigoArticulo === item.CodigoArticulo &&
-                                  i.CodigoProveedor === item.CodigoProveedor
-                                )
-                            )
-                          )
+                              (i) => generateProductKey(i) !== generateProductKey(item)
+                            ))
                         }
                       >
                         Eliminar
@@ -409,6 +421,7 @@ const OrderCreate = () => {
             totalPages={totalPages}
             onPageChange={handlePageChange}
             searchTerm={searchTerm}
+            generateProductKey={generateProductKey}
           />
         </div>
       </div>

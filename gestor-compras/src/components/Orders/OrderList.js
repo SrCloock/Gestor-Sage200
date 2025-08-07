@@ -21,7 +21,8 @@ const OrderList = () => {
         setError('');
         const response = await api.get('/api/orders', {
           params: {
-            codigoCliente: user?.codigoCliente
+            codigoCliente: user?.codigoCliente,
+            seriePedido: 'Web' // Añadir seriePedido a la solicitud
           }
         });
         setOrders(response.data.orders);
@@ -70,12 +71,12 @@ const OrderList = () => {
     setFilteredOrders(result);
   }, [searchTerm, sortBy, orders]);
 
-  const handleViewDetails = (orderId) => {
-    navigate(`/mis-pedidos/${orderId}`);
+  const handleViewDetails = (orderId, seriePedido) => {
+    navigate(`/mis-pedidos/${orderId}`, { state: { seriePedido } });
   };
 
-  const handleEditOrder = (orderId) => {
-    navigate(`/editar-pedido/${orderId}`);
+  const handleEditOrder = (orderId, seriePedido) => {
+    navigate(`/editar-pedido/${orderId}`, { state: { seriePedido } });
   };
 
   if (loading) return <div className="loading">Cargando pedidos...</div>;
@@ -125,7 +126,7 @@ const OrderList = () => {
             </thead>
             <tbody>
               {filteredOrders.map(order => (
-                <tr key={order.NumeroPedido}>
+                <tr key={`${order.SeriePedido}-${order.NumeroPedido}`}>
                   <td>{order.NumeroPedido}</td>
                   <td>{new Date(order.FechaPedido).toLocaleDateString()}</td>
                   <td>
@@ -142,14 +143,14 @@ const OrderList = () => {
                   <td>
                     <div className="actions-container">
                       <button 
-                        onClick={() => handleViewDetails(order.NumeroPedido)}
+                        onClick={() => handleViewDetails(order.NumeroPedido, order.SeriePedido)}
                         className="view-button"
                       >
                         Ver Detalle
                       </button>
                       {order.Estado === 'Pendiente' && (
                         <button 
-                          onClick={() => handleEditOrder(order.NumeroPedido)}
+                          onClick={() => handleEditOrder(order.NumeroPedido, order.SeriePedido)}
                           className="edit-button"
                         >
                           Editar

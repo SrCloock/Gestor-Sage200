@@ -25,8 +25,17 @@ const ProductCatalog = () => {
     if (!user) navigate('/login');
   }, [user, navigate]);
 
-  const generateProductKey = (product) => 
-    `${product.CodigoArticulo}-${product.CodigoProveedor}`;
+  // Función hash estable para generar claves únicas
+  const generateProductKey = (product) => {
+    const str = `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}`;
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convertir a 32bit entero
+    }
+    return hash.toString(36);
+  };
 
   const removeDuplicates = (products) => {
     const seen = new Set();
@@ -105,8 +114,7 @@ const ProductCatalog = () => {
   const handleAddToCart = (product) => {
     setSelectedProducts(prev => {
       const existingIndex = prev.findIndex(p => 
-        p.CodigoArticulo === product.CodigoArticulo && 
-        p.CodigoProveedor === product.CodigoProveedor
+        generateProductKey(p) === generateProductKey(product)
       );
       
       if (existingIndex >= 0) {
@@ -124,7 +132,7 @@ const ProductCatalog = () => {
 
   const handleRemoveFromCart = (productKey) => {
     setSelectedProducts(prev => prev.filter(p => 
-      `${p.CodigoArticulo}-${p.CodigoProveedor}` !== productKey
+      generateProductKey(p) !== productKey
     ));
   };
 
@@ -175,12 +183,14 @@ const ProductCatalog = () => {
         totalPages={totalPages}
         onPageChange={handlePageChange}
         searchTerm={searchTerm}
+        generateProductKey={generateProductKey}
       />
       
       <CartPreview 
         products={selectedProducts} 
         onRemove={handleRemoveFromCart}
         onGoToOrder={handleGoToOrder}
+        generateProductKey={generateProductKey}
       />
 
       {!currentProducts.length && (

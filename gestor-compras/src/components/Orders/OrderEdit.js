@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api';
 import ProductGrid from '../Shared/ProductGrid';
-import './OrderCreate.css';
+import './OrderEdit.css'; // Cambiado a CSS específico
 
 const OrderEdit = () => {
   const { orderId } = useParams();
@@ -22,6 +22,36 @@ const OrderEdit = () => {
   const [deliveryDate, setDeliveryDate] = useState('');
   const [comment, setComment] = useState('');
   const productsPerPage = 20;
+
+  // Función mejorada para generar claves únicas
+  const generateProductKey = (product) => {
+    const str = `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}`;
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convertir a 32bit entero
+    }
+    return `prod-${hash.toString(36)}`;
+  };
+
+  // Funciones para manejar imágenes
+  const checkImageExists = (url) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = url;
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+    });
+  };
+
+  const getProductImage = async (product) => {
+    const localImagePath = `/images/${product.CodigoArticulo}.jpg`;
+    const exists = await checkImageExists(localImagePath);
+    if (exists) return localImagePath;
+    if (product.RutaImagen) return product.RutaImagen;
+    return '/images/default.jpg';
+  };
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -60,8 +90,28 @@ const OrderEdit = () => {
       try {
         setLoading(prev => ({ ...prev, products: true }));
         const response = await api.get('/api/products');
-        setProducts(response.data);
-        setFilteredProducts(response.data);
+        
+        // Procesar imágenes y eliminar duplicados
+        const productsWithImages = await Promise.all(
+          response.data.map(async (product) => {
+            const imagePath = await getProductImage(product);
+            return { ...product, FinalImage: imagePath };
+          })
+        );
+        
+        const uniqueProducts = [];
+        const seenKeys = new Set();
+        
+        productsWithImages.forEach(product => {
+          const key = generateProductKey(product);
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            uniqueProducts.push(product);
+          }
+        });
+        
+        setProducts(uniqueProducts);
+        setFilteredProducts(uniqueProducts);
       } catch (err) {
         setError('Error al cargar productos');
         console.error(err);
@@ -76,10 +126,6 @@ const OrderEdit = () => {
     }
   }, [orderId, user]);
 
-  const generateProductKey = (product) => {
-    return `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}`;
-  };
-
   useEffect(() => {
     let result = [...products];
     
@@ -89,14 +135,22 @@ const OrderEdit = () => {
         const matchesCode = product.CodigoArticulo?.toLowerCase().includes(term);
         const matchesDesc = product.DescripcionArticulo?.toLowerCase().includes(term);
         const matchesSupplier = product.NombreProveedor?.toLowerCase().includes(term);
-        
         return matchesCode || matchesDesc || matchesSupplier;
       });
     }
 
-    const uniqueProducts = [...new Set(result.map(p => p.CodigoArticulo))]
-      .map(codigo => result.find(p => p.CodigoArticulo === codigo));
+    // Eliminar duplicados usando la función hash
+    const uniqueProducts = [];
+    const seenKeys = new Set();
     
+    result.forEach(product => {
+      const key = generateProductKey(product);
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        uniqueProducts.push(product);
+      }
+    });
+
     uniqueProducts.sort((a, b) =>
       sortOrder === 'asc'
         ? a.DescripcionArticulo.localeCompare(b.DescripcionArticulo)
@@ -121,14 +175,12 @@ const OrderEdit = () => {
   const handleAddItem = (product) => {
     setOrderItems((prev) => {
       const existingItem = prev.find(item =>
-        item.CodigoArticulo === product.CodigoArticulo &&
-        item.CodigoProveedor === product.CodigoProveedor
+        generateProductKey(item) === generateProductKey(product)
       );
 
       if (existingItem) {
         return prev.map(item =>
-          item.CodigoArticulo === product.CodigoArticulo &&
-          item.CodigoProveedor === product.CodigoProveedor
+          generateProductKey(item) === generateProductKey(product)
             ? { ...item, Cantidad: item.Cantidad + 1 }
             : item
         );
@@ -146,64 +198,83 @@ const OrderEdit = () => {
     });
   };
 
-  const handleUpdateOrder = async () => {
+  const handleRemoveItem = (itemToRemove) => {
+    setOrderItems(prev => 
+      prev.filter(item => 
+        generateProductKey(item) !== generateProductKey(itemToRemove)
+      )
+    );
+  };
+
+  const handleUpdateQuantity = (itemToUpdate, newQuantity) => {
+    const quantity = Math.max(1, parseInt(newQuantity) || 1);
+    setOrderItems(prev => 
+      prev.map(item => 
+        generateProductKey(item) === generateProductKey(itemToUpdate)
+          ? { ...item, Cantidad: quantity }
+          : item
+      )
+    );
+  };
+
+  const handleSubmitChanges = async () => {
     try {
       setError('');
-      setLoading((prev) => ({ ...prev, submit: true }));
-
-      if (!user?.codigoCliente || !user?.cifDni) {
-        throw new Error('Datos de usuario incompletos. Por favor, inicie sesión nuevamente.');
-      }
+      setLoading(prev => ({ ...prev, submit: true }));
 
       const itemsToSend = orderItems.map(item => ({
         CodigoArticulo: item.CodigoArticulo,
         DescripcionArticulo: item.DescripcionArticulo,
         Cantidad: Number(item.Cantidad),
-        PrecioCompra: item.PrecioCompra,
-        CodigoProveedor: item.CodigoProveedor || '',
+        PrecioCompra: item.Precio,
+        CodigoProveedor: item.CodigoProveedor || null,
         CodigoCliente: user.codigoCliente,
         CifDni: user.cifDni
       }));
 
-      const orderData = {
+      const response = await api.put(`/api/orders/${orderId}`, {
         items: itemsToSend,
         deliveryDate: deliveryDate || null,
         comment: comment
-      };
-
-      await api.put(`/api/orders/${orderId}`, orderData);
-
-      navigate('/mis-pedidos', {
-        state: {
-          success: true,
-          message: 'Pedido actualizado correctamente'
-        }
       });
 
-    } catch (error) {
-      console.error('Error al actualizar pedido:', error);
-      setError(error.response?.data?.message || error.message || 'Error al actualizar el pedido');
+      if (response.data.success) {
+        navigate('/mis-pedidos', {
+          state: {
+            success: true,
+            message: 'Pedido actualizado correctamente'
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Error al actualizar pedido:', err);
+      setError(err.response?.data?.message || err.message || 'Error al actualizar el pedido');
     } finally {
-      setLoading((prev) => ({ ...prev, submit: false }));
+      setLoading(prev => ({ ...prev, submit: false }));
     }
   };
 
-  if (loading.order || loading.products) return <div className="oc-loading">Cargando datos...</div>;
-  if (error) return <div className="oc-error">{error}</div>;
+  if (loading.order || loading.products) {
+    return <div className="oe-loading">Cargando datos del pedido...</div>;
+  }
+
+  if (error) {
+    return <div className="oe-error">{error}</div>;
+  }
 
   return (
-    <div className="oc-container">
+    <div className="oe-container">
       <h2>Editar Pedido #{orderId}</h2>
 
       {error && (
-        <div className="oc-error-message">
+        <div className="oe-error-message">
           <p>{error}</p>
           <button onClick={() => setError('')}>×</button>
         </div>
       )}
 
-      <div className="oc-delivery-date">
-        <label htmlFor="deliveryDate">Fecha de entrega deseada:</label>
+      <div className="oe-delivery-date">
+        <label htmlFor="deliveryDate">Nueva fecha de entrega (opcional):</label>
         <input
           type="date"
           id="deliveryDate"
@@ -213,7 +284,7 @@ const OrderEdit = () => {
         />
         {deliveryDate && (
           <button 
-            className="oc-clear-date"
+            className="oe-clear-date"
             onClick={() => setDeliveryDate('')}
           >
             Limpiar fecha
@@ -221,18 +292,21 @@ const OrderEdit = () => {
         )}
       </div>
 
-      <div className="oc-filters">
-        <div className="pc-search-box">
+      <div className="oe-filters">
+        <div className="oe-search-box">
           <input
             type="text"
-            placeholder="Buscar productos..."
+            placeholder="Buscar productos por nombre, código o proveedor..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
           />
           <span className="search-icon">🔍</span>
         </div>
 
-        <div className="pc-sort-options">
+        <div className="oe-sort-options">
           <select
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value)}
@@ -244,58 +318,48 @@ const OrderEdit = () => {
         </div>
       </div>
 
-      <div className="oc-order-container">
-        <div className="oc-order-summary">
-          <h3>Resumen del Pedido ({orderItems.length} productos)</h3>
+      <div className="oe-order-container">
+        <div className="oe-order-summary">
+          <h3>Productos en el Pedido ({orderItems.length})</h3>
           
           {deliveryDate && (
-            <div className="oc-delivery-info">
+            <div className="oe-delivery-info">
               <strong>Fecha de entrega:</strong> {new Date(deliveryDate).toLocaleDateString()}
             </div>
           )}
+
+          <div className="oe-comment-section">
+            <label>Comentarios:</label>
+            <textarea 
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows="3"
+              placeholder="Agregue comentarios para este pedido..."
+            />
+          </div>
 
           {orderItems.length === 0 ? (
             <p>No hay productos en el pedido</p>
           ) : (
             <>
-              <ul className="oc-order-items">
+              <ul className="oe-order-items">
                 {orderItems.map((item) => (
                   <li key={generateProductKey(item)}>
-                    <div className="oc-item-info">
+                    <div className="oe-item-info">
                       <span>{item.DescripcionArticulo}</span>
                       <span>Código: {item.CodigoArticulo}</span>
                       {item.NombreProveedor && <span>Proveedor: {item.NombreProveedor}</span>}
                     </div>
-                    <div className="oc-item-actions">
+                    <div className="oe-item-actions">
                       <input
                         type="number"
                         min="1"
                         value={item.Cantidad}
-                        onChange={(e) => {
-                          const value = Math.max(1, parseInt(e.target.value) || 1);
-                          setOrderItems((prev) =>
-                            prev.map((i) =>
-                              i.CodigoArticulo === item.CodigoArticulo &&
-                              i.CodigoProveedor === item.CodigoProveedor
-                                ? { ...i, Cantidad: value }
-                                : i
-                            )
-                          );
-                        }}
+                        onChange={(e) => handleUpdateQuantity(item, e.target.value)}
                       />
                       <button
-                        className="oc-remove-button"
-                        onClick={() =>
-                          setOrderItems((prev) =>
-                            prev.filter(
-                              (i) =>
-                                !(
-                                  i.CodigoArticulo === item.CodigoArticulo &&
-                                  i.CodigoProveedor === item.CodigoProveedor
-                                )
-                            )
-                          )
-                        }
+                        className="oe-remove-button"
+                        onClick={() => handleRemoveItem(item)}
                       >
                         Eliminar
                       </button>
@@ -304,18 +368,18 @@ const OrderEdit = () => {
                 ))}
               </ul>
               <button
-                className="oc-submit-order"
-                onClick={handleUpdateOrder}
-                disabled={loading.submit}
+                className="oe-submit-order"
+                onClick={handleSubmitChanges}
+                disabled={orderItems.length === 0 || loading.submit}
               >
-                {loading.submit ? 'Actualizando...' : 'Actualizar Pedido'}
+                {loading.submit ? 'Guardando cambios...' : 'Guardar Cambios'}
               </button>
             </>
           )}
         </div>
 
-        <div className="oc-product-selection">
-          <h3>Seleccionar Productos ({filteredProducts.length} disponibles)</h3>
+        <div className="oe-product-selection">
+          <h3>Agregar más productos ({filteredProducts.length} disponibles)</h3>
 
           <ProductGrid
             products={currentProducts}
@@ -324,6 +388,7 @@ const OrderEdit = () => {
             totalPages={totalPages}
             onPageChange={handlePageChange}
             searchTerm={searchTerm}
+            generateProductKey={generateProductKey}
           />
         </div>
       </div>
