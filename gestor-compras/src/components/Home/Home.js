@@ -11,7 +11,7 @@ const Home = () => {
   return (
     <div className="home-container">
       <div className="home-card">
-        <h1><FaShoppingCart /> ClearDent Gestor</h1>
+        <h1><FaShoppingCart /> Gestor de Ofertas</h1>
         <div className="welcome-container">
           <p className="welcome-message">
             {user?.nombreUsuario && `${user.nombreUsuario}, `}
@@ -24,7 +24,7 @@ const Home = () => {
           className="quick-order-button"
           onClick={() => navigate('/crear-pedido')}
         >
-          <FaPlusCircle className="button-icon" /> Nuevo Pedido Dental
+          <FaPlusCircle className="button-icon" /> Nueva Oferta
         </button>
         
         <div className="home-section">
@@ -34,14 +34,14 @@ const Home = () => {
               <FaBoxOpen className="icon" /> 
               <div className="option-content">
                 <h3>Catálogo de Productos</h3>
-                <p>Suministros e instrumental dental</p>
+                <p>Productos a ofertar</p>
               </div>
             </li>
-            <li onClick={() => navigate('/crear-pedido')}>
+            <li onClick={() => navigate('/crear-oferta')}>
               <FaShoppingCart className="icon" />
               <div className="option-content">
-                <h3>Gestión de Pedidos</h3>
-                <p>Crear y seguir pedidos</p>
+                <h3>Gestión de Ofertas</h3>
+                <p>Crear y seguir ofertas</p>
               </div>
             </li>
             <li onClick={() => navigate('/mis-pedidos')}>

@@ -41,16 +41,7 @@ const Navbar = () => {
               <FaShoppingCart className="icon" /> Nuevo Pedido
             </Link>
           </li>
-          <li>
-            <Link to="/crear-oferta" className={location.pathname === '/crear-oferta' ? 'active' : ''}>
-              <FaFileContract className="icon" /> Nueva Oferta
-            </Link>
-          </li>
-          <li>
-            <Link to="/crear-pedido-proveedor" className={location.pathname === '/crear-pedido-proveedor' ? 'active' : ''}>
-              <FaTruck className="icon" /> Proveedores
-            </Link>
-          </li>
+          
           <li>
             <Link to="/mis-pedidos" className={location.pathname === '/mis-pedidos' ? 'active' : ''}>
               <FaHistory className="icon" /> Historial

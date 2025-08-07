@@ -20,7 +20,34 @@ const OfferCreate = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [deliveryDate, setDeliveryDate] = useState('');
   const [reviewMode, setReviewMode] = useState(false);
+  const [discountType, setDiscountType] = useState('percent');
+  const [discountValue, setDiscountValue] = useState(0);
+  const [subtotal, setSubtotal] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [iva, setIva] = useState(0);
   const productsPerPage = 20;
+
+  // Calcular totales cuando cambian los items o el descuento
+  useEffect(() => {
+    const newSubtotal = offerItems.reduce((sum, item) => 
+      sum + (item.PrecioVenta * item.Cantidad), 0);
+    
+    setSubtotal(newSubtotal);
+    
+    let discountAmount = 0;
+    if (discountType === 'percent') {
+      discountAmount = newSubtotal * (discountValue / 100);
+    } else {
+      discountAmount = discountValue;
+    }
+    
+    const baseImponible = newSubtotal - discountAmount;
+    const newIva = baseImponible * 0.21;
+    const newTotal = baseImponible + newIva;
+    
+    setIva(newIva);
+    setTotal(newTotal);
+  }, [offerItems, discountType, discountValue]);
 
   const generateProductKey = (product) => {
     return `${product.CodigoArticulo}-${product.CodigoProveedor || 'NOPROV'}`;
@@ -188,7 +215,12 @@ const OfferCreate = () => {
 
       const offerData = {
         items: itemsToSend,
-        deliveryDate: deliveryDate || null
+        deliveryDate: deliveryDate || null,
+        discountType,
+        discountValue,
+        subtotal,
+        iva,
+        total
       };
 
       const response = await api.post('/api/offers', offerData);
@@ -198,6 +230,11 @@ const OfferCreate = () => {
           offerId: response.data.offerId,
           serieOferta: response.data.serieOferta,
           deliveryDate: deliveryDate,
+          discountType,
+          discountValue,
+          subtotal,
+          iva,
+          total,
           success: true
         }
       });
@@ -239,11 +276,22 @@ const OfferCreate = () => {
             ))}
           </div>
           
+          <div className="review-totals">
+            <p><strong>Subtotal:</strong> {subtotal.toFixed(2)} €</p>
+            <p><strong>Descuento:</strong> {
+              discountType === 'percent' 
+                ? `${discountValue}%`
+                : `${discountValue.toFixed(2)} €`
+            }</p>
+            <p><strong>IVA (21%):</strong> {iva.toFixed(2)} €</p>
+            <p><strong>Total oferta:</strong> {total.toFixed(2)} €</p>
+          </div>
+          
           <div className="review-actions">
             <button onClick={handleBackToEdit} className="edit-button">
               Editar Oferta
             </button>
-            <button onClick={handleSubmitOffer} className="confirm-button">
+            <button onClick={() => navigate('/')} className="confirm-button">
               Confirmar Oferta
             </button>
           </div>
@@ -325,6 +373,38 @@ const OfferCreate = () => {
               <strong>Fecha de entrega:</strong> {new Date(deliveryDate).toLocaleDateString()}
             </div>
           )}
+
+          <div className="oc-discount-section">
+            <h3>Aplicar Descuento</h3>
+            <div className="oc-discount-controls">
+              <select
+                value={discountType}
+                onChange={(e) => setDiscountType(e.target.value)}
+              >
+                <option value="percent">Porcentaje (%)</option>
+                <option value="amount">Cantidad fija</option>
+              </select>
+              
+              <input
+                type="number"
+                min="0"
+                value={discountValue}
+                onChange={(e) => setDiscountValue(Number(e.target.value))}
+                placeholder={discountType === 'percent' ? '0-100%' : 'Monto'}
+              />
+            </div>
+          </div>
+
+          <div className="oc-summary-totals">
+            <p><strong>Subtotal:</strong> {subtotal.toFixed(2)} €</p>
+            <p><strong>Descuento:</strong> {
+              discountType === 'percent' 
+                ? `${discountValue}%` 
+                : `${discountValue.toFixed(2)} €`
+            }</p>
+            <p><strong>IVA (21%):</strong> {iva.toFixed(2)} €</p>
+            <p className="oc-total"><strong>Total oferta:</strong> {total.toFixed(2)} €</p>
+          </div>
 
           {offerItems.length === 0 ? (
             <p>No hay productos en la oferta</p>

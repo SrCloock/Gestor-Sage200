@@ -40,12 +40,12 @@ const Login = () => {
     <div className="login-container">
       <div className="login-branding">
         <img src={logo} alt="AlAndalus Feeling" className="login-logo" />
-        <h1>ClearDent Gestor</h1>
-        <p>Sistema integrado con Sage200 - Suministros dentales</p>
+        
+        <p>Sistema integrado con Sage200</p>
       </div>
       
       <form className="login-form" onSubmit={handleSubmit}>
-        <h2>Acceso Clínicas</h2>
+        <h2>Acceso </h2>
         {error && <div className="login-error">{error}</div>}
 
         <div className="input-group">

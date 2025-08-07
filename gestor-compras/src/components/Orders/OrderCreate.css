@@ -1,4 +1,3 @@
-/* src/components/Orders/OrderCreate.css */
 .oc-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -151,8 +150,6 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* ... (resto de estilos permanece igual) ... */
-
 .oc-error-message {
   background: #ffebee;
   color: #d32f2f;
@@ -176,6 +173,61 @@
   margin-bottom: 1rem;
 }
 
+.review-summary {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.review-header {
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 1rem;
+}
+
+.review-items {
+  margin: 1.5rem 0;
+}
+
+.review-item {
+  padding: 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.item-info h4 {
+  margin: 0 0 5px 0;
+  color: #333;
+}
+
+.item-quantity {
+  display: flex;
+  align-items: center;
+}
+
+.review-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.edit-button, .confirm-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.edit-button {
+  background: #e0e0e0;
+  color: #333;
+}
+
 .confirm-button {
   background: #00796b;
   color: #ffffff;
@@ -183,4 +235,26 @@
 
 .confirm-button:hover {
   background: #00695c;
+}
+
+/* Nuevos estilos para comentario */
+.review-comment {
+  margin: 1.5rem 0;
+}
+
+.review-comment label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+  color: #00796b;
+}
+
+.review-comment textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #c8e6c9;
+  border-radius: 6px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
 }

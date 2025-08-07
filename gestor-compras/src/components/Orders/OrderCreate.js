@@ -20,10 +20,11 @@ const OrderCreate = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [deliveryDate, setDeliveryDate] = useState('');
   const [reviewMode, setReviewMode] = useState(false);
+  const [comment, setComment] = useState(''); // Nuevo estado para comentario
   const productsPerPage = 20;
 
   const generateProductKey = (product) => {
-    return `${product.CodigoArticulo}-${product.CodigoProveedor || 'NOPROV'}`;
+    return `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}`; // Clave única con proveedor
   };
 
   const checkImageExists = (url) => {
@@ -180,14 +181,15 @@ const OrderCreate = () => {
         DescripcionArticulo: item.DescripcionArticulo,
         Cantidad: Number(item.Cantidad),
         PrecioCompra: item.PrecioCompra,
-        CodigoProveedor: null,
+        CodigoProveedor: item.CodigoProveedor || null, // Incluir proveedor
         CodigoCliente: user.codigoCliente,
         CifDni: user.cifDni
       }));
 
       const orderData = {
         items: itemsToSend,
-        deliveryDate: deliveryDate || null
+        deliveryDate: deliveryDate || null,
+        comment: comment // Incluir comentario
       };
 
       const response = await api.post('/api/orders', orderData);
@@ -197,6 +199,7 @@ const OrderCreate = () => {
           orderId: response.data.orderId,
           seriePedido: response.data.seriePedido,
           deliveryDate: deliveryDate,
+          comment: comment,
           success: true
         }
       });
@@ -225,16 +228,28 @@ const OrderCreate = () => {
           
           <div className="review-items">
             {orderItems.map((item, index) => (
-              <div key={index} className="review-item">
+              <div key={generateProductKey(item)} className="review-item">
                 <div className="item-info">
                   <h4>{item.DescripcionArticulo}</h4>
                   <p>Código: {item.CodigoArticulo}</p>
+                  {item.CodigoProveedor && <p>Proveedor: {item.CodigoProveedor}</p>}
                 </div>
                 <div className="item-quantity">
                   <span>Cantidad: {item.Cantidad}</span>
                 </div>
               </div>
             ))}
+          </div>
+          
+          {/* Sección para comentario */}
+          <div className="review-comment">
+            <label>Comentarios para el pedido:</label>
+            <textarea 
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows="3"
+              placeholder="Escriba aquí cualquier observación adicional..."
+            />
           </div>
           
           <div className="review-actions">

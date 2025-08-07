@@ -1,7 +1,7 @@
 const { getPool } = require('../db/Sage200db');
 
 const createOrder = async (req, res) => {
-  const { items, deliveryDate } = req.body;
+  const { items, deliveryDate, comment } = req.body;
   
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ 
@@ -16,21 +16,27 @@ const createOrder = async (req, res) => {
     await transaction.begin();
 
     try {
+      // Validar que todos los items pertenezcan al mismo cliente
+      const clientesUnicos = [...new Set(items.map(item => item.CodigoCliente))];
+      if (clientesUnicos.length !== 1) {
+        throw new Error('Todos los artículos del pedido deben pertenecer al mismo cliente');
+      }
+      const codigoCliente = clientesUnicos[0];
       const primerItem = items[0];
-      
-      if (!primerItem.CodigoCliente || !primerItem.CifDni) {
+
+      if (!codigoCliente || !primerItem.CifDni) {
         throw new Error('Datos de cliente incompletos en los items');
       }
 
-      // Obtener información del cliente
+      // Obtener información del cliente (incluyendo CifEuropeo)
       const clienteResult = await transaction.request()
-        .input('CodigoCliente', primerItem.CodigoCliente)
+        .input('CodigoCliente', codigoCliente)
         .query(`
           SELECT 
             c.CodigoEmpresa, c.RazonSocial, c.CodigoContable, c.IdDelegacion,
             c.Domicilio, c.CodigoPostal, c.Municipio, c.Provincia, c.Nacion,
             c.CodigoNacion, c.CodigoProvincia, c.CodigoMunicipio,
-            c.SiglaNacion, c.CifDni
+            c.SiglaNacion, c.CifDni, c.CifEuropeo
           FROM CLIENTES c
           WHERE c.CodigoCliente = @CodigoCliente
         `);
@@ -42,7 +48,7 @@ const createOrder = async (req, res) => {
       const cliente = clienteResult.recordset[0];
       const codigoEmpresa = cliente.CodigoEmpresa || '9999';
 
-      // Obtener datos extendidos desde ClientesProveedores (si existen)
+      // Obtener datos extendidos desde ClientesProveedores
       const cpResult = await transaction.request()
         .input('CifDni', cliente.CifDni)
         .input('SiglaNacion', cliente.SiglaNacion)
@@ -133,7 +139,7 @@ const createOrder = async (req, res) => {
 
       const usuarioActual = req.user?.username || 'WEB';
 
-      // Insertar cabecera
+      // Insertar cabecera con todos los campos necesarios
       await transaction.request()
         .input('CodigoEmpresa', codigoEmpresa)
         .input('EjercicioPedido', fechaActual.getFullYear())
@@ -143,8 +149,9 @@ const createOrder = async (req, res) => {
         .input('FechaNecesaria', fechaEntrega)
         .input('FechaEntrega', fechaEntrega)
         .input('FechaTope', fechaEntrega)
-        .input('CodigoCliente', primerItem.CodigoCliente)
+        .input('CodigoCliente', codigoCliente)
         .input('CifDni', primerItem.CifDni)
+        .input('CifEuropeo', cliente.CifEuropeo || '') // Nuevo campo
         .input('RazonSocial', cliente.RazonSocial || '')
         .input('IdDelegacion', cliente.IdDelegacion || '')
         .input('Domicilio', domicilio)
@@ -166,42 +173,48 @@ const createOrder = async (req, res) => {
         .input('TotalIva', 0)
         .input('ImporteLiquido', 0)
         .input('NumeroLineas', 0)
+        .input('ObservacionesPedido', comment || '')
         .query(`
           INSERT INTO CabeceraPedidoCliente (
             CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido,
             FechaPedido, FechaNecesaria, FechaEntrega, FechaTope,
-            CodigoCliente, CifDni, RazonSocial, IdDelegacion,
+            CodigoCliente, CifDni, CifEuropeo, RazonSocial, IdDelegacion,
             Domicilio, CodigoPostal, Municipio, Provincia, Nacion,
             CodigoNacion, CodigoProvincia, CodigoMunicipio, CodigoContable,
             StatusAprobado, MantenerCambio_,
             SiglaNacion,
             NumeroPlazos, DiasPrimerPlazo, DiasEntrePlazos,
             BaseImponible, TotalIva, ImporteLiquido,
-            NumeroLineas
+            NumeroLineas,
+            ObservacionesPedido
           )
           VALUES (
             @CodigoEmpresa, @EjercicioPedido, @SeriePedido, @NumeroPedido,
             @FechaPedido, @FechaNecesaria, @FechaEntrega, @FechaTope,
-            @CodigoCliente, @CifDni, @RazonSocial, @IdDelegacion,
+            @CodigoCliente, @CifDni, @CifEuropeo, @RazonSocial, @IdDelegacion,
             @Domicilio, @CodigoPostal, @Municipio, @Provincia, @Nacion,
             @CodigoNacion, @CodigoProvincia, @CodigoMunicipio, @CodigoContable,
             @StatusAprobado, @MantenerCambio_,
             @SiglaNacion,
             @NumeroPlazos, @DiasPrimerPlazo, @DiasEntrePlazos,
             @BaseImponible, @TotalIva, @ImporteLiquido,
-            @NumeroLineas
+            @NumeroLineas,
+            @ObservacionesPedido
           )
         `);
 
       // Insertar cada línea del pedido
       for (const [index, item] of items.entries()) {
+        // Buscar el artículo específico con proveedor
         const articuloResult = await transaction.request()
           .input('CodigoArticulo', item.CodigoArticulo)
+          .input('CodigoProveedor', item.CodigoProveedor || '') // Proveedor específico
           .input('CodigoEmpresa', codigoEmpresa)
           .query(`
             SELECT DescripcionArticulo, DescripcionLinea 
             FROM Articulos
             WHERE CodigoArticulo = @CodigoArticulo
+            AND (CodigoProveedor = @CodigoProveedor OR @CodigoProveedor = '')
             AND CodigoEmpresa = @CodigoEmpresa
           `);
 
@@ -264,7 +277,7 @@ const createOrder = async (req, res) => {
           .input('CodigoAlmacenAnterior', codigoAlmacenAnterior)
           .input('FechaRegistro', `${fechaActual.toISOString().split('T')[0]} 00:00:00.000`)
           .input('CodigoDelCliente', '')
-          .input('CodigoProveedor', '')
+          .input('CodigoProveedor', item.CodigoProveedor || '') // Proveedor específico
           .query(`
             INSERT INTO LineasPedidoCliente (
               CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido, Orden,
