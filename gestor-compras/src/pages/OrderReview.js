@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FaCheckCircle,FaCalendarCheck, FaFileInvoice, FaArrowLeft, FaShoppingCart } from 'react-icons/fa';
-import './OrderReview.css';
+import '../styles/OrderReview.css';
 
 const OrderReview = () => {
   const location = useLocation();

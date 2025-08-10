@@ -1,29 +1,29 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import api from '../../api';
-import ProductGrid from '../Shared/ProductGrid';
-import './OrderEdit.css'; // Cambiado a CSS específico
+import { useNavigate, useLocation } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
+import api from '../api';
+import ProductGrid from '../components/ProductGrid';
+import '../styles/OrderCreate.css';
 
-const OrderEdit = () => {
-  const { orderId } = useParams();
+const OrderCreate = () => {
+  const location = useLocation();
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
-  
-  const [originalItems, setOriginalItems] = useState([]);
+
   const [orderItems, setOrderItems] = useState([]);
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
-  const [loading, setLoading] = useState({ order: true, products: true, submit: false });
+  const [loading, setLoading] = useState({ products: true, submit: false });
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [deliveryDate, setDeliveryDate] = useState('');
+  const [reviewMode, setReviewMode] = useState(false);
   const [comment, setComment] = useState('');
   const productsPerPage = 20;
 
-  // Función mejorada para generar claves únicas
+  // Función hash estable para generar claves únicas
   const generateProductKey = (product) => {
     const str = `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}`;
     let hash = 0;
@@ -32,10 +32,9 @@ const OrderEdit = () => {
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash; // Convertir a 32bit entero
     }
-    return `prod-${hash.toString(36)}`;
+    return hash.toString(36);
   };
 
-  // Funciones para manejar imágenes
   const checkImageExists = (url) => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -48,57 +47,23 @@ const OrderEdit = () => {
   const getProductImage = async (product) => {
     const localImagePath = `/images/${product.CodigoArticulo}.jpg`;
     const exists = await checkImageExists(localImagePath);
+
     if (exists) return localImagePath;
     if (product.RutaImagen) return product.RutaImagen;
+
     return '/images/default.jpg';
   };
 
   useEffect(() => {
-    const fetchOrderDetails = async () => {
-      try {
-        setLoading(prev => ({ ...prev, order: true }));
-        const response = await api.get(`/api/orders/${orderId}`, {
-          params: {
-            codigoCliente: user?.codigoCliente,
-            seriePedido: 'Web'
-          }
-        });
-        
-        const order = response.data.order;
-        setOriginalItems(order.Productos.map(item => ({
-          ...item,
-          Cantidad: item.UnidadesPedidas
-        })));
-        
-        setOrderItems(order.Productos.map(item => ({
-          ...item,
-          Cantidad: item.UnidadesPedidas
-        })));
-        
-        setDeliveryDate(order.FechaNecesaria?.split('T')[0] || '');
-        setComment(order.ObservacionesPedido || '');
-        
-      } catch (err) {
-        setError('Error al cargar los detalles del pedido');
-        console.error(err);
-      } finally {
-        setLoading(prev => ({ ...prev, order: false }));
-      }
-    };
-
     const fetchProducts = async () => {
       try {
-        setLoading(prev => ({ ...prev, products: true }));
         const response = await api.get('/api/products');
+        const productsWithImages = await Promise.all(response.data.map(async (product) => {
+          const imagePath = await getProductImage(product);
+          return { ...product, FinalImage: imagePath };
+        }));
         
-        // Procesar imágenes y eliminar duplicados
-        const productsWithImages = await Promise.all(
-          response.data.map(async (product) => {
-            const imagePath = await getProductImage(product);
-            return { ...product, FinalImage: imagePath };
-          })
-        );
-        
+        // Eliminar duplicados usando la función hash
         const uniqueProducts = [];
         const seenKeys = new Set();
         
@@ -110,31 +75,42 @@ const OrderEdit = () => {
           }
         });
         
-        setProducts(uniqueProducts);
-        setFilteredProducts(uniqueProducts);
+        const sortedProducts = uniqueProducts.sort((a, b) =>
+          a.DescripcionArticulo.localeCompare(b.DescripcionArticulo)
+        );
+        
+        setProducts(sortedProducts);
+        setFilteredProducts(sortedProducts);
       } catch (err) {
-        setError('Error al cargar productos');
         console.error(err);
+        setError('Error al cargar productos');
       } finally {
-        setLoading(prev => ({ ...prev, products: false }));
+        setLoading((prev) => ({ ...prev, products: false }));
       }
     };
 
-    if (user?.codigoCliente) {
-      fetchOrderDetails();
-      fetchProducts();
+    fetchProducts();
+
+    if (location.state?.selectedProduct) {
+      setOrderItems([{
+        ...location.state.selectedProduct,
+        Cantidad: 1,
+        CodigoCliente: user?.codigoCliente,
+        CifDni: user?.cifDni
+      }]);
     }
-  }, [orderId, user]);
+  }, [location, user]);
 
   useEffect(() => {
     let result = [...products];
-    
+
     if (searchTerm.trim() !== '') {
       const term = searchTerm.toLowerCase().trim();
       result = result.filter(product => {
         const matchesCode = product.CodigoArticulo?.toLowerCase().includes(term);
         const matchesDesc = product.DescripcionArticulo?.toLowerCase().includes(term);
         const matchesSupplier = product.NombreProveedor?.toLowerCase().includes(term);
+        
         return matchesCode || matchesDesc || matchesSupplier;
       });
     }
@@ -198,83 +174,131 @@ const OrderEdit = () => {
     });
   };
 
-  const handleRemoveItem = (itemToRemove) => {
-    setOrderItems(prev => 
-      prev.filter(item => 
-        generateProductKey(item) !== generateProductKey(itemToRemove)
-      )
-    );
+  const handleReviewOrder = () => {
+    if (orderItems.length === 0) {
+      setError('Debe agregar al menos un producto al pedido');
+      return;
+    }
+    setReviewMode(true);
   };
 
-  const handleUpdateQuantity = (itemToUpdate, newQuantity) => {
-    const quantity = Math.max(1, parseInt(newQuantity) || 1);
-    setOrderItems(prev => 
-      prev.map(item => 
-        generateProductKey(item) === generateProductKey(itemToUpdate)
-          ? { ...item, Cantidad: quantity }
-          : item
-      )
-    );
+  const handleBackToEdit = () => {
+    setReviewMode(false);
   };
 
-  const handleSubmitChanges = async () => {
+  const handleSubmitOrder = async () => {
     try {
       setError('');
-      setLoading(prev => ({ ...prev, submit: true }));
+      setLoading((prev) => ({ ...prev, submit: true }));
+
+      if (!user?.codigoCliente || !user?.cifDni) {
+        throw new Error('Datos de usuario incompletos. Por favor, inicie sesión nuevamente.');
+      }
 
       const itemsToSend = orderItems.map(item => ({
         CodigoArticulo: item.CodigoArticulo,
         DescripcionArticulo: item.DescripcionArticulo,
         Cantidad: Number(item.Cantidad),
-        PrecioCompra: item.Precio,
+        PrecioCompra: item.PrecioCompra,
         CodigoProveedor: item.CodigoProveedor || null,
         CodigoCliente: user.codigoCliente,
         CifDni: user.cifDni
       }));
 
-      const response = await api.put(`/api/orders/${orderId}`, {
+      const orderData = {
         items: itemsToSend,
         deliveryDate: deliveryDate || null,
         comment: comment
-      });
+      };
 
-      if (response.data.success) {
-        navigate('/mis-pedidos', {
-          state: {
-            success: true,
-            message: 'Pedido actualizado correctamente'
-          }
-        });
-      }
+      const response = await api.post('/api/orders', orderData);
+
+      navigate('/revisar-pedido', {
+        state: {
+          orderId: response.data.orderId,
+          seriePedido: response.data.seriePedido,
+          deliveryDate: deliveryDate,
+          comment: comment,
+          success: true
+        }
+      });
     } catch (err) {
-      console.error('Error al actualizar pedido:', err);
-      setError(err.response?.data?.message || err.message || 'Error al actualizar el pedido');
+      console.error('Error al crear pedido:', err);
+      setError(err.response?.data?.message || err.message || 'Error al crear el pedido');
     } finally {
-      setLoading(prev => ({ ...prev, submit: false }));
+      setLoading((prev) => ({ ...prev, submit: false }));
     }
   };
 
-  if (loading.order || loading.products) {
-    return <div className="oe-loading">Cargando datos del pedido...</div>;
+  if (reviewMode) {
+    return (
+      <div className="review-container">
+        <h2>Revisar Pedido</h2>
+        <p>Por favor revise los detalles de su pedido antes de confirmar</p>
+        
+        <div className="review-summary">
+          <div className="review-header">
+            <h3>Resumen del Pedido</h3>
+            <p><strong>Número de productos:</strong> {orderItems.length}</p>
+            {deliveryDate && (
+              <p><strong>Fecha de entrega:</strong> {new Date(deliveryDate).toLocaleDateString()}</p>
+            )}
+          </div>
+          
+          <div className="review-items">
+            {orderItems.map((item) => (
+              <div key={generateProductKey(item)} className="review-item">
+                <div className="item-info">
+                  <h4>{item.DescripcionArticulo}</h4>
+                  <p>Código: {item.CodigoArticulo}</p>
+                  {item.CodigoProveedor && <p>Proveedor: {item.CodigoProveedor}</p>}
+                </div>
+                <div className="item-quantity">
+                  <span>Cantidad: {item.Cantidad}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="review-comment">
+            <label>Comentarios para el pedido:</label>
+            <textarea 
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows="3"
+              placeholder="Escriba aquí cualquier observación adicional..."
+            />
+          </div>
+          
+          <div className="review-actions">
+            <button onClick={handleBackToEdit} className="edit-button">
+              Editar Pedido
+            </button>
+            <button onClick={handleSubmitOrder} className="confirm-button">
+              Confirmar Pedido
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  if (error) {
-    return <div className="oe-error">{error}</div>;
-  }
+  if (loading.products) return <div className="oc-loading">Cargando productos...</div>;
+  if (error) return <div className="oc-error">{error}</div>;
 
   return (
-    <div className="oe-container">
-      <h2>Editar Pedido #{orderId}</h2>
+    <div className="oc-container">
+      <h2>Crear Nuevo Pedido</h2>
 
       {error && (
-        <div className="oe-error-message">
+        <div className="oc-error-message">
           <p>{error}</p>
           <button onClick={() => setError('')}>×</button>
         </div>
       )}
 
-      <div className="oe-delivery-date">
-        <label htmlFor="deliveryDate">Nueva fecha de entrega (opcional):</label>
+      <div className="oc-delivery-date">
+        <label htmlFor="deliveryDate">Fecha de entrega deseada (opcional):</label>
         <input
           type="date"
           id="deliveryDate"
@@ -284,7 +308,7 @@ const OrderEdit = () => {
         />
         {deliveryDate && (
           <button 
-            className="oe-clear-date"
+            className="oc-clear-date"
             onClick={() => setDeliveryDate('')}
           >
             Limpiar fecha
@@ -292,8 +316,8 @@ const OrderEdit = () => {
         )}
       </div>
 
-      <div className="oe-filters">
-        <div className="oe-search-box">
+      <div className="oc-filters">
+        <div className="pc-search-box">
           <input
             type="text"
             placeholder="Buscar productos por nombre, código o proveedor..."
@@ -302,11 +326,16 @@ const OrderEdit = () => {
               setSearchTerm(e.target.value);
               setCurrentPage(1);
             }}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                // Actualización eliminada para evitar loop
+              }
+            }}
           />
           <span className="search-icon">🔍</span>
         </div>
 
-        <div className="oe-sort-options">
+        <div className="pc-sort-options">
           <select
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value)}
@@ -318,48 +347,52 @@ const OrderEdit = () => {
         </div>
       </div>
 
-      <div className="oe-order-container">
-        <div className="oe-order-summary">
-          <h3>Productos en el Pedido ({orderItems.length})</h3>
+      <div className="oc-order-container">
+        <div className="oc-order-summary">
+          <h3>Resumen del Pedido ({orderItems.length} productos)</h3>
           
           {deliveryDate && (
-            <div className="oe-delivery-info">
+            <div className="oc-delivery-info">
               <strong>Fecha de entrega:</strong> {new Date(deliveryDate).toLocaleDateString()}
             </div>
           )}
-
-          <div className="oe-comment-section">
-            <label>Comentarios:</label>
-            <textarea 
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              rows="3"
-              placeholder="Agregue comentarios para este pedido..."
-            />
-          </div>
 
           {orderItems.length === 0 ? (
             <p>No hay productos en el pedido</p>
           ) : (
             <>
-              <ul className="oe-order-items">
+              <ul className="oc-order-items">
                 {orderItems.map((item) => (
                   <li key={generateProductKey(item)}>
-                    <div className="oe-item-info">
+                    <div className="oc-item-info">
                       <span>{item.DescripcionArticulo}</span>
                       <span>Código: {item.CodigoArticulo}</span>
                       {item.NombreProveedor && <span>Proveedor: {item.NombreProveedor}</span>}
                     </div>
-                    <div className="oe-item-actions">
+                    <div className="oc-item-actions">
                       <input
                         type="number"
                         min="1"
                         value={item.Cantidad}
-                        onChange={(e) => handleUpdateQuantity(item, e.target.value)}
+                        onChange={(e) => {
+                          const value = Math.max(1, parseInt(e.target.value) || 1);
+                          setOrderItems((prev) =>
+                            prev.map((i) =>
+                              generateProductKey(i) === generateProductKey(item)
+                                ? { ...i, Cantidad: value }
+                                : i
+                            )
+                          );
+                        }}
                       />
                       <button
-                        className="oe-remove-button"
-                        onClick={() => handleRemoveItem(item)}
+                        className="oc-remove-button"
+                        onClick={() =>
+                          setOrderItems((prev) =>
+                            prev.filter(
+                              (i) => generateProductKey(i) !== generateProductKey(item)
+                            ))
+                        }
                       >
                         Eliminar
                       </button>
@@ -368,18 +401,18 @@ const OrderEdit = () => {
                 ))}
               </ul>
               <button
-                className="oe-submit-order"
-                onClick={handleSubmitChanges}
+                className="oc-submit-order"
+                onClick={handleReviewOrder}
                 disabled={orderItems.length === 0 || loading.submit}
               >
-                {loading.submit ? 'Guardando cambios...' : 'Guardar Cambios'}
+                {loading.submit ? 'Procesando...' : 'Revisar Pedido'}
               </button>
             </>
           )}
         </div>
 
-        <div className="oe-product-selection">
-          <h3>Agregar más productos ({filteredProducts.length} disponibles)</h3>
+        <div className="oc-product-selection">
+          <h3>Seleccionar Productos ({filteredProducts.length} disponibles)</h3>
 
           <ProductGrid
             products={currentProducts}
@@ -396,4 +429,4 @@ const OrderEdit = () => {
   );
 };
 
-export default OrderEdit;
+export default OrderCreate;

@@ -3,8 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   FaShoppingCart, FaBoxOpen, FaHistory, FaHome, FaUserCircle, FaSignOutAlt
 } from 'react-icons/fa';
-import { AuthContext } from '../../context/AuthContext';
-import './Navbar.css';
+import { AuthContext } from '../context/AuthContext';
+import '../styles/Navbar.css';
 
 const Navbar = () => {
   const location = useLocation();

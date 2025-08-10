@@ -1,16 +1,16 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import Login from './components/Auth/Login';
-import Home from './components/Home/Home';
-import ProductCatalog from './components/Products/ProductCatalog';
-import OrderCreate from './components/Orders/OrderCreate';
-import OrderReview from './components/Orders/OrderReview';
-import OrderList from './components/Orders/OrderList';
-import OrderDetail from './components/Orders/OrderDetail';
-import ProtectedRoute from './components/Layout/ProtectedRoute';
-import Navbar from './components/Layout/Navbar';
+import Login from './pages/Login';
+import Home from './pages/Home';
+import ProductCatalog from './pages/ProductCatalog';
+import OrderCreate from './pages/OrderCreate';
+import OrderReview from './pages/OrderReview';
+import OrderList from './pages/OrderList';
+import OrderDetail from './pages/OrderDetail';
+import ProtectedRoute from './components/ProtectedRoute';
+import Navbar from './components/Navbar';
 import { AuthProvider } from './context/AuthContext';
-import OrderEdit from './components/Orders/OrderEdit';
+import OrderEdit from './pages/OrderEdit';
 
 import './App.css';
 

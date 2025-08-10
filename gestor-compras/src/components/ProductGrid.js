@@ -1,6 +1,6 @@
 import React from 'react';
 import { FaArrowLeft, FaArrowRight } from 'react-icons/fa';
-import '../Products/ProductCatalog.css';
+import '../styles/ProductCatalog.css';
 
 const ProductGrid = ({ 
   products, 

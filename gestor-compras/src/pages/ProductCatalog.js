@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import api from '../../api';
+import { AuthContext } from '../context/AuthContext';
+import api from '../api';
 import { FaSearch, FaBoxOpen, FaShoppingCart } from 'react-icons/fa';
-import ProductGrid from '../Shared/ProductGrid';
-import CartPreview from '../Shared/CartPreview';
-import './ProductCatalog.css';
+import ProductGrid from '../components/ProductGrid';
+import CartPreview from '../components/CartPreview';
+import '../styles/ProductCatalog.css';
 
 const ProductCatalog = () => {
   const [products, setProducts] = useState([]);

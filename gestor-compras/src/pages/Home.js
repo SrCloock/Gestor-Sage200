@@ -1,8 +1,8 @@
 import React, { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './Home.css';
+import '../styles/Home.css';
 import { FaShoppingCart, FaBoxOpen, FaHistory, FaPlusCircle } from 'react-icons/fa';
-import { AuthContext } from '../../context/AuthContext';
+import { AuthContext } from '../context/AuthContext';
 
 const Home = () => {
   const { user } = useContext(AuthContext);

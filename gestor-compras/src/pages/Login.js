@@ -1,9 +1,9 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import './Login.css';
+import { AuthContext } from '../context/AuthContext';
+import '../styles/Login.css';
 import { FaUser, FaLock } from 'react-icons/fa';
-import logo from '../../assets/al-andalus-logo.png';
+import logo from '../assets/al-andalus-logo.png';
 
 const Login = () => {
   const [username, setUsername] = useState('');
