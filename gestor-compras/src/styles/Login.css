@@ -1,123 +1,243 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-
-.login-container {
+.lg-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background-color: #e0f2f1;
+  background: linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%);
   padding: 2rem;
   font-family: 'Inter', sans-serif;
 }
 
-.login-branding {
+.lg-branding {
   text-align: center;
-  margin-bottom: 2rem;
-  max-width: 400px;
-}
-
-.login-logo {
-  width: 180px;
-  margin-bottom: 1.5rem;
-  filter: drop-shadow(0 2px 4px rgba(0, 77, 64, 0.1));
-}
-
-.login-branding h1 {
-  color: #004d40;
-  margin-bottom: 0.5rem;
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-.login-branding p {
-  color: #757575;
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-
-.login-form {
-  background: #ffffff;
-  padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  margin-bottom: 3rem;
+  max-width: 450px;
   width: 100%;
-  max-width: 400px;
 }
 
-.login-form h2 {
-  color: #00796b;
-  text-align: center;
-  margin-bottom: 1.5rem;
-  font-size: 1.25rem;
-  font-weight: 600;
+.lg-logo-container {
+  margin-bottom: 1.8rem;
+  display: flex;
+  justify-content: center;
 }
 
-.input-group {
-  position: relative;
-  margin-bottom: 1rem;
-}
-
-.input-icon {
-  position: absolute;
-  left: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #00796b;
-  font-size: 0.9rem;
-}
-
-.input-group input {
-  width: 100%;
-  padding: 0.8rem 1rem 0.8rem 2.5rem;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  transition: border-color 0.1s ease-in-out;
-}
-
-.input-group input:focus {
-  border-color: #00796b;
-  outline: 2px solid rgba(0, 121, 107, 0.2);
-}
-
-.remember-me {
-  margin: 1rem 0;
+.lg-logo {
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(135deg, #00796b, #004d40);
+  color: white;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+}
+
+.lg-app-name {
+  color: #004d40;
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+}
+
+.lg-integration-text {
   color: #757575;
-  font-size: 0.875rem;
+  font-size: 1rem;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0.5rem 1.2rem;
+  border-radius: 20px;
+  display: inline-block;
 }
 
-.remember-me input {
-  width: 1rem;
-  height: 1rem;
-  accent-color: #00796b;
-}
-
-.login-button {
+.lg-form {
+  background: #ffffff;
+  padding: 2.5rem;
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0, 77, 64, 0.15);
   width: 100%;
-  padding: 0.8rem;
-  background-color: #00796b;
+  max-width: 450px;
+}
+
+.lg-form-title {
+  color: #004d40;
+  text-align: center;
+  margin-bottom: 2rem;
+  font-size: 1.6rem;
+  font-weight: 600;
+  position: relative;
+  padding-bottom: 1rem;
+}
+
+.lg-form-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, #00796b, #004d40);
+  border-radius: 2px;
+}
+
+.lg-input-group {
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+
+.lg-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #004d40;
+  font-size: 0.95rem;
+}
+
+.lg-input {
+  width: 100%;
+  padding: 1rem 1rem 1rem 3rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.lg-input:focus {
+  border-color: #00796b;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 121, 107, 0.15);
+}
+
+.lg-input-icon {
+  position: absolute;
+  left: 1rem;
+  top: 40px;
+  font-size: 1.2rem;
+  color: #757575;
+}
+
+.lg-remember-me {
+  margin: 1.5rem 0;
+  display: flex;
+  align-items: center;
+  color: #757575;
+  font-size: 0.95rem;
+}
+
+.lg-checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.lg-checkbox {
+  position: absolute;
+  opacity: 0;
+  height: 0;
+  width: 0;
+}
+
+.lg-checkbox-custom {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  margin-right: 10px;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.lg-checkbox:checked + .lg-checkbox-custom {
+  background: #00796b;
+  border-color: #00796b;
+}
+
+.lg-checkbox:checked + .lg-checkbox-custom::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.lg-button {
+  width: 100%;
+  padding: 1.2rem;
+  background: linear-gradient(135deg, #00796b, #00695c);
   color: #ffffff;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   font-weight: 600;
+  font-size: 1.1rem;
   cursor: pointer;
-  transition: background-color 0.1s ease-in-out;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.login-button:hover {
-  background-color: #00695c;
+.lg-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #00695c, #004d40);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
 }
 
-.login-error {
-  color: #d32f2f;
-  background-color: #ffebee;
-  padding: 0.8rem;
-  border-radius: 6px;
-  margin-bottom: 1rem;
-  font-size: 0.875rem;
-  text-align: center;
+.lg-button:disabled {
+  background: #bdbdbd;
+  cursor: not-allowed;
+}
+
+.lg-error {
+  background: #ffebee;
+  color: #c62828;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  animation: shake 0.5s;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.lg-error-icon {
+  width: 30px;
+  height: 30px;
+  background: #c62828;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+@media (max-width: 576px) {
+  .lg-form {
+    padding: 1.8rem 1.5rem;
+  }
+  
+  .lg-form-title {
+    font-size: 1.4rem;
+  }
+  
+  .lg-logo {
+    width: 80px;
+    height: 80px;
+    font-size: 2rem;
+  }
 }

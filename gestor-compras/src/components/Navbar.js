@@ -1,8 +1,5 @@
 import React, { useContext } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import {
-  FaShoppingCart, FaBoxOpen, FaHistory, FaHome, FaUserCircle, FaSignOutAlt
-} from 'react-icons/fa';
 import { AuthContext } from '../context/AuthContext';
 import '../styles/Navbar.css';
 
@@ -16,44 +13,46 @@ const Navbar = () => {
     navigate('/login');
   };
 
+  const isActive = (path) => location.pathname === path;
+
   return (
-    <nav className="navbar">
-      <div className="navbar-section navbar-left">
-        <h1 className="app-title">Gestor de Pedidos</h1>
+    <nav className="nv-navbar">
+      <div className="nv-left">
+        <h1 className="nv-app-title">Gestor de Pedidos</h1>
       </div>
 
-      <div className="navbar-section navbar-center">
-        <ul className="navbar-links">
-          <li>
-            <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
-              <FaHome className="icon" /> Inicio
+      <div className="nv-center">
+        <ul className="nv-links">
+          <li className="nv-link-item">
+            <Link to="/" className={`nv-link ${isActive('/') ? 'nv-active' : ''}`}>
+              <span className="nv-icon">🏠</span> Inicio
             </Link>
           </li>
-          <li>
-            <Link to="/catalogo" className={location.pathname === '/catalogo' ? 'active' : ''}>
-              <FaBoxOpen className="icon" /> Catálogo
+          <li className="nv-link-item">
+            <Link to="/catalogo" className={`nv-link ${isActive('/catalogo') ? 'nv-active' : ''}`}>
+              <span className="nv-icon">📦</span> Catálogo
             </Link>
           </li>
-          <li>
-            <Link to="/crear-pedido" className={location.pathname === '/crear-pedido' ? 'active' : ''}>
-              <FaShoppingCart className="icon" /> Nuevo Pedido
+          <li className="nv-link-item">
+            <Link to="/crear-pedido" className={`nv-link ${isActive('/crear-pedido') ? 'nv-active' : ''}`}>
+              <span className="nv-icon">🛒</span> Nuevo Pedido
             </Link>
           </li>
-          <li>
-            <Link to="/mis-pedidos" className={location.pathname === '/mis-pedidos' ? 'active' : ''}>
-              <FaHistory className="icon" /> Historial
+          <li className="nv-link-item">
+            <Link to="/mis-pedidos" className={`nv-link ${isActive('/mis-pedidos') ? 'nv-active' : ''}`}>
+              <span className="nv-icon">📊</span> Historial
             </Link>
           </li>
         </ul>
       </div>
 
-      <div className="navbar-section navbar-right">
-        <div className="user-section">
-          <FaUserCircle className="user-icon" />
-          <span className="username">{user?.nombreUsuario || 'Usuario'}</span>
-          <div className="dropdown-menu">
-            <button className="logout-button" onClick={handleLogout}>
-              <FaSignOutAlt /> Cerrar Sesión
+      <div className="nv-right">
+        <div className="nv-user-section">
+          <div className="nv-user-icon">👤</div>
+          <span className="nv-username">{user?.nombreUsuario || 'Usuario'}</span>
+          <div className="nv-dropdown">
+            <button className="nv-logout-button" onClick={handleLogout}>
+              <span className="nv-logout-icon">🚪</span> Cerrar Sesión
             </button>
           </div>
         </div>

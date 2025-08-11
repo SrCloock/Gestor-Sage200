@@ -1,24 +1,15 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { FaArrowLeft, FaArrowRight } from 'react-icons/fa';
-import '../styles/ProductCatalog.css';
+import '../styles/ProductGrid.css';
 
-const ProductGrid = ({ 
+const ProductGrid = memo(({ 
   products, 
   onAddProduct, 
   currentPage, 
   totalPages, 
   onPageChange, 
   searchTerm,
-  generateProductKey = (product) => {
-    const str = `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}`;
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convertir a 32bit entero
-    }
-    return hash.toString(36);
-  }
+  generateProductKey
 }) => {
   const createPageNumbers = () => {
     const pageNumbers = [];
@@ -39,38 +30,38 @@ const ProductGrid = ({
 
   return (
     <>
-      <div className="pc-product-grid">
+      <div className="pg-product-grid">
         {products.map(product => (
           <div
             key={generateProductKey(product)}
-            className="pc-product-card"
+            className="pg-product-card"
             onClick={() => onAddProduct(product)}
           >
-            <div className="product-image-container">
+            <div className="pg-product-image-container">
               <img
-                src={product.FinalImage}
+                src={product.FinalImage || '/images/default.jpg'}
                 alt={product.DescripcionArticulo}
-                className="product-image"
+                className="pg-product-image"
                 onError={(e) => {
                   e.target.src = '/images/default.jpg';
-                  e.target.className = 'product-image default-product-image';
+                  e.target.className = 'pg-product-image pg-default-image';
                 }}
               />
             </div>
 
-            <div className="product-header">
-              <h3>{product.DescripcionArticulo}</h3>
-              <span className="product-code">{product.CodigoArticulo}</span>
+            <div className="pg-product-header">
+              <h3 className="pg-product-name">{product.DescripcionArticulo}</h3>
+              <span className="pg-product-code">{product.CodigoArticulo}</span>
             </div>
 
             {product.NombreProveedor && (
-              <div className="product-supplier">
+              <div className="pg-product-supplier">
                 <span>Proveedor:</span> {product.NombreProveedor}
               </div>
             )}
 
-            <div className="product-actions">
-              <button className="add-button">
+            <div className="pg-product-actions">
+              <button className="pg-add-button">
                 Añadir al pedido
               </button>
             </div>
@@ -78,7 +69,7 @@ const ProductGrid = ({
         ))}
         
         {products.length === 0 && (
-          <div className="pc-no-results">
+          <div className="pg-no-results">
             {searchTerm 
               ? `No se encontraron resultados para "${searchTerm}"`
               : 'No hay productos disponibles en este momento'}
@@ -87,10 +78,11 @@ const ProductGrid = ({
       </div>
 
       {totalPages > 1 && (
-        <div className="pc-pagination">
+        <div className="pg-pagination">
           <button
             onClick={() => onPageChange(currentPage - 1)}
             disabled={currentPage === 1}
+            className="pg-pagination-button"
           >
             <FaArrowLeft />
           </button>
@@ -99,7 +91,7 @@ const ProductGrid = ({
             <button
               key={index}
               onClick={() => page !== '...' && onPageChange(page)}
-              className={currentPage === page ? 'pc-active' : ''}
+              className={`pg-pagination-button ${currentPage === page ? 'pg-active' : ''}`}
               disabled={page === '...'}
             >
               {page}
@@ -109,6 +101,7 @@ const ProductGrid = ({
           <button
             onClick={() => onPageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
+            className="pg-pagination-button"
           >
             <FaArrowRight />
           </button>
@@ -116,6 +109,6 @@ const ProductGrid = ({
       )}
     </>
   );
-};
+});
 
 export default ProductGrid;

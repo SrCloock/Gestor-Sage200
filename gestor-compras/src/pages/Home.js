@@ -1,52 +1,57 @@
 import React, { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import '../styles/Home.css';
-import { FaShoppingCart, FaBoxOpen, FaHistory, FaPlusCircle } from 'react-icons/fa';
 import { AuthContext } from '../context/AuthContext';
+import '../styles/Home.css';
 
 const Home = () => {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
 
   return (
-    <div className="home-container">
-      <div className="home-card">
-        <h1><FaShoppingCart /> Gestor de Pedidos</h1>
-        <div className="welcome-container">
-          <p className="welcome-message">
+    <div className="hm-container">
+      <div className="hm-card">
+        <h1 className="hm-title">Gestor de Pedidos</h1>
+        <div className="hm-welcome-container">
+          <p className="hm-welcome-message">
             {user?.nombreUsuario && `${user.nombreUsuario}, `}
-            {user?.razonSocial && <span className="company-name">{user.razonSocial}</span>}
+            {user?.razonSocial && <span className="hm-company-name">{user.razonSocial}</span>}
           </p>
-          <p className="integration-badge">Conectado con Sage200</p>
+          <p className="hm-integration-badge">Conectado con Sage200</p>
         </div>
         
         <button 
-          className="quick-order-button"
+          className="hm-quick-order-button"
           onClick={() => navigate('/crear-pedido')}
         >
-          <FaPlusCircle className="button-icon" /> Nuevo Pedido
+          Nuevo Pedido
         </button>
         
-        <div className="home-section">
-          <h2>Acciones Rápidas</h2>
-          <ul className="home-options">
-            <li onClick={() => navigate('/catalogo')}>
-              <FaBoxOpen className="icon" /> 
-              <div className="option-content">
+        <div className="hm-section">
+          <h2 className="hm-section-title">Acciones Rápidas</h2>
+          <ul className="hm-options">
+            <li className="hm-option" onClick={() => navigate('/catalogo')}>
+              <div className="hm-icon-container">
+                <span className="hm-icon">📦</span>
+              </div>
+              <div className="hm-option-content">
                 <h3>Catálogo de Productos</h3>
                 <p>Productos disponibles</p>
               </div>
             </li>
-            <li onClick={() => navigate('/crear-pedido')}>
-              <FaShoppingCart className="icon" />
-              <div className="option-content">
+            <li className="hm-option" onClick={() => navigate('/crear-pedido')}>
+              <div className="hm-icon-container">
+                <span className="hm-icon">🛒</span>
+              </div>
+              <div className="hm-option-content">
                 <h3>Gestión de Pedidos</h3>
                 <p>Crear y seguir pedidos</p>
               </div>
             </li>
-            <li onClick={() => navigate('/mis-pedidos')}>
-              <FaHistory className="icon" />
-              <div className="option-content">
+            <li className="hm-option" onClick={() => navigate('/mis-pedidos')}>
+              <div className="hm-icon-container">
+                <span className="hm-icon">📊</span>
+              </div>
+              <div className="hm-option-content">
                 <h3>Historial Completo</h3>
                 <p>Todos tus movimientos registrados</p>
               </div>

@@ -1,127 +1,166 @@
-/* gestor-compras/src/components/Layout/Navbar.css */
-
-.navbar {
+.nv-navbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: #004d40;
+  background: linear-gradient(90deg, #004d40, #00796b);
   padding: 0 2rem;
-  height: 60px;
+  height: 70px;
   position: sticky;
   top: 0;
   z-index: 1000;
   font-family: 'Inter', sans-serif;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* Secciones izquierda, centro y derecha */
-.navbar-section {
+.nv-left, .nv-center, .nv-right {
   display: flex;
   align-items: center;
 }
 
-/* Título izquierdo */
-.navbar-left {
-  flex: 1;
-}
-
-.app-title {
+.nv-app-title {
   margin: 0;
   color: #ffffff;
-  font-size: 1.25rem;
+  font-size: 1.4rem;
   font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
-/* Centro con los links */
-.navbar-center {
-  flex: 2;
+.nv-center {
+  flex: 1;
   justify-content: center;
 }
 
-.navbar-links {
+.nv-links {
   display: flex;
-  gap: 0.75rem;
+  gap: 1.5rem;
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
-.navbar-links a {
+.nv-link {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: #ffffff;
+  gap: 0.6rem;
+  color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
-  font-size: 0.875rem;
-  padding: 0.6rem 1rem;
-  border-radius: 6px;
-  transition: background-color 0.2s ease-in-out;
-}
-
-.navbar-links a:hover,
-.navbar-links a.active {
-  background-color: #00796b;
+  font-size: 1rem;
   font-weight: 500;
+  padding: 0.8rem 1.2rem;
+  border-radius: 8px;
+  transition: all 0.3s ease;
 }
 
-/* Derecha: usuario */
-.navbar-right {
-  flex: 1;
-  justify-content: flex-end;
+.nv-link:hover, .nv-active {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
 }
 
-.user-section {
+.nv-icon {
+  font-size: 1.3rem;
+}
+
+.nv-user-section {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.8rem;
   position: relative;
   color: #ffffff;
   cursor: pointer;
   padding: 0.5rem 1rem;
-  border-radius: 6px;
+  border-radius: 8px;
+  transition: background 0.3s;
 }
 
-.user-icon {
-  font-size: 1.2rem;
+.nv-user-section:hover {
+  background: rgba(255, 255, 255, 0.15);
 }
 
-.username {
-  font-size: 0.875rem;
+.nv-user-icon {
+  font-size: 1.4rem;
+}
+
+.nv-username {
+  font-size: 1rem;
   font-weight: 500;
-  white-space: nowrap;
 }
 
-.dropdown-menu {
+.nv-dropdown {
   position: absolute;
   top: 100%;
   right: 0;
-  background: rgb(194, 194, 194);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border-radius: 6px;
-  min-width: 180px;
+  background: #ffffff;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  min-width: 200px;
   display: none;
   z-index: 10;
+  overflow: hidden;
 }
 
-.user-section:hover .dropdown-menu {
+.nv-user-section:hover .nv-dropdown {
   display: block;
 }
 
-.logout-button {
+.nv-logout-button {
   width: 100%;
-  padding: 0.8rem 1rem;
+  padding: 1rem;
   background: none;
   border: none;
-  border-radius: 6px;
   text-align: left;
-  font-size: 0.875rem;
-  color: #444;
+  font-size: 1rem;
+  color: #424242;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  transition: background 0.2s;
+  gap: 0.8rem;
+  transition: all 0.2s;
+  cursor: pointer;
 }
 
-.logout-button:hover {
-  background-color: rgb(170, 170, 170);
+.nv-logout-button:hover {
+  background: #f5f5f5;
   color: #d32f2f;
+}
+
+.nv-logout-icon {
+  font-size: 1.2rem;
+}
+
+@media (max-width: 992px) {
+  .nv-navbar {
+    flex-direction: column;
+    height: auto;
+    padding: 1rem;
+    gap: 1rem;
+  }
+  
+  .nv-center {
+    order: 3;
+    width: 100%;
+    margin-top: 1rem;
+  }
+  
+  .nv-links {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .nv-right {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 576px) {
+  .nv-links {
+    gap: 0.5rem;
+  }
+  
+  .nv-link {
+    padding: 0.6rem;
+    font-size: 0.9rem;
+  }
+  
+  .nv-icon {
+    display: none;
+  }
 }
