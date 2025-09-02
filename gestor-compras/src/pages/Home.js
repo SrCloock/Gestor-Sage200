@@ -10,13 +10,17 @@ const Home = () => {
   return (
     <div className="hm-container">
       <div className="hm-card">
-        <h1 className="hm-title">Gestor de Pedidos</h1>
-        <div className="hm-welcome-container">
-          <p className="hm-welcome-message">
-            {user?.nombreUsuario && `${user.nombreUsuario}, `}
-            {user?.razonSocial && <span className="hm-company-name">{user.razonSocial}</span>}
-          </p>
-          <p className="hm-integration-badge">Conectado con Sage200</p>
+        <div className="hm-header">
+          <h1 className="hm-title">Gestor de Pedidos</h1>
+          <div className="hm-welcome-container">
+            <p className="hm-welcome-message">
+              Bienvenido, <span className="hm-username">{user?.nombreUsuario || 'Usuario'}</span>
+            </p>
+            {user?.razonSocial && (
+              <p className="hm-company-name">{user.razonSocial}</p>
+            )}
+            <p className="hm-integration-badge">Conectado con Sage200</p>
+          </div>
         </div>
         
         <button 
@@ -28,35 +32,37 @@ const Home = () => {
         
         <div className="hm-section">
           <h2 className="hm-section-title">Acciones Rápidas</h2>
-          <ul className="hm-options">
-            <li className="hm-option" onClick={() => navigate('/catalogo')}>
+          <div className="hm-options">
+            <div className="hm-option" onClick={() => navigate('/catalogo')}>
               <div className="hm-icon-container">
                 <span className="hm-icon">📦</span>
               </div>
               <div className="hm-option-content">
-                <h3>Catálogo de Productos</h3>
+                <h3>Catálogo</h3>
                 <p>Productos disponibles</p>
               </div>
-            </li>
-            <li className="hm-option" onClick={() => navigate('/crear-pedido')}>
+            </div>
+            
+            <div className="hm-option" onClick={() => navigate('/crear-pedido')}>
               <div className="hm-icon-container">
                 <span className="hm-icon">🛒</span>
               </div>
               <div className="hm-option-content">
-                <h3>Gestión de Pedidos</h3>
-                <p>Crear y seguir pedidos</p>
+                <h3>Nuevo Pedido</h3>
+                <p>Crear nuevo pedido</p>
               </div>
-            </li>
-            <li className="hm-option" onClick={() => navigate('/mis-pedidos')}>
+            </div>
+            
+            <div className="hm-option" onClick={() => navigate('/mis-pedidos')}>
               <div className="hm-icon-container">
                 <span className="hm-icon">📊</span>
               </div>
               <div className="hm-option-content">
-                <h3>Historial Completo</h3>
-                <p>Todos tus movimientos registrados</p>
+                <h3>Historial</h3>
+                <p>Tus pedidos anteriores</p>
               </div>
-            </li>
-          </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>

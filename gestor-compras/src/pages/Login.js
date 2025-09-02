@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import '../styles/Login.css';
@@ -8,8 +8,10 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
-  const { login, loading } = useContext(AuthContext);
+  const { login } = useContext(AuthContext);
   const navigate = useNavigate();
+  
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const savedUsername = localStorage.getItem('rememberedUsername');
@@ -21,6 +23,7 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
     const success = await login(username, password);
     if (success) {
       if (rememberMe) {
@@ -32,6 +35,7 @@ const Login = () => {
     } else {
       setError('Usuario o contraseña incorrectos');
     }
+    setLoading(false);
   };
 
   return (
@@ -55,7 +59,7 @@ const Login = () => {
         )}
 
         <div className="lg-input-group">
-          <label htmlFor="username" className="lg-label">Usuario</label>
+          <span className="lg-input-icon">👤</span>
           <input
             id="username"
             type="text"
@@ -65,11 +69,10 @@ const Login = () => {
             required
             className="lg-input"
           />
-          <span className="lg-input-icon">👤</span>
         </div>
 
         <div className="lg-input-group">
-          <label htmlFor="password" className="lg-label">Contraseña</label>
+          <span className="lg-input-icon">🔒</span>
           <input
             id="password"
             type="password"
@@ -79,7 +82,6 @@ const Login = () => {
             required
             className="lg-input"
           />
-          <span className="lg-input-icon">🔒</span>
         </div>
 
         <div className="lg-remember-me">

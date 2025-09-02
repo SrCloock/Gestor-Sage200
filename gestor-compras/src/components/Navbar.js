@@ -1,19 +1,37 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { FaUser, FaPowerOff, FaCaretDown } from 'react-icons/fa';
 import '../styles/Navbar.css';
 
 const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useContext(AuthContext);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
+    setDropdownOpen(false);
   };
 
   const isActive = (path) => location.pathname === path;
+
+  // Cerrar dropdown al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
     <nav className="nv-navbar">
@@ -46,15 +64,24 @@ const Navbar = () => {
         </ul>
       </div>
 
-      <div className="nv-right">
-        <div className="nv-user-section">
-          <div className="nv-user-icon">👤</div>
-          <span className="nv-username">{user?.nombreUsuario || 'Usuario'}</span>
-          <div className="nv-dropdown">
-            <button className="nv-logout-button" onClick={handleLogout}>
-              <span className="nv-logout-icon">🚪</span> Cerrar Sesión
-            </button>
+      <div className="nv-right" ref={dropdownRef}>
+        <div 
+          className="nv-user-section" 
+          onClick={() => setDropdownOpen(!dropdownOpen)}
+        >
+          <div className="nv-user-icon">
+            <FaUser />
           </div>
+          <span className="nv-username">{user?.nombreUsuario || 'Usuario'}</span>
+          <FaCaretDown className="nv-caret" />
+          
+          {dropdownOpen && (
+            <div className="nv-dropdown">
+              <button className="nv-logout-button" onClick={handleLogout}>
+                <FaPowerOff className="nv-logout-icon" /> Cerrar Sesión
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </nav>
