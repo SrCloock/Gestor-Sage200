@@ -61,6 +61,15 @@ const Navbar = () => {
               <span className="nv-icon">📊</span> Historial
             </Link>
           </li>
+          
+          {/* Enlace de Administración */}
+          {user?.isAdmin && (
+            <li className="nv-link-item">
+              <Link to="/admin/orders" className={`nv-link ${isActive('/admin/orders') ? 'nv-active' : ''}`}>
+                <span className="nv-icon">👑</span> Administración
+              </Link>
+            </li>
+          )}
         </ul>
       </div>
 

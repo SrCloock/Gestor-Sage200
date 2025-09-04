@@ -11,6 +11,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 import { AuthProvider } from './context/AuthContext';
 import OrderEdit from './pages/OrderEdit';
+import AdminOrders from './pages/AdminOrders';
 
 import './App.css';
 
@@ -31,6 +32,7 @@ function App() {
               <Route path="/mis-pedidos" element={<OrderList />} />
               <Route path="/mis-pedidos/:orderId" element={<OrderDetail />} />
               <Route path="/editar-pedido/:orderId" element={<OrderEdit />} />
+              <Route path="/admin/orders" element={<AdminOrders />} />
             </Route>
 
             <Route path="*" element={<Login />} />

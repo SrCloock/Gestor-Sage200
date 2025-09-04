@@ -7,6 +7,7 @@ const productRoutes = require('./routes/productRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const supplierOrderController = require('./routes/orderSupplierRoutes');
 const offerRoutes = require('./routes/offerRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const { connect } = require('./db/Sage200db');
 const { syncImagesWithDB } = require('./controllers/productController');
@@ -43,7 +44,7 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Credentials', true);
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Content-Type', 'Authorization');
   next();
 });
 
@@ -53,7 +54,7 @@ app.use(express.urlencoded({ extended: true }));
 // Conectar a la base de datos y sincronizar imágenes
 connect().then(async () => {
   console.log('✅ Base de datos conectada');
-  await syncImagesWithDB(); // 🔁 Sincronizar imágenes automáticamente
+  await syncImagesWithDB();
 }).catch(err => {
   console.error('❌ Error al conectar a la base de datos:', err);
 });
@@ -64,6 +65,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/supplier-orders', supplierOrderController);
 app.use('/api/offers', offerRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Middleware de errores
 app.use((err, req, res, next) => {

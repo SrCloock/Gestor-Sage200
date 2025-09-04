@@ -1,5 +1,8 @@
 const { getPool } = require('../db/Sage200db');
 
+// Lista de usuarios administradores (configura según tus necesidades)
+const adminUsers = ['admin', 'useradmin'];
+
 const login = async (req, res) => {
   const { username, password } = req.body;
   
@@ -30,6 +33,8 @@ const login = async (req, res) => {
 
     if (result.recordset.length > 0) {
       const userData = result.recordset[0];
+      const isAdmin = adminUsers.includes(userData.UsuarioLogicNet);
+      
       return res.status(200).json({ 
         success: true, 
         user: {
@@ -44,7 +49,8 @@ const login = async (req, res) => {
           codigoProvincia: userData.CodigoProvincia || '',
           codigoNacion: userData.CodigoNacion || 'ES',
           nacion: userData.Nacion || '',
-          siglaNacion: userData.SiglaNacion || 'ES'
+          siglaNacion: userData.SiglaNacion || 'ES',
+          isAdmin: isAdmin
         }
       });
     } else {
