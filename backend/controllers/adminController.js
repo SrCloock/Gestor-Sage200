@@ -1,8 +1,5 @@
 const { getPool } = require('../db/Sage200db');
 
-// Lista de usuarios administradores (configura según tus necesidades)
-const adminUsers = ['admin', 'useradmin'];
-
 const getPendingOrders = async (req, res) => {
   try {
     const pool = await getPool();
@@ -16,12 +13,16 @@ const getPendingOrders = async (req, res) => {
         c.StatusAprobado,
         c.SeriePedido,
         c.BaseImponible,
+        c.FechaNecesaria,
+        c.ObservacionesPedido,
         u.UsuarioLogicNet as UsuarioCliente
       FROM CabeceraPedidoCliente c
       JOIN CLIENTES u ON c.CodigoCliente = u.CodigoCliente
-      WHERE c.StatusAprobado = 0
+      WHERE c.SeriePedido = 'Web' AND c.StatusAprobado = 0
       ORDER BY c.FechaPedido DESC
     `);
+
+    console.log('Pedidos pendientes encontrados:', result.recordset.length); // Para debug
 
     res.status(200).json({
       success: true,

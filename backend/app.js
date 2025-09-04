@@ -65,7 +65,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/supplier-orders', supplierOrderController);
 app.use('/api/offers', offerRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/admin', adminRoutes); // Asegúrate de que esta línea esté presente
 
 // Middleware de errores
 app.use((err, req, res, next) => {

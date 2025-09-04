@@ -19,7 +19,6 @@ const Navbar = () => {
 
   const isActive = (path) => location.pathname === path;
 
-  // Cerrar dropdown al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -62,7 +61,6 @@ const Navbar = () => {
             </Link>
           </li>
           
-          {/* Enlace de Administración */}
           {user?.isAdmin && (
             <li className="nv-link-item">
               <Link to="/admin/orders" className={`nv-link ${isActive('/admin/orders') ? 'nv-active' : ''}`}>
@@ -81,7 +79,7 @@ const Navbar = () => {
           <div className="nv-user-icon">
             <FaUser />
           </div>
-          <span className="nv-username">{user?.nombreUsuario || 'Usuario'}</span>
+          <span className="nv-username">{user?.username || 'Usuario'}</span>
           <FaCaretDown className="nv-caret" />
           
           {dropdownOpen && (

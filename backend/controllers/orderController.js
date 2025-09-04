@@ -158,7 +158,7 @@ const createOrder = async (req, res) => {
         .input('CodigoProvincia', codigoProvincia)
         .input('CodigoMunicipio', codigoMunicipio)
         .input('CodigoContable', cliente.CodigoContable || '')
-        .input('StatusAprobado', -1) // Cambiado a -1
+        .input('StatusAprobado', 0) 
         .input('MantenerCambio_', -1)
         .input('SiglaNacion', 'ES')
         .input('NumeroPlazos', condicionesPago.NumeroPlazos)
