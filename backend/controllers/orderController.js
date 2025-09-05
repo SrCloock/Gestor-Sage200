@@ -415,7 +415,7 @@ const getOrders = async (req, res) => {
           c.BaseImponible,
           c.TotalIVA,
           c.ImporteLiquido,
-          c.FechaEntrega,
+          c.FechaEntreza,
           c.Domicilio,
           c.CodigoPostal,
           c.Municipio,
@@ -436,19 +436,20 @@ const getOrders = async (req, res) => {
           .input('SeriePedido', order.SeriePedido)
           .query(`
             SELECT 
-              CodigoArticulo, 
-              DescripcionArticulo,
-              DescripcionLinea,
-              UnidadesPedidas,
-              Precio,
-              ImporteBruto,
-              ImporteNeto,
-              ImporteLiquido,
-              TotalIva
-            FROM LineasPedidoCliente
-            WHERE NumeroPedido = @NumeroPedido
-            AND SeriePedido = @SeriePedido
-            ORDER BY Orden
+              l.Orden,
+              l.CodigoArticulo, 
+              l.DescripcionArticulo,
+              l.DescripcionLinea,
+              l.UnidadesPedidas,
+              l.Precio,
+              l.ImporteBruto,
+              l.ImporteNeto,
+              l.ImporteLiquido,
+              l.TotalIva
+            FROM LineasPedidoCliente l
+            WHERE l.NumeroPedido = @NumeroPedido
+            AND l.SeriePedido = @SeriePedido
+            ORDER BY l.Orden
           `);
 
         return {
@@ -531,20 +532,34 @@ const getOrderDetails = async (req, res) => {
       .input('SeriePedido', seriePedido)
       .query(`
         SELECT 
-          CodigoArticulo, 
-          DescripcionArticulo,
-          DescripcionLinea,
-          UnidadesPedidas,
-          Precio,
-          ImporteBruto,
-          ImporteNeto,
-          ImporteLiquido,
-          TotalIva
-        FROM LineasPedidoCliente
-        WHERE NumeroPedido = @NumeroPedido
-        AND SeriePedido = @SeriePedido
-        ORDER BY Orden
+          l.Orden,
+          l.CodigoArticulo, 
+          l.DescripcionArticulo,
+          l.DescripcionLinea,
+          l.UnidadesPedidas,
+          l.Precio,
+          l.ImporteBruto,
+          l.ImporteNeto,
+          l.ImporteLiquido,
+          l.TotalIva,
+          l.CodigoProveedor
+        FROM LineasPedidoCliente l
+        WHERE l.NumeroPedido = @NumeroPedido
+        AND l.SeriePedido = @SeriePedido
+        ORDER BY l.Orden
       `);
+
+    // Eliminar posibles duplicados (por si acaso)
+    const uniqueProducts = [];
+    const seenKeys = new Set();
+    
+    linesResult.recordset.forEach(item => {
+      const key = `${item.Orden}-${item.CodigoArticulo}-${item.CodigoProveedor || 'no-prov'}`;
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        uniqueProducts.push(item);
+      }
+    });
 
     return res.status(200).json({
       success: true,
@@ -552,7 +567,7 @@ const getOrderDetails = async (req, res) => {
         ...orderResult.recordset[0],
         Estado: orderResult.recordset[0].StatusAprobado === 0 ? 'Pendiente' : 
                orderResult.recordset[0].StatusAprobado === -1 ? 'Pendiente' : 'Aprobado',
-        Productos: linesResult.recordset
+        Productos: uniqueProducts
       },
       message: 'Detalle del pedido obtenido correctamente'
     });
