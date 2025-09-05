@@ -1,334 +1,264 @@
-import React, { useState, useEffect } from 'react';
-import { FaEye, FaCheck, FaArrowLeft, FaSync, FaExclamationTriangle } from 'react-icons/fa';
+import React, { useState, useEffect, useContext } from 'react';
+import { AuthContext } from '../context/AuthContext';
 import '../styles/AdminOrders.css';
 
 const AdminOrders = () => {
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [modifiedQuantities, setModifiedQuantities] = useState({});
   const [error, setError] = useState('');
+  const { user } = useContext(AuthContext);
 
   useEffect(() => {
-    fetchPendingOrders();
-  }, []);
+    if (user && user.isAdmin) {
+      fetchPendingOrders();
+    }
+  }, [user]);
 
   const fetchPendingOrders = async () => {
     try {
       setLoading(true);
       setError('');
-      const response = await fetch('/api/admin/orders/pending');
       
-      // Verificar si la respuesta es JSON
+      const response = await fetch('http://localhost:5000/api/admin/orders/pending', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        const textResponse = await response.text();
-        console.error('El servidor devolvió HTML en lugar de JSON:', textResponse.substring(0, 200));
-        throw new Error('Error de configuración del servidor. Contacte al administrador.');
+        const text = await response.text();
+        throw new Error(`El servidor devolvió HTML en lugar de JSON: ${text.substring(0, 100)}...`);
       }
-      
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
-      }
-      
+
       const data = await response.json();
-      console.log('Datos recibidos de pedidos pendientes:', data);
       
       if (data.success) {
-        setOrders(data.orders || []);
+        setOrders(data.orders);
       } else {
-        setError(data.message || 'Error al cargar pedidos');
+        setError(data.message || 'Error al cargar los pedidos');
       }
     } catch (error) {
       console.error('Error fetching orders:', error);
-      setError(error.message || 'No se pudieron cargar los pedidos. Verifique la conexión con el servidor.');
+      setError('Error de configuración del servidor. Contacte al administrador.');
     } finally {
       setLoading(false);
     }
   };
 
-  const viewOrderDetails = async (orderId) => {
+  const fetchOrderDetails = async (orderId) => {
     try {
-      const response = await fetch(`/api/admin/orders/${orderId}`);
-      
-      // Verificar si la respuesta es JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Error de configuración del servidor.');
-      }
-      
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
-      }
-      
+      const response = await fetch(`http://localhost:5000/api/admin/orders/${orderId}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
       const data = await response.json();
-      console.log('Datos del pedido:', data);
       
       if (data.success) {
         setSelectedOrder(data.order);
-        const initialQuantities = {};
-        data.order.Productos.forEach(product => {
-          initialQuantities[product.CodigoArticulo] = product.UnidadesPedidas;
-        });
-        setModifiedQuantities(initialQuantities);
       } else {
-        setError(data.message || 'Error al cargar detalles del pedido');
+        setError(data.message || 'Error al cargar los detalles del pedido');
       }
     } catch (error) {
       console.error('Error fetching order details:', error);
-      setError('Error al cargar detalles del pedido: ' + error.message);
+      setError('Error al cargar los detalles del pedido');
     }
-  };
-
-  const handleQuantityChange = (codigoArticulo, newQuantity) => {
-    setModifiedQuantities(prev => ({
-      ...prev,
-      [codigoArticulo]: parseInt(newQuantity) || 0
-    }));
   };
 
   const approveOrder = async (orderId) => {
     try {
-      const itemsToUpdate = selectedOrder.Productos.map(product => ({
-        CodigoArticulo: product.CodigoArticulo,
-        UnidadesPedidas: modifiedQuantities[product.CodigoArticulo] || product.UnidadesPedidas
-      }));
-
-      const response = await fetch(`/api/admin/orders/${orderId}/approve`, {
+      const response = await fetch(`http://localhost:5000/api/admin/orders/${orderId}/approve`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ modifiedItems: itemsToUpdate })
+        body: JSON.stringify({ modifiedItems: [] }),
       });
 
-      // Verificar si la respuesta es JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Error de configuración del servidor.');
-      }
-
       const data = await response.json();
+      
       if (data.success) {
-        alert('Pedido aprobado correctamente. Se han generado las órdenes de compra.');
-        setSelectedOrder(null);
+        alert('Pedido aprobado correctamente');
         fetchPendingOrders();
+        setSelectedOrder(null);
       } else {
-        alert('Error al aprobar el pedido: ' + data.message);
+        setError(data.message || 'Error al aprobar el pedido');
       }
     } catch (error) {
       console.error('Error approving order:', error);
-      alert('Error al aprobar el pedido: ' + error.message);
+      setError('Error al aprobar el pedido');
     }
   };
 
-  if (loading) return (
-    <div className="admin-loading">
-      <div className="admin-spinner"></div>
-      <p>Cargando pedidos pendientes...</p>
-    </div>
-  );
+  // Función para generar una clave única para cada producto
+  const generateProductKey = (product) => {
+    return `${product.CodigoEmpresa || ''}-${product.CodigoAlmacen || ''}-${product.CodigoArticulo || ''}-${product.CodigoColor_ || ''}-${product.CodigoTalla01_ || ''}-${product.TipoUnidadMedida_ || ''}-${product.Partida || ''}-${product.Periodo || ''}`;
+  };
 
-  if (error) {
-    return (
-      <div className="admin-error">
-        <div className="error-icon">
-          <FaExclamationTriangle />
-        </div>
-        <h3>Error de conexión</h3>
-        <p>{error}</p>
-        <div className="error-actions">
-          <button className="btn-refresh" onClick={fetchPendingOrders}>
-            <FaSync /> Reintentar
-          </button>
-          <button className="btn-support" onClick={() => window.location.href = 'mailto:soporte@empresa.com'}>
-            Contactar soporte
-          </button>
-        </div>
-        <div className="error-troubleshooting">
-          <h4>Posibles soluciones:</h4>
-          <ul>
-            <li>Verifique que el servidor esté en ejecución</li>
-            <li>Compruebe su conexión a internet</li>
-            <li>Contacte al administrador del sistema</li>
-          </ul>
-        </div>
-      </div>
-    );
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES');
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('es-ES', {
+      style: 'currency',
+      currency: 'EUR'
+    }).format(amount || 0);
+  };
+
+  if (!user || !user.isAdmin) {
+    return <div className="admin-container">Acceso restringido. Se requieren permisos de administrador.</div>;
   }
 
   return (
-    <div className="admin-orders-container">
+    <div className="admin-container">
       <div className="admin-header">
-        <h2 className="admin-orders-title">Pedidos Pendientes de Aprobación</h2>
+        <h1>Panel de Administración - Pedidos Pendientes</h1>
         <div className="header-actions">
-          <span className="orders-count">{orders.length} pedidos pendientes</span>
-          <button className="btn-refresh" onClick={fetchPendingOrders}>
-            <FaSync /> Actualizar
+          <button onClick={fetchPendingOrders} className="refresh-btn">
+            Actualizar lista
           </button>
         </div>
       </div>
       
-      {selectedOrder ? (
-        <OrderReview 
-          order={selectedOrder} 
-          modifiedQuantities={modifiedQuantities}
-          onQuantityChange={handleQuantityChange}
-          onApprove={approveOrder}
-          onBack={() => setSelectedOrder(null)}
-        />
+      {error && <div className="error-message">{error}</div>}
+      
+      {loading ? (
+        <div className="loading">Cargando pedidos...</div>
       ) : (
-        <OrdersList 
-          orders={orders} 
-          onViewOrder={viewOrderDetails}
-          onRefresh={fetchPendingOrders}
-        />
+        <>
+          <div className="orders-summary">
+            <p>Total de pedidos pendientes: <strong>{orders.length}</strong></p>
+          </div>
+          
+          <div className="orders-table-container">
+            {orders.length === 0 ? (
+              <p className="no-orders">No hay pedidos pendientes de aprobación.</p>
+            ) : (
+              <table className="orders-table">
+                <thead>
+                  <tr>
+                    <th>Nº Pedido</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>CIF/DNI</th>
+                    <th>Líneas</th>
+                    <th>Importe</th>
+                    <th>Fecha necesaria</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map(order => (
+                    <tr key={order.NumeroPedido}>
+                      <td>{order.NumeroPedido}</td>
+                      <td>{formatDate(order.FechaPedido)}</td>
+                      <td>{order.RazonSocial}</td>
+                      <td>{order.CifDni}</td>
+                      <td>{order.NumeroLineas}</td>
+                      <td>{formatCurrency(order.BaseImponible)}</td>
+                      <td>{formatDate(order.FechaNecesaria)}</td>
+                      <td>
+                        <button 
+                          onClick={() => fetchOrderDetails(order.NumeroPedido)}
+                          className="details-btn"
+                        >
+                          Ver detalles
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
       )}
-    </div>
-  );
-};
-
-const OrdersList = ({ orders, onViewOrder, onRefresh }) => (
-  <>
-    {orders.length === 0 ? (
-      <div className="no-pending-orders">
-        <div className="empty-state">
-          <FaCheck className="empty-icon" />
-          <h3>No hay pedidos pendientes</h3>
-          <p>Todos los pedidos han sido procesados.</p>
-          <button className="btn-refresh" onClick={onRefresh}>
-            <FaSync /> Actualizar
-          </button>
-        </div>
-      </div>
-    ) : (
-      <div className="admin-orders-table-container">
-        <table className="admin-orders-table">
-          <thead>
-            <tr>
-              <th>Nº Pedido</th>
-              <th>Fecha</th>
-              <th>Cliente</th>
-              <th>Artículos</th>
-              <th>Total</th>
-              <th>Fecha Entrega Solicitada</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.map(order => (
-              <tr key={order.NumeroPedido} className="admin-order-row">
-                <td className="admin-order-id">{order.NumeroPedido}</td>
-                <td className="admin-order-date">{new Date(order.FechaPedido).toLocaleDateString()}</td>
-                <td>{order.RazonSocial}</td>
-                <td className="admin-items-count">{order.NumeroLineas}</td>
-                <td className="admin-total">{order.BaseImponible} €</td>
-                <td className="admin-delivery-date">
-                  {order.FechaNecesaria ? new Date(order.FechaNecesaria).toLocaleDateString() : 'No especificada'}
-                </td>
-                <td>
-                  <div className="admin-actions-container">
-                    <button 
-                      className="admin-view-button"
-                      onClick={() => onViewOrder(order.NumeroPedido)}
-                    >
-                      <FaEye /> Revisar
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    )}
-  </>
-);
-
-const OrderReview = ({ order, modifiedQuantities, onQuantityChange, onApprove, onBack }) => {
-  const productsBySupplier = {};
-  order.Productos.forEach(product => {
-    const supplier = product.NombreProveedor || 'Sin proveedor';
-    if (!productsBySupplier[supplier]) {
-      productsBySupplier[supplier] = [];
-    }
-    productsBySupplier[supplier].push(product);
-  });
-
-  return (
-    <div className="order-review">
-      <button className="btn-back" onClick={onBack}>
-        <FaArrowLeft /> Volver a la lista
-      </button>
-
-      <div className="order-header">
-        <h3>Revisión de Pedido #{order.NumeroPedido}</h3>
-        <p className="order-date">Fecha: {new Date(order.FechaPedido).toLocaleDateString()}</p>
-      </div>
       
-      <div className="order-info">
-        <div className="info-section">
-          <h4>Información del Cliente</h4>
-          <p><strong>Cliente:</strong> {order.RazonSocial}</p>
-          <p><strong>CIF/DNI:</strong> {order.CifDni}</p>
-          <p><strong>Dirección:</strong> {order.Domicilio}, {order.CodigoPostal} {order.Municipio}</p>
+      {selectedOrder && (
+        <div className="order-modal">
+          <div className="modal-content">
+            <h2>Detalles del Pedido #{selectedOrder.NumeroPedido}</h2>
+            
+            <div className="order-info-grid">
+              <div className="info-card">
+                <h3>Información del cliente</h3>
+                <div className="info-row">
+                  <span className="info-label">Nombre:</span>
+                  <span>{selectedOrder.RazonSocial}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">CIF/DNI:</span>
+                  <span>{selectedOrder.CifDni}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Dirección:</span>
+                  <span>{selectedOrder.Domicilio}, {selectedOrder.CodigoPostal} {selectedOrder.Municipio}, {selectedOrder.Provincia}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Fecha necesaria:</span>
+                  <span>{formatDate(selectedOrder.FechaNecesaria)}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Observaciones:</span>
+                  <span>{selectedOrder.ObservacionesPedido || 'Ninguna'}</span>
+                </div>
+              </div>
+            </div>
+            
+            <h3 className="products-title">Productos</h3>
+            <div className="products-table-container">
+              <table className="products-table">
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Descripción</th>
+                    <th>Cantidad</th>
+                    <th>Precio</th>
+                    <th>Proveedor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedOrder.Productos && selectedOrder.Productos.map(product => (
+                    <tr key={generateProductKey(product)}>
+                      <td>{product.CodigoArticulo}</td>
+                      <td>{product.DescripcionArticulo}</td>
+                      <td>{product.UnidadesPedidas}</td>
+                      <td>{formatCurrency(product.Precio)}</td>
+                      <td>{product.NombreProveedor || 'No especificado'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="modal-actions">
+              <button 
+                onClick={() => approveOrder(selectedOrder.NumeroPedido)}
+                className="approve-btn"
+              >
+                Aprobar Pedido
+              </button>
+              <button 
+                onClick={() => setSelectedOrder(null)}
+                className="cancel-btn"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
         </div>
-        
-        <div className="info-section">
-          <h4>Detalles del Pedido</h4>
-          <p><strong>Fecha entrega solicitada:</strong> {order.FechaNecesaria ? new Date(order.FechaNecesaria).toLocaleDateString() : 'No especificada'}</p>
-          <p><strong>Observaciones:</strong> {order.ObservacionesPedido || 'Ninguna'}</p>
-        </div>
-      </div>
-
-      <h4>Artículos del Pedido (agrupados por proveedor)</h4>
-      
-      {Object.entries(productsBySupplier).map(([supplier, products]) => (
-        <div key={supplier} className="supplier-section">
-          <h5>Proveedor: {supplier}</h5>
-          <table className="items-table">
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Descripción</th>
-                <th>Cantidad Solicitada</th>
-                <th>Cantidad Aprobada</th>
-                <th>Precio Unitario</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map(product => (
-                <tr key={product.CodigoArticulo}>
-                  <td>{product.CodigoArticulo}</td>
-                  <td>{product.DescripcionArticulo}</td>
-                  <td>{product.UnidadesPedidas}</td>
-                  <td>
-                    <input
-                      type="number"
-                      min="0"
-                      value={modifiedQuantities[product.CodigoArticulo] || product.UnidadesPedidas}
-                      onChange={(e) => onQuantityChange(product.CodigoArticulo, e.target.value)}
-                      className="quantity-input"
-                    />
-                  </td>
-                  <td>{product.Precio} €</td>
-                  <td>{(product.Precio * (modifiedQuantities[product.CodigoArticulo] || product.UnidadesPedidas)).toFixed(2)} €</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
-
-      <div className="review-actions">
-        <button 
-          className="btn-approve"
-          onClick={() => onApprove(order.NumeroPedido)}
-        >
-          <FaCheck /> Aprobar Pedido y Generar Órdenes de Compra
-        </button>
-      </div>
+      )}
     </div>
   );
 };

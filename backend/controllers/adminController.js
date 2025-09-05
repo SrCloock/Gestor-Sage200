@@ -5,24 +5,23 @@ const getPendingOrders = async (req, res) => {
     const pool = await getPool();
     const result = await pool.request().query(`
       SELECT 
-        c.NumeroPedido,
-        c.FechaPedido,
-        c.RazonSocial,
-        c.CifDni,
-        c.NumeroLineas,
-        c.StatusAprobado,
-        c.SeriePedido,
-        c.BaseImponible,
-        c.FechaNecesaria,
-        c.ObservacionesPedido,
-        u.UsuarioLogicNet as UsuarioCliente
-      FROM CabeceraPedidoCliente c
-      JOIN CLIENTES u ON c.CodigoCliente = u.CodigoCliente
-      WHERE c.SeriePedido = 'Web' AND c.StatusAprobado = 0
-      ORDER BY c.FechaPedido DESC
+        NumeroPedido,
+        FechaPedido,
+        RazonSocial,
+        CifDni,
+        NumeroLineas,
+        StatusAprobado,
+        SeriePedido,
+        BaseImponible,
+        FechaNecesaria,
+        ObservacionesPedido,
+        CodigoCliente
+      FROM CabeceraPedidoCliente
+      WHERE SeriePedido = 'Web' AND StatusAprobado = 0
+      ORDER BY FechaPedido DESC
     `);
 
-    console.log('Pedidos pendientes encontrados:', result.recordset.length); // Para debug
+    console.log('Pedidos pendientes encontrados:', result.recordset.length);
 
     res.status(200).json({
       success: true,
@@ -32,7 +31,8 @@ const getPendingOrders = async (req, res) => {
     console.error('Error al obtener pedidos pendientes:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Error al obtener pedidos pendientes' 
+      message: 'Error al obtener pedidos pendientes',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -95,7 +95,8 @@ const getOrderForReview = async (req, res) => {
     console.error('Error al obtener pedido:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Error al obtener el pedido' 
+      message: 'Error al obtener el pedido',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -106,6 +107,12 @@ const approveOrder = async (req, res) => {
 
   try {
     const pool = await getPool();
+    
+    // Verificar que la conexión esté activa
+    if (!pool.connected) {
+      throw new Error('Conexión a la base de datos no disponible');
+    }
+
     const transaction = pool.transaction();
     await transaction.begin();
 
@@ -262,13 +269,15 @@ const approveOrder = async (req, res) => {
 
     } catch (err) {
       await transaction.rollback();
-      throw err;
+      console.error('Error en la transacción:', err);
+      throw new Error(`Error en la transacción: ${err.message}`);
     }
   } catch (error) {
     console.error('Error al aprobar pedido:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Error al aprobar el pedido' 
+      message: 'Error al aprobar el pedido',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
