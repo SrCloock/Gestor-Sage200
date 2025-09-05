@@ -5,6 +5,7 @@ import '../styles/AdminOrders.css';
 const AdminOrders = () => {
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [modifiedOrder, setModifiedOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { user } = useContext(AuthContext);
@@ -63,6 +64,7 @@ const AdminOrders = () => {
       
       if (data.success) {
         setSelectedOrder(data.order);
+        setModifiedOrder(JSON.parse(JSON.stringify(data.order)));
       } else {
         setError(data.message || 'Error al cargar los detalles del pedido');
       }
@@ -72,15 +74,32 @@ const AdminOrders = () => {
     }
   };
 
+  const handleQuantityChange = (index, newQuantity) => {
+    const updatedProducts = [...modifiedOrder.Productos];
+    updatedProducts[index].UnidadesPedidas = parseInt(newQuantity) || 0;
+    
+    setModifiedOrder({
+      ...modifiedOrder,
+      Productos: updatedProducts
+    });
+  };
+
   const approveOrder = async (orderId) => {
     try {
+      const modifiedItems = modifiedOrder.Productos
+        .filter(product => product.UnidadesPedidas > 0)
+        .map(product => ({
+          CodigoArticulo: product.CodigoArticulo,
+          UnidadesPedidas: product.UnidadesPedidas
+        }));
+
       const response = await fetch(`http://localhost:5000/api/admin/orders/${orderId}/approve`, {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ modifiedItems: [] }),
+        body: JSON.stringify({ modifiedItems }),
       });
 
       const data = await response.json();
@@ -89,6 +108,7 @@ const AdminOrders = () => {
         alert('Pedido aprobado correctamente');
         fetchPendingOrders();
         setSelectedOrder(null);
+        setModifiedOrder(null);
       } else {
         setError(data.message || 'Error al aprobar el pedido');
       }
@@ -98,9 +118,8 @@ const AdminOrders = () => {
     }
   };
 
-  // Función para generar una clave única para cada producto
   const generateProductKey = (product) => {
-    return `${product.CodigoEmpresa || ''}-${product.CodigoAlmacen || ''}-${product.CodigoArticulo || ''}-${product.CodigoColor_ || ''}-${product.CodigoTalla01_ || ''}-${product.TipoUnidadMedida_ || ''}-${product.Partida || ''}-${product.Periodo || ''}`;
+    return `${product.CodigoArticulo}-${product.CodigoProveedor || 'no-prov'}`;
   };
 
   const formatDate = (dateString) => {
@@ -185,33 +204,33 @@ const AdminOrders = () => {
         </>
       )}
       
-      {selectedOrder && (
+      {modifiedOrder && (
         <div className="order-modal">
           <div className="modal-content">
-            <h2>Detalles del Pedido #{selectedOrder.NumeroPedido}</h2>
+            <h2>Detalles del Pedido #{modifiedOrder.NumeroPedido}</h2>
             
             <div className="order-info-grid">
               <div className="info-card">
                 <h3>Información del cliente</h3>
                 <div className="info-row">
                   <span className="info-label">Nombre:</span>
-                  <span>{selectedOrder.RazonSocial}</span>
+                  <span>{modifiedOrder.RazonSocial}</span>
                 </div>
                 <div className="info-row">
                   <span className="info-label">CIF/DNI:</span>
-                  <span>{selectedOrder.CifDni}</span>
+                  <span>{modifiedOrder.CifDni}</span>
                 </div>
                 <div className="info-row">
                   <span className="info-label">Dirección:</span>
-                  <span>{selectedOrder.Domicilio}, {selectedOrder.CodigoPostal} {selectedOrder.Municipio}, {selectedOrder.Provincia}</span>
+                  <span>{modifiedOrder.Domicilio}, {modifiedOrder.CodigoPostal} {modifiedOrder.Municipio}, {modifiedOrder.Provincia}</span>
                 </div>
                 <div className="info-row">
                   <span className="info-label">Fecha necesaria:</span>
-                  <span>{formatDate(selectedOrder.FechaNecesaria)}</span>
+                  <span>{formatDate(modifiedOrder.FechaNecesaria)}</span>
                 </div>
                 <div className="info-row">
                   <span className="info-label">Observaciones:</span>
-                  <span>{selectedOrder.ObservacionesPedido || 'Ninguna'}</span>
+                  <span>{modifiedOrder.ObservacionesPedido || 'Ninguna'}</span>
                 </div>
               </div>
             </div>
@@ -229,11 +248,19 @@ const AdminOrders = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedOrder.Productos && selectedOrder.Productos.map(product => (
+                  {modifiedOrder.Productos && modifiedOrder.Productos.map((product, index) => (
                     <tr key={generateProductKey(product)}>
                       <td>{product.CodigoArticulo}</td>
                       <td>{product.DescripcionArticulo}</td>
-                      <td>{product.UnidadesPedidas}</td>
+                      <td>
+                        <input
+                          type="number"
+                          min="0"
+                          value={product.UnidadesPedidas}
+                          onChange={(e) => handleQuantityChange(index, e.target.value)}
+                          className="quantity-input"
+                        />
+                      </td>
                       <td>{formatCurrency(product.Precio)}</td>
                       <td>{product.NombreProveedor || 'No especificado'}</td>
                     </tr>
@@ -244,13 +271,16 @@ const AdminOrders = () => {
             
             <div className="modal-actions">
               <button 
-                onClick={() => approveOrder(selectedOrder.NumeroPedido)}
+                onClick={() => approveOrder(modifiedOrder.NumeroPedido)}
                 className="approve-btn"
               >
                 Aprobar Pedido
               </button>
               <button 
-                onClick={() => setSelectedOrder(null)}
+                onClick={() => {
+                  setSelectedOrder(null);
+                  setModifiedOrder(null);
+                }}
                 className="cancel-btn"
               >
                 Cerrar

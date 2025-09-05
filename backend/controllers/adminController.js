@@ -108,7 +108,6 @@ const approveOrder = async (req, res) => {
   try {
     const pool = await getPool();
     
-    // Verificar que la conexión esté activa
     if (!pool.connected) {
       throw new Error('Conexión a la base de datos no disponible');
     }
@@ -117,7 +116,6 @@ const approveOrder = async (req, res) => {
     await transaction.begin();
 
     try {
-      // 1. Actualizar cantidades si se modificaron
       if (modifiedItems && modifiedItems.length > 0) {
         for (const item of modifiedItems) {
           await transaction.request()
@@ -136,7 +134,6 @@ const approveOrder = async (req, res) => {
         }
       }
 
-      // 2. Obtener información del pedido actualizado
       const orderResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .query(`
@@ -163,7 +160,6 @@ const approveOrder = async (req, res) => {
 
       const order = orderResult.recordset[0];
 
-      // 3. Agrupar artículos por proveedor
       const itemsBySupplier = {};
       orderResult.recordset.forEach(item => {
         const supplier = item.CodigoProveedor;
@@ -173,9 +169,7 @@ const approveOrder = async (req, res) => {
         itemsBySupplier[supplier].push(item);
       });
 
-      // 4. Crear pedidos de compra para cada proveedor
       for (const [supplierCode, items] of Object.entries(itemsBySupplier)) {
-        // Obtener el último número de pedido de proveedor
         const lastOrderResult = await transaction.request()
           .input('sysGrupo', order.CodigoEmpresa)
           .query(`
@@ -190,7 +184,6 @@ const approveOrder = async (req, res) => {
           numeroPedidoProveedor = lastOrderResult.recordset[0].UltimoNumero + 1;
         }
 
-        // Crear cabecera de pedido de proveedor
         await transaction.request()
           .input('CodigoEmpresa', order.CodigoEmpresa)
           .input('EjercicioPedido', order.EjercicioPedido)
@@ -216,7 +209,6 @@ const approveOrder = async (req, res) => {
             )
           `);
 
-        // Crear líneas de pedido de proveedor
         for (const [index, item] of items.entries()) {
           await transaction.request()
             .input('CodigoEmpresa', order.CodigoEmpresa)
@@ -239,7 +231,6 @@ const approveOrder = async (req, res) => {
             `);
         }
 
-        // Actualizar contador de pedidos de proveedor
         await transaction.request()
           .input('sysGrupo', order.CodigoEmpresa)
           .input('sysContadorValor', numeroPedidoProveedor)
@@ -251,7 +242,6 @@ const approveOrder = async (req, res) => {
           `);
       }
 
-      // 5. Marcar pedido como aprobado
       await transaction.request()
         .input('NumeroPedido', orderId)
         .query(`
