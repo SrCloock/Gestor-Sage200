@@ -106,7 +106,7 @@ const AdminOrders = () => {
       const data = await response.json();
       
       if (data.success) {
-        setSuccessMessage('Pedido aprobado correctamente');
+        setSuccessMessage('Pedido aprobado y convertido a pedidos de proveedor correctamente');
         // Actualizar la lista de pedidos pendientes
         fetchPendingOrders();
         // Cerrar el modal después de un breve retraso
@@ -114,7 +114,7 @@ const AdminOrders = () => {
           setSelectedOrder(null);
           setEditedOrder(null);
           setSuccessMessage('');
-        }, 2000);
+        }, 3000);
       } else {
         setError(data.message || 'Error al aprobar el pedido');
       }
@@ -285,7 +285,7 @@ const AdminOrders = () => {
                 className="approve-btn"
                 disabled={loading}
               >
-                {loading ? 'Procesando...' : 'Aprobar Pedido'}
+                {loading ? 'Procesando...' : 'Aprobar Pedido y Generar Pedidos a Proveedores'}
               </button>
               <button 
                 onClick={() => {

@@ -415,7 +415,7 @@ const getOrders = async (req, res) => {
           c.BaseImponible,
           c.TotalIVA,
           c.ImporteLiquido,
-          c.FechaEntreza,
+          c.FechaEntrega,
           c.Domicilio,
           c.CodigoPostal,
           c.Municipio,
