@@ -190,6 +190,14 @@
   background-color: #f5f5f5;
 }
 
+.quantity-input {
+  width: 60px;
+  padding: 6px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  text-align: center;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -208,6 +216,11 @@
 
 .approve-btn:hover {
   background-color: #45a049;
+}
+
+.approve-btn:disabled {
+  background-color: #a5d6a7;
+  cursor: not-allowed;
 }
 
 .cancel-btn {
@@ -238,6 +251,15 @@
   border-radius: 4px;
   margin-bottom: 1.5rem;
   border-left: 4px solid #c62828;
+}
+
+.success-message {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  padding: 1rem;
+  border-radius: 4px;
+  margin-bottom: 1.5rem;
+  border-left: 4px solid #2e7d32;
 }
 
 .no-orders {

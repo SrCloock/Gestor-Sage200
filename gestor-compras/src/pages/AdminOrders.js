@@ -5,8 +5,10 @@ import '../styles/AdminOrders.css';
 const AdminOrders = () => {
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [editedOrder, setEditedOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const { user } = useContext(AuthContext);
 
   useEffect(() => {
@@ -63,12 +65,64 @@ const AdminOrders = () => {
       
       if (data.success) {
         setSelectedOrder(data.order);
+        setEditedOrder({
+          ...data.order,
+          Productos: data.order.Productos.map(product => ({ ...product }))
+        });
       } else {
         setError(data.message || 'Error al cargar los detalles del pedido');
       }
     } catch (error) {
       console.error('Error fetching order details:', error);
       setError('Error al cargar los detalles del pedido');
+    }
+  };
+
+  const handleQuantityChange = (index, newQuantity) => {
+    const updatedProducts = [...editedOrder.Productos];
+    updatedProducts[index].UnidadesPedidas = parseInt(newQuantity) || 1;
+    setEditedOrder({
+      ...editedOrder,
+      Productos: updatedProducts
+    });
+  };
+
+  const handleApproveOrder = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      const response = await fetch(`http://localhost:5000/api/admin/orders/${selectedOrder.NumeroPedido}/approve`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: editedOrder.Productos
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setSuccessMessage('Pedido aprobado correctamente');
+        // Actualizar la lista de pedidos pendientes
+        fetchPendingOrders();
+        // Cerrar el modal después de un breve retraso
+        setTimeout(() => {
+          setSelectedOrder(null);
+          setEditedOrder(null);
+          setSuccessMessage('');
+        }, 2000);
+      } else {
+        setError(data.message || 'Error al aprobar el pedido');
+      }
+    } catch (error) {
+      console.error('Error approving order:', error);
+      setError('Error al aprobar el pedido');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -106,6 +160,7 @@ const AdminOrders = () => {
       </div>
       
       {error && <div className="error-message">{error}</div>}
+      {successMessage && <div className="success-message">{successMessage}</div>}
       
       {loading ? (
         <div className="loading">Cargando pedidos...</div>
@@ -159,7 +214,7 @@ const AdminOrders = () => {
         </>
       )}
       
-      {selectedOrder && (
+      {selectedOrder && editedOrder && (
         <div className="order-modal">
           <div className="modal-content">
             <h2>Detalles del Pedido #{selectedOrder.NumeroPedido}</h2>
@@ -203,11 +258,19 @@ const AdminOrders = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedOrder.Productos && selectedOrder.Productos.map((product, index) => (
+                  {editedOrder.Productos && editedOrder.Productos.map((product, index) => (
                     <tr key={generateProductKey(product, index)}>
                       <td>{product.CodigoArticulo}</td>
                       <td>{product.DescripcionArticulo}</td>
-                      <td>{product.UnidadesPedidas}</td>
+                      <td>
+                        <input
+                          type="number"
+                          value={product.UnidadesPedidas}
+                          onChange={(e) => handleQuantityChange(index, e.target.value)}
+                          min="1"
+                          className="quantity-input"
+                        />
+                      </td>
                       <td>{formatCurrency(product.Precio)}</td>
                       <td>{product.NombreProveedor || 'No especificado'}</td>
                     </tr>
@@ -218,8 +281,16 @@ const AdminOrders = () => {
             
             <div className="modal-actions">
               <button 
+                onClick={handleApproveOrder}
+                className="approve-btn"
+                disabled={loading}
+              >
+                {loading ? 'Procesando...' : 'Aprobar Pedido'}
+              </button>
+              <button 
                 onClick={() => {
                   setSelectedOrder(null);
+                  setEditedOrder(null);
                 }}
                 className="cancel-btn"
               >

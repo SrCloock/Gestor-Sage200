@@ -114,8 +114,90 @@ const getOrderForReview = async (req, res) => {
   }
 };
 
+const updateOrderQuantitiesAndApprove = async (req, res) => {
+  const { orderId } = req.params;
+  const { items } = req.body; // Array de items con nuevas cantidades
+
+  try {
+    const pool = await getPool();
+    const transaction = pool.transaction();
+    await transaction.begin();
+
+    try {
+      // 1. Actualizar cantidades en LineasPedidoCliente
+      for (const item of items) {
+        await transaction.request()
+          .input('NumeroPedido', orderId)
+          .input('Orden', item.Orden)
+          .input('UnidadesPedidas', item.UnidadesPedidas)
+          .input('UnidadesPendientes', item.UnidadesPedidas)
+          .input('Unidades2_', item.UnidadesPedidas)
+          .input('UnidadesPendientesFabricar', item.UnidadesPedidas)
+          .query(`
+            UPDATE LineasPedidoCliente 
+            SET 
+              UnidadesPedidas = @UnidadesPedidas,
+              UnidadesPendientes = @UnidadesPendientes,
+              Unidades2_ = @Unidades2_,
+              UnidadesPendientesFabricar = @UnidadesPendientesFabricar
+            WHERE NumeroPedido = @NumeroPedido AND Orden = @Orden
+          `);
+      }
+
+      // 2. Recalcular totales del pedido
+      const totalesResult = await transaction.request()
+        .input('NumeroPedido', orderId)
+        .query(`
+          SELECT 
+            SUM(UnidadesPedidas * Precio) AS BaseImponible,
+            SUM((UnidadesPedidas * Precio) * ([%Iva] / 100.0)) AS TotalIVA
+          FROM LineasPedidoCliente
+          WHERE NumeroPedido = @NumeroPedido
+        `);
+
+      const baseImponibleTotal = parseFloat(totalesResult.recordset[0].BaseImponible) || 0;
+      const totalIVATotal = parseFloat(totalesResult.recordset[0].TotalIVA) || 0;
+      const importeLiquidoTotal = baseImponibleTotal + totalIVATotal;
+
+      // 3. Actualizar cabecera con nuevos totales y estado
+      await transaction.request()
+        .input('NumeroPedido', orderId)
+        .input('BaseImponible', baseImponibleTotal)
+        .input('TotalIVA', totalIVATotal)
+        .input('ImporteLiquido', importeLiquidoTotal)
+        .input('StatusAprobado', -1)
+        .query(`
+          UPDATE CabeceraPedidoCliente 
+          SET 
+            BaseImponible = @BaseImponible,
+            TotalIva = @TotalIVA,
+            ImporteLiquido = @ImporteLiquido,
+            StatusAprobado = @StatusAprobado
+          WHERE NumeroPedido = @NumeroPedido
+        `);
+
+      await transaction.commit();
+
+      res.status(200).json({
+        success: true,
+        message: 'Pedido actualizado y aprobado correctamente'
+      });
+
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
+  } catch (error) {
+    console.error('Error al actualizar pedido:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al procesar la actualización del pedido'
+    });
+  }
+};
 
 module.exports = {
   getPendingOrders,
-  getOrderForReview
+  getOrderForReview,
+  updateOrderQuantitiesAndApprove
 };
