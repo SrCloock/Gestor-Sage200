@@ -183,14 +183,14 @@
   font-weight: 500;
 }
 
-.ol-approved {
-  background-color: rgba(46, 125, 50, 0.15);
-  color: #2e7d32;
-}
-
 .ol-pending {
   background-color: rgba(245, 127, 23, 0.15);
   color: #f57f17;
+}
+
+.ol-served {
+  background-color: rgba(46, 125, 50, 0.15);
+  color: #2e7d32;
 }
 
 .ol-actions-container {
@@ -272,6 +272,11 @@
   justify-content: center;
   font-weight: bold;
   font-size: 1.2rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 @media (max-width: 992px) {

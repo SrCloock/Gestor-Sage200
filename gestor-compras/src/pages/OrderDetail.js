@@ -37,6 +37,10 @@ const OrderDetail = () => {
     }
   }, [orderId, user]);
 
+  const getStatusText = (status) => {
+    return Number(status) === 0 ? 'Pendiente' : 'Servido';
+  };
+
   if (loading) return <div className="loading">Cargando detalles del pedido...</div>;
   if (error) return <div className="error">{error}</div>;
   if (!order) return <div>No se encontró el pedido</div>;
@@ -49,8 +53,8 @@ const OrderDetail = () => {
       
       <div className="order-header">
         <h2>Pedido #{order.NumeroPedido}</h2>
-        <span className={`status-badge ${order.Estado === 'Aprobado' ? 'approved' : 'pending'}`}>
-          {order.Estado || 'Pendiente'}
+        <span className={`status-badge ${Number(order.Estado) === 0 ? 'pending' : 'served'}`}>
+          {getStatusText(order.Estado)}
         </span>
       </div>
       
@@ -92,6 +96,17 @@ const OrderDetail = () => {
         </div>
       </div>
       
+      <div className="order-actions">
+        {Number(order.Estado) === 0 && (
+          <button 
+            onClick={() => navigate(`/mis-pedidos/${orderId}/recepcion`)}
+            className="reception-button"
+          >
+            Confirmar Recepción
+          </button>
+        )}
+      </div>
+
       <h3 className="products-title">Artículos del Pedido</h3>
       <div className="products-table-container">
         <table className="products-table">

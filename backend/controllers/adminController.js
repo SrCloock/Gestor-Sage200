@@ -365,8 +365,8 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           numeroPedidoProveedor = nuevoNumero;
         }
 
-        // Agregar observación con el formato #Pedido-RazonSocial en ObservacionesPedido
-        const observacionesPedido = `#Pedido-${RazonSocial}`;
+        // Agregar observación con el formato "Pedido X de [Razón Social]"
+        const observacionesPedido = `Pedido ${orderId} de ${RazonSocial}`;
 
         // Insertar cabecera del pedido a proveedor con campos básicos
         await transaction.request()
@@ -392,7 +392,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           .input('CodigoCondiciones', proveedor.CodigoCondiciones || 0)
           .input('FormadePago', proveedor.FormadePago || '')
           .input('CodigoContable', proveedor.CodigoContable || '')
-          .input('ObservacionesPedido', observacionesPedido) // CORRECCIÓN: Usamos ObservacionesPedido
+          .input('ObservacionesPedido', observacionesPedido)
           .input('FechaPedido', new Date().toISOString().split('T')[0] + ' 00:00:00.000')
           .input('FechaNecesaria', new Date().toISOString().split('T')[0] + ' 00:00:00.000')
           .input('FechaRecepcion', new Date().toISOString().split('T')[0] + ' 00:00:00.000')
@@ -411,7 +411,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
               CodigoProveedor, SiglaNacion, CifDni, CifEuropeo, RazonSocial, Nombre,
               Domicilio, CodigoPostal, CodigoMunicipio, Municipio, CodigoProvincia, Provincia,
               CodigoNacion, Nacion, CodigoCondiciones, FormadePago,
-              CodigoContable, ObservacionesPedido, FechaPedido, FechaNecesaria, FechaRecepcion, FechaTope, // CORRECCIÓN: Usamos ObservacionesPedido
+              CodigoContable, ObservacionesPedido, FechaPedido, FechaNecesaria, FechaRecepcion, FechaTope,
               StatusAprobado, BaseImponible, TotalIva, ImporteLiquido, NumeroLineas,
               CodigoIdioma_, MantenerCambio_, CodigoContableANT_
             )
@@ -420,7 +420,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
               @CodigoProveedor, @SiglaNacion, @CifDni, @CifEuropeo, @RazonSocial, @Nombre,
               @Domicilio, @CodigoPostal, @CodigoMunicipio, @Municipio, @CodigoProvincia, @Provincia,
               @CodigoNacion, @Nacion, @CodigoCondiciones, @FormadePago,
-              @CodigoContable, @ObservacionesPedido, @FechaPedido, @FechaNecesaria, @FechaRecepcion, @FechaTope, // CORRECCIÓN: Usamos @ObservacionesPedido
+              @CodigoContable, @ObservacionesPedido, @FechaPedido, @FechaNecesaria, @FechaRecepcion, @FechaTope,
               @StatusAprobado, @BaseImponible, @TotalIva, @ImporteLiquido, @NumeroLineas,
               @CodigoIdioma_, @MantenerCambio_, @CodigoContableANT_
             )
@@ -520,7 +520,18 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
     } catch (err) {
       await transaction.rollback();
       console.error('Error en la transacción:', err);
-      throw err;
+      
+      // Mensaje más descriptivo
+      let errorMessage = 'Error al procesar la transacción';
+      if (err.number === 132) {
+        errorMessage = 'Error de duplicación en la base de datos';
+      }
+      
+      res.status(500).json({
+        success: false,
+        message: errorMessage,
+        error: process.env.NODE_ENV === 'development' ? err.message : undefined
+      });
     }
   } catch (error) {
     console.error('Error al actualizar pedido:', error);

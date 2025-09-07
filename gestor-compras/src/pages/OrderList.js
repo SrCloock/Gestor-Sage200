@@ -115,7 +115,7 @@ const OrderList = () => {
             <option value="recent">Más recientes primero</option>
             <option value="oldest">Más antiguos primero</option>
             <option value="id-asc">#Pedido (ascendente)</option>
-            <option value="id-desc">#Pedido (descendente)</option>
+            <option value='id-desc'>#Pedido (descendente)</option>
           </select>
         </div>
       </div>
@@ -151,8 +151,8 @@ const OrderList = () => {
                   </td>
                   <td className="ol-items-count">{order.NumeroLineas}</td>
                   <td>
-                    <span className={`ol-status-badge ${order.Estado === 'Aprobado' ? 'ol-approved' : 'ol-pending'}`}>
-                      {order.Estado || 'Pendiente'}
+                    <span className={`ol-status-badge ${Number(order.Estado) === 0 ? 'ol-pending' : 'ol-served'}`}>
+                      {Number(order.Estado) === 0 ? 'Pendiente' : 'Servido'}
                     </span>
                   </td>
                   <td>
@@ -163,7 +163,7 @@ const OrderList = () => {
                       >
                         Ver Detalle
                       </button>
-                      {order.Estado === 'Pendiente' && (
+                      {Number(order.Estado) === 0 && (
                         <button 
                           onClick={() => handleEditOrder(order.NumeroPedido, order.SeriePedido)}
                           className="ol-edit-button"
