@@ -304,4 +304,40 @@
     width: 100%;
     text-align: center;
   }
+}/* OrderList.css - Añadir estos estilos al final del archivo */
+
+.ol-status-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.ol-status-badge.ol-preparing {
+  background-color: #ff9800;
+  color: white;
+}
+
+.ol-status-badge.ol-served {
+  background-color: #4caf50;
+  color: white;
+}
+
+/* OrderDetail.css - Añadir estos estilos al final del archivo */
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.status-badge.preparing {
+  background-color: #ff9800;
+  color: white;
+}
+
+.status-badge.served {
+  background-color: #4caf50;
+  color: white;
 }

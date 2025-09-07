@@ -159,6 +159,7 @@ const createOrder = async (req, res) => {
         .input('CodigoMunicipio', codigoMunicipio)
         .input('CodigoContable', cliente.CodigoContable || '')
         .input('StatusAprobado', 0) 
+        .input('Estado', 0) // Estado inicial: En preparación
         .input('MantenerCambio_', -1)
         .input('SiglaNacion', 'ES')
         .input('NumeroPlazos', condicionesPago.NumeroPlazos)
@@ -178,7 +179,7 @@ const createOrder = async (req, res) => {
             CodigoCliente, CifDni, CifEuropeo, RazonSocial, Nombre, IdDelegacion,
             Domicilio, CodigoPostal, Municipio, Provincia, Nacion,
             CodigoNacion, CodigoProvincia, CodigoMunicipio, CodigoContable,
-            StatusAprobado, MantenerCambio_,
+            StatusAprobado, Estado, MantenerCambio_,
             SiglaNacion,
             NumeroPlazos, DiasPrimerPlazo, DiasEntrePlazos,
             BaseImponible, TotalIva, ImporteLiquido,
@@ -192,7 +193,7 @@ const createOrder = async (req, res) => {
             @CodigoCliente, @CifDni, @CifEuropeo, @RazonSocial, @Nombre, @IdDelegacion,
             @Domicilio, @CodigoPostal, @Municipio, @Provincia, @Nacion,
             @CodigoNacion, @CodigoProvincia, @CodigoMunicipio, @CodigoContable,
-            @StatusAprobado, @MantenerCambio_,
+            @StatusAprobado, @Estado, @MantenerCambio_,
             @SiglaNacion,
             @NumeroPlazos, @DiasPrimerPlazo, @DiasEntrePlazos,
             @BaseImponible, @TotalIva, @ImporteLiquido,
@@ -411,6 +412,7 @@ const getOrders = async (req, res) => {
           c.CifDni,
           c.NumeroLineas,
           c.StatusAprobado,
+          c.Estado,
           c.SeriePedido,
           c.BaseImponible,
           c.TotalIVA,
@@ -454,8 +456,7 @@ const getOrders = async (req, res) => {
 
         return {
           ...order,
-          Estado: order.StatusAprobado === 0 ? 'Pendiente' : 
-                 order.StatusAprobado === -1 ? 'Pendiente' : 'Aprobado',
+          Estado: order.Estado === 0 ? 'Preparando' : 'Servido',
           Productos: detailsResult.recordset
         };
       })
@@ -501,6 +502,7 @@ const getOrderDetails = async (req, res) => {
           RazonSocial,
           CifDni,
           StatusAprobado,
+          Estado,
           SeriePedido,
           BaseImponible,
           TotalIVA,
@@ -549,7 +551,7 @@ const getOrderDetails = async (req, res) => {
         ORDER BY l.Orden
       `);
 
-    // Eliminar posibles duplicados (por si acaso)
+    // Eliminar posibles duplicados
     const uniqueProducts = [];
     const seenKeys = new Set();
     
@@ -561,12 +563,13 @@ const getOrderDetails = async (req, res) => {
       }
     });
 
+    const orderData = orderResult.recordset[0];
+    
     return res.status(200).json({
       success: true,
       order: {
-        ...orderResult.recordset[0],
-        Estado: orderResult.recordset[0].StatusAprobado === 0 ? 'Pendiente' : 
-               orderResult.recordset[0].StatusAprobado === -1 ? 'Pendiente' : 'Aprobado',
+        ...orderData,
+        Estado: orderData.Estado === 0 ? 'Preparando' : 'Servido',
         Productos: uniqueProducts
       },
       message: 'Detalle del pedido obtenido correctamente'

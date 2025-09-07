@@ -72,7 +72,11 @@ const OrderList = () => {
   };
 
   const handleEditOrder = (orderId, seriePedido) => {
-    navigate(`/editar-pedido/${orderId}`, { state: { seriePedido } });
+    // Solo permitir editar pedidos en preparación (Estado = 0)
+    const order = orders.find(o => o.NumeroPedido === orderId);
+    if (order && order.Estado === 'Preparando') {
+      navigate(`/editar-pedido/${orderId}`, { state: { seriePedido } });
+    }
   };
 
   if (loading) return (
@@ -151,8 +155,8 @@ const OrderList = () => {
                   </td>
                   <td className="ol-items-count">{order.NumeroLineas}</td>
                   <td>
-                    <span className={`ol-status-badge ${Number(order.Estado) === 0 ? 'ol-pending' : 'ol-served'}`}>
-                      {Number(order.Estado) === 0 ? 'Pendiente' : 'Servido'}
+                    <span className={`ol-status-badge ${order.Estado === 'Preparando' ? 'ol-preparing' : 'ol-served'}`}>
+                      {order.Estado}
                     </span>
                   </td>
                   <td>
@@ -163,7 +167,7 @@ const OrderList = () => {
                       >
                         Ver Detalle
                       </button>
-                      {Number(order.Estado) === 0 && (
+                      {order.Estado === 'Preparando' && (
                         <button 
                           onClick={() => handleEditOrder(order.NumeroPedido, order.SeriePedido)}
                           className="ol-edit-button"
