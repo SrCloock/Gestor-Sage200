@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api';
 import ProductGrid from '../components/ProductGrid';
-import '../styles/OrderEdit.css'; // Cambiado a CSS específico
+import { FaCalendarAlt, FaSearch, FaSort, FaTrash, FaArrowLeft } from 'react-icons/fa';
+import '../styles/OrderEdit.css';
 
 const OrderEdit = () => {
   const { orderId } = useParams();
@@ -23,19 +24,17 @@ const OrderEdit = () => {
   const [comment, setComment] = useState('');
   const productsPerPage = 20;
 
-  // Función mejorada para generar claves únicas
   const generateProductKey = (product) => {
     const str = `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}`;
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convertir a 32bit entero
+      hash = hash & hash;
     }
     return `prod-${hash.toString(36)}`;
   };
 
-  // Funciones para manejar imágenes
   const checkImageExists = (url) => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -91,7 +90,6 @@ const OrderEdit = () => {
         setLoading(prev => ({ ...prev, products: true }));
         const response = await api.get('/api/products');
         
-        // Procesar imágenes y eliminar duplicados
         const productsWithImages = await Promise.all(
           response.data.map(async (product) => {
             const imagePath = await getProductImage(product);
@@ -139,7 +137,6 @@ const OrderEdit = () => {
       });
     }
 
-    // Eliminar duplicados usando la función hash
     const uniqueProducts = [];
     const seenKeys = new Set();
     
@@ -255,45 +252,69 @@ const OrderEdit = () => {
   };
 
   if (loading.order || loading.products) {
-    return <div className="oe-loading">Cargando datos del pedido...</div>;
+    return (
+      <div className="oe-loading-container">
+        <div className="oe-spinner"></div>
+        <p>Cargando datos del pedido...</p>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="oe-error">{error}</div>;
+    return (
+      <div className="oe-error-container">
+        <div className="oe-error-icon">⚠️</div>
+        <p>{error}</p>
+      </div>
+    );
   }
 
   return (
     <div className="oe-container">
-      <h2>Editar Pedido #{orderId}</h2>
+      <div className="oe-header">
+        <button onClick={() => navigate(-1)} className="oe-back-button">
+          <FaArrowLeft className="oe-back-icon" />
+          Volver
+        </button>
+        <div className="oe-title-section">
+          <h2>Editar Pedido #{orderId}</h2>
+          <p>Modifique los productos y detalles de su pedido</p>
+        </div>
+      </div>
 
       {error && (
         <div className="oe-error-message">
           <p>{error}</p>
-          <button onClick={() => setError('')}>×</button>
+          <button onClick={() => setError('')} className="oe-error-close">×</button>
         </div>
       )}
 
-      <div className="oe-delivery-date">
-        <label htmlFor="deliveryDate">Nueva fecha de entrega (opcional):</label>
-        <input
-          type="date"
-          id="deliveryDate"
-          value={deliveryDate}
-          onChange={(e) => setDeliveryDate(e.target.value)}
-          min={new Date().toISOString().split('T')[0]}
-        />
-        {deliveryDate && (
-          <button 
-            className="oe-clear-date"
-            onClick={() => setDeliveryDate('')}
-          >
-            Limpiar fecha
-          </button>
-        )}
+      <div className="oe-delivery-section">
+        <div className="oe-delivery-input">
+          <FaCalendarAlt className="oe-delivery-icon" />
+          <label htmlFor="deliveryDate">Nueva fecha de entrega (opcional):</label>
+          <input
+            type="date"
+            id="deliveryDate"
+            value={deliveryDate}
+            onChange={(e) => setDeliveryDate(e.target.value)}
+            min={new Date().toISOString().split('T')[0]}
+            className="oe-date-input"
+          />
+          {deliveryDate && (
+            <button 
+              className="oe-clear-date"
+              onClick={() => setDeliveryDate('')}
+            >
+              ×
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="oe-filters">
-        <div className="oe-search-box">
+      <div className="oe-controls-panel">
+        <div className="oe-search-container">
+          <FaSearch className="oe-search-icon" />
           <input
             type="text"
             placeholder="Buscar productos por nombre, código o proveedor..."
@@ -302,15 +323,16 @@ const OrderEdit = () => {
               setSearchTerm(e.target.value);
               setCurrentPage(1);
             }}
+            className="oe-search-input"
           />
-          <span className="search-icon">🔍</span>
         </div>
 
-        <div className="oe-sort-options">
+        <div className="oe-filter-container">
+          <FaSort className="oe-filter-icon" />
           <select
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value)}
-            className="styled-select"
+            className="oe-filter-select"
           >
             <option value="asc">Ordenar A-Z</option>
             <option value="desc">Ordenar Z-A</option>
@@ -318,13 +340,17 @@ const OrderEdit = () => {
         </div>
       </div>
 
-      <div className="oe-order-container">
+      <div className="oe-main-content">
         <div className="oe-order-summary">
-          <h3>Productos en el Pedido ({orderItems.length})</h3>
+          <div className="oe-summary-header">
+            <h3>Productos en el Pedido</h3>
+            <span className="oe-items-count">{orderItems.length} productos</span>
+          </div>
           
           {deliveryDate && (
             <div className="oe-delivery-info">
-              <strong>Fecha de entrega:</strong> {new Date(deliveryDate).toLocaleDateString()}
+              <FaCalendarAlt className="oe-info-icon" />
+              <span>Entrega: {new Date(deliveryDate).toLocaleDateString()}</span>
             </div>
           )}
 
@@ -334,52 +360,65 @@ const OrderEdit = () => {
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               rows="3"
-              placeholder="Agregue comentarios para este pedido..."
+              placeholder="Agregue comentarios sobre el pedido..."
+              className="oe-comment-textarea"
             />
           </div>
 
           {orderItems.length === 0 ? (
-            <p>No hay productos en el pedido</p>
+            <div className="oe-empty-cart">
+              <p>No hay productos en el pedido</p>
+            </div>
           ) : (
-            <>
-              <ul className="oe-order-items">
-                {orderItems.map((item) => (
-                  <li key={generateProductKey(item)}>
-                    <div className="oe-item-info">
-                      <span>{item.DescripcionArticulo}</span>
-                      <span>Código: {item.CodigoArticulo}</span>
-                      {item.NombreProveedor && <span>Proveedor: {item.NombreProveedor}</span>}
-                    </div>
-                    <div className="oe-item-actions">
-                      <input
-                        type="number"
-                        min="1"
-                        value={item.Cantidad}
-                        onChange={(e) => handleUpdateQuantity(item, e.target.value)}
-                      />
-                      <button
-                        className="oe-remove-button"
-                        onClick={() => handleRemoveItem(item)}
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              <button
-                className="oe-submit-order"
-                onClick={handleSubmitChanges}
-                disabled={orderItems.length === 0 || loading.submit}
-              >
-                {loading.submit ? 'Guardando cambios...' : 'Guardar Cambios'}
-              </button>
-            </>
+            <div className="oe-order-items">
+              {orderItems.map((item) => (
+                <div key={generateProductKey(item)} className="oe-order-item">
+                  <div className="oe-item-details">
+                    <h4>{item.DescripcionArticulo}</h4>
+                    <p>Código: {item.CodigoArticulo}</p>
+                    {item.NombreProveedor && <p>Proveedor: {item.NombreProveedor}</p>}
+                  </div>
+                  <div className="oe-item-controls">
+                    <input
+                      type="number"
+                      min="1"
+                      value={item.Cantidad}
+                      onChange={(e) => handleUpdateQuantity(item, e.target.value)}
+                      className="oe-quantity-input"
+                    />
+                    <button
+                      className="oe-remove-button"
+                      onClick={() => handleRemoveItem(item)}
+                    >
+                      <FaTrash />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
+
+          <div className="oe-actions">
+            <button
+              onClick={handleSubmitChanges}
+              disabled={loading.submit || orderItems.length === 0}
+              className="oe-submit-button"
+            >
+              {loading.submit ? 'Guardando cambios...' : 'Guardar Cambios'}
+            </button>
+            <button
+              onClick={() => navigate('/mis-pedidos')}
+              className="oe-cancel-button"
+            >
+              Cancelar
+            </button>
+          </div>
         </div>
 
         <div className="oe-product-selection">
-          <h3>Agregar más productos ({filteredProducts.length} disponibles)</h3>
+          <div className="oe-products-header">
+            <h3>Seleccionar Productos ({filteredProducts.length} disponibles)</h3>
+          </div>
 
           <ProductGrid
             products={currentProducts}

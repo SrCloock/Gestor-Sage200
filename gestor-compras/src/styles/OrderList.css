@@ -1,33 +1,32 @@
 .ol-container {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 2rem;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.ol-header {
+  margin-bottom: 2.5rem;
+  text-align: center;
 }
 
 .ol-title {
-  color: #004d40;
-  font-size: 1.8rem;
-  margin-bottom: 1.8rem;
-  text-align: center;
-  font-weight: 600;
-  position: relative;
-  padding-bottom: 0.8rem;
+  color: #1a3c34;
+  font-size: 2.2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(135deg, #2e7d67 0%, #4ca788 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-.ol-title::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100px;
-  height: 4px;
-  background: linear-gradient(90deg, #00796b, #004d40);
-  border-radius: 2px;
+.ol-subtitle {
+  color: #6b7280;
+  font-size: 1.1rem;
+  font-weight: 400;
 }
 
-.ol-controls {
+.ol-controls-panel {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -36,30 +35,31 @@
   flex-wrap: wrap;
   background: #ffffff;
   padding: 1.5rem;
-  border-radius: 12px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
-.ol-search-box {
-  flex-grow: 1;
+.ol-search-container {
   position: relative;
+  flex-grow: 1;
   max-width: 400px;
 }
 
 .ol-search-input {
   width: 100%;
   padding: 1rem 1rem 1rem 3rem;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
   font-size: 1rem;
-  transition: all 0.3s;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: #fafafa;
 }
 
 .ol-search-input:focus {
-  border-color: #00796b;
+  border-color: #34d399;
   outline: none;
-  box-shadow: 0 0 0 3px rgba(0, 121, 107, 0.15);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.1);
+  background: #ffffff;
 }
 
 .ol-search-icon {
@@ -67,112 +67,102 @@
   left: 1rem;
   top: 50%;
   transform: translateY(-50%);
-  color: #757575;
+  color: #9ca3af;
   font-size: 1.2rem;
 }
 
-.ol-sort-options {
+.ol-filter-container {
   display: flex;
   align-items: center;
   gap: 1rem;
 }
 
-.ol-sort-label {
+.ol-filter-label {
   font-weight: 500;
-  color: #004d40;
+  color: #374151;
   font-size: 1rem;
+  white-space: nowrap;
 }
 
-.ol-sort-select {
+.ol-filter-select {
   padding: 1rem;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
   font-size: 1rem;
-  background: white;
+  background: #fafafa;
   cursor: pointer;
-  transition: all 0.3s;
-  min-width: 220px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 200px;
 }
 
-.ol-sort-select:focus {
-  border-color: #00796b;
+.ol-filter-select:focus {
+  border-color: #34d399;
   outline: none;
-  box-shadow: 0 0 0 3px rgba(0, 121, 107, 0.15);
-}
-
-.ol-no-orders {
-  text-align: center;
-  padding: 3rem;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.1);
   background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-  margin-top: 1rem;
 }
 
-.ol-no-orders-icon {
-  font-size: 4rem;
-  margin-bottom: 1.5rem;
-  color: #e0e0e0;
-}
-
-.ol-no-orders h3 {
-  color: #004d40;
-  font-size: 1.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.ol-no-orders p {
-  color: #757575;
-  font-size: 1.1rem;
-  margin: 0;
-}
-
-.ol-orders-table-container {
+.ol-table-container {
   overflow-x: auto;
-  border-radius: 12px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   margin-top: 1rem;
+  background: #ffffff;
 }
 
 .ol-orders-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   background: #ffffff;
-  border-radius: 12px;
-  overflow: hidden;
+  border-radius: 16px;
 }
 
 .ol-orders-table th {
-  background: linear-gradient(180deg, #00796b, #00695c);
+  background: linear-gradient(135deg, #2e7d67 0%, #4ca788 100%);
   color: #ffffff;
   padding: 1.2rem 1.5rem;
   text-align: left;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ol-orders-table th:first-child {
+  border-top-left-radius: 16px;
+}
+
+.ol-orders-table th:last-child {
+  border-top-right-radius: 16px;
 }
 
 .ol-orders-table td {
   padding: 1.2rem 1.5rem;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f3f4f6;
   font-size: 0.95rem;
-  color: #424242;
+  color: #374151;
 }
 
 .ol-orders-table tr:last-child td {
   border-bottom: none;
 }
 
-.ol-order-row:hover {
-  background-color: #f9f9f9;
+.ol-table-row:hover {
+  background-color: #f9fafb;
+  transform: scale(1.01);
+  transition: all 0.2s ease;
 }
 
 .ol-order-id {
   font-weight: 600;
-  color: #004d40;
+  color: #1a3c34;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
 }
 
 .ol-order-date, .ol-delivery-date, .ol-items-count {
   font-weight: 500;
+  color: #6b7280;
 }
 
 .ol-status-badge {
@@ -180,164 +170,179 @@
   padding: 0.5rem 1rem;
   border-radius: 20px;
   font-size: 0.85rem;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.3px;
 }
 
-.ol-pending {
-  background-color: rgba(245, 127, 23, 0.15);
-  color: #f57f17;
+.ol-status-preparing {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
 }
 
-.ol-served {
-  background-color: rgba(46, 125, 50, 0.15);
-  color: #2e7d32;
+.ol-status-served {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
-.ol-actions-container {
+.ol-actions {
   display: flex;
   gap: 0.8rem;
 }
 
-.ol-view-button, .ol-edit-button {
+.ol-btn {
   padding: 0.7rem 1.2rem;
-  border-radius: 6px;
+  border-radius: 10px;
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: none;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.ol-view-button {
-  background: linear-gradient(135deg, #00796b, #00695c);
+.ol-btn-primary {
+  background: linear-gradient(135deg, #2e7d67 0%, #4ca788 100%);
   color: #ffffff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(46, 125, 103, 0.3);
 }
 
-.ol-view-button:hover {
-  background: linear-gradient(135deg, #00695c, #004d40);
+.ol-btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 16px rgba(46, 125, 103, 0.4);
 }
 
-.ol-edit-button {
-  background: #f5f5f5;
-  color: #004d40;
-  border: 1px solid #e0e0e0;
+.ol-btn-secondary {
+  background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+  color: #374151;
+  border: 1px solid #d1d5db;
 }
 
-.ol-edit-button:hover {
-  background: #e0e0e0;
+.ol-btn-secondary:hover {
+  background: linear-gradient(135deg, #e5e7eb, #d1d5db);
   transform: translateY(-2px);
 }
 
-.ol-loading {
+.ol-empty-state {
   text-align: center;
-  padding: 3rem;
+  padding: 4rem 2rem;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  margin-top: 1rem;
+}
+
+.ol-empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1.5rem;
+  opacity: 0.7;
+}
+
+.ol-empty-state h3 {
+  color: #1a3c34;
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.ol-empty-state p {
+  color: #6b7280;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.ol-loading-container {
+  text-align: center;
+  padding: 4rem 2rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
 .ol-spinner {
-  width: 50px;
-  height: 50px;
-  border: 5px solid rgba(0, 121, 107, 0.2);
-  border-top: 5px solid #00796b;
+  width: 60px;
+  height: 60px;
+  border: 4px solid rgba(46, 125, 103, 0.2);
+  border-top: 4px solid #2e7d67;
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: ol-spin 1s linear infinite;
 }
 
-.ol-error {
-  background: #ffebee;
-  color: #c62828;
-  padding: 1.5rem;
-  border-radius: 8px;
+.ol-error-container {
+  background: #fef2f2;
+  color: #dc2626;
+  padding: 2rem;
+  border-radius: 16px;
   margin: 2rem auto;
   max-width: 800px;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 .ol-error-icon {
-  width: 40px;
-  height: 40px;
-  background: #c62828;
+  width: 50px;
+  height: 50px;
+  background: #dc2626;
   color: white;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: bold;
-  font-size: 1.2rem;
+  font-size: 1.5rem;
+  flex-shrink: 0;
 }
 
-@keyframes spin {
+@keyframes ol-spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
 
-@media (max-width: 992px) {
-  .ol-controls {
+@media (max-width: 1024px) {
+  .ol-controls-panel {
     flex-direction: column;
     align-items: stretch;
   }
   
-  .ol-search-box {
+  .ol-search-container {
     max-width: 100%;
+  }
+  
+  .ol-filter-container {
+    width: 100%;
+    justify-content: space-between;
   }
 }
 
 @media (max-width: 768px) {
   .ol-container {
-    padding: 1.5rem;
+    padding: 1rem;
   }
   
-  .ol-actions-container {
+  .ol-title {
+    font-size: 1.8rem;
+  }
+  
+  .ol-actions {
     flex-direction: column;
     gap: 0.5rem;
   }
   
-  .ol-view-button, .ol-edit-button {
+  .ol-btn {
     width: 100%;
     text-align: center;
   }
-}/* OrderList.css - Añadir estos estilos al final del archivo */
-
-.ol-status-badge {
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 500;
-}
-
-.ol-status-badge.ol-preparing {
-  background-color: #ff9800;
-  color: white;
-}
-
-.ol-status-badge.ol-served {
-  background-color: #4caf50;
-  color: white;
-}
-
-/* OrderDetail.css - Añadir estos estilos al final del archivo */
-
-.status-badge {
-  padding: 6px 12px;
-  border-radius: 16px;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.status-badge.preparing {
-  background-color: #ff9800;
-  color: white;
-}
-
-.status-badge.served {
-  background-color: #4caf50;
-  color: white;
+  
+  .ol-orders-table {
+    font-size: 0.85rem;
+  }
+  
+  .ol-orders-table th,
+  .ol-orders-table td {
+    padding: 0.8rem;
+  }
 }

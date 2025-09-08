@@ -25,14 +25,13 @@ const ProductCatalog = () => {
     if (!user) navigate('/login');
   }, [user, navigate]);
 
-  // Función hash estable para generar claves únicas
   const generateProductKey = (product) => {
     const str = `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}`;
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convertir a 32bit entero
+      hash = hash & hash;
     }
     return hash.toString(36);
   };
@@ -143,32 +142,45 @@ const ProductCatalog = () => {
   const handlePageChange = (newPage) => 
     newPage > 0 && newPage <= totalPages && setCurrentPage(newPage);
 
-  if (loading) return <div className="pc-loading"><FaBoxOpen /> Cargando catálogo...</div>;
-  if (error) return <div className="pc-error">{error}</div>;
+  if (loading) return (
+    <div className="pc-loading-container">
+      <div className="pc-spinner"></div>
+      <p>Cargando catálogo...</p>
+    </div>
+  );
+
+  if (error) return (
+    <div className="pc-error-container">
+      <div className="pc-error-icon">⚠️</div>
+      <p>{error}</p>
+    </div>
+  );
 
   return (
     <div className="pc-container">
       <div className="pc-header">
-        <h2>Catálogo de Suministros Dentales</h2>
-        <p>{filteredProducts.length} productos disponibles en inventario</p>
+        <h2 className="pc-title">Catálogo de Suministros Dentales</h2>
+        <p className="pc-subtitle">{filteredProducts.length} productos disponibles en inventario</p>
       </div>
 
-      <div className="pc-controls">
-        <div className="pc-search-box">
+      <div className="pc-controls-panel">
+        <div className="pc-search-container">
           <input
             type="text"
             placeholder="Buscar instrumental y suministros..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            className="pc-search-input"
           />
-          <FaSearch className="search-icon" />
+          <FaSearch className="pc-search-icon" />
         </div>
 
-        <div className="pc-sort-options">
+        <div className="pc-filter-container">
+          <label className="pc-filter-label">Ordenar por:</label>
           <select
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value)}
-            className="styled-select"
+            className="pc-filter-select"
           >
             <option value="asc">Ordenar A-Z</option>
             <option value="desc">Ordenar Z-A</option>
@@ -194,9 +206,10 @@ const ProductCatalog = () => {
       />
 
       {!currentProducts.length && (
-        <div className="pc-no-results">
-          <FaBoxOpen />
-          <p>No se encontraron productos con los filtros aplicados</p>
+        <div className="pc-empty-state">
+          <FaBoxOpen className="pc-empty-icon" />
+          <h3>No se encontraron productos</h3>
+          <p>No hay productos que coincidan con los filtros aplicados</p>
         </div>
       )}
     </div>

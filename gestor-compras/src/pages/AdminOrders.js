@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
+import { FaSync, FaEye, FaCheckCircle, FaTimes } from 'react-icons/fa';
 import '../styles/AdminOrders.css';
 
 const AdminOrders = () => {
@@ -107,9 +108,7 @@ const AdminOrders = () => {
       
       if (data.success) {
         setSuccessMessage('Pedido aprobado y convertido a pedidos de proveedor correctamente');
-        // Actualizar la lista de pedidos pendientes
         fetchPendingOrders();
-        // Cerrar el modal después de un breve retraso
         setTimeout(() => {
           setSelectedOrder(null);
           setEditedOrder(null);
@@ -126,7 +125,6 @@ const AdminOrders = () => {
     }
   };
 
-  // Función para generar claves únicas
   const generateProductKey = (product, index) => {
     return `${product.Orden}-${product.CodigoArticulo}-${product.CodigoProveedor || 'no-prov'}-${index}`;
   };
@@ -145,36 +143,79 @@ const AdminOrders = () => {
   };
 
   if (!user || !user.isAdmin) {
-    return <div className="admin-container">Acceso restringido. Se requieren permisos de administrador.</div>;
+    return (
+      <div className="ao-container">
+        <div className="ao-access-denied">
+          <FaTimes className="ao-denied-icon" />
+          <h2>Acceso restringido</h2>
+          <p>Se requieren permisos de administrador para acceder a esta sección.</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="admin-container">
-      <div className="admin-header">
-        <h1>Panel de Administración - Pedidos Pendientes</h1>
-        <div className="header-actions">
-          <button onClick={fetchPendingOrders} className="refresh-btn">
-            Actualizar lista
+    <div className="ao-container">
+      <div className="ao-header">
+        <div className="ao-title-section">
+          <h1>Panel de Administración</h1>
+          <p>Gestión de pedidos pendientes de aprobación</p>
+        </div>
+        <div className="ao-header-actions">
+          <button onClick={fetchPendingOrders} className="ao-refresh-btn">
+            <FaSync className="ao-refresh-icon" />
+            Actualizar
           </button>
         </div>
       </div>
       
-      {error && <div className="error-message">{error}</div>}
-      {successMessage && <div className="success-message">{successMessage}</div>}
+      {error && (
+        <div className="ao-error-message">
+          <div className="ao-error-icon">⚠️</div>
+          <p>{error}</p>
+        </div>
+      )}
+      
+      {successMessage && (
+        <div className="ao-success-message">
+          <FaCheckCircle className="ao-success-icon" />
+          <p>{successMessage}</p>
+        </div>
+      )}
       
       {loading ? (
-        <div className="loading">Cargando pedidos...</div>
+        <div className="ao-loading">
+          <div className="ao-spinner"></div>
+          <p>Cargando pedidos...</p>
+        </div>
       ) : (
         <>
-          <div className="orders-summary">
-            <p>Total de pedidos pendientes: <strong>{orders.length}</strong></p>
+          <div className="ao-stats-cards">
+            <div className="ao-stat-card">
+              <div className="ao-stat-icon">📦</div>
+              <div className="ao-stat-content">
+                <span className="ao-stat-value">{orders.length}</span>
+                <span className="ao-stat-label">Pedidos pendientes</span>
+              </div>
+            </div>
+            <div className="ao-stat-card">
+              <div className="ao-stat-icon">⏳</div>
+              <div className="ao-stat-content">
+                <span className="ao-stat-value">{orders.filter(o => new Date(o.FechaNecesaria) < new Date()).length}</span>
+                <span className="ao-stat-label">Urgentes</span>
+              </div>
+            </div>
           </div>
           
-          <div className="orders-table-container">
+          <div className="ao-table-container">
             {orders.length === 0 ? (
-              <p className="no-orders">No hay pedidos pendientes de aprobación.</p>
+              <div className="ao-empty-state">
+                <div className="ao-empty-icon">📭</div>
+                <h3>No hay pedidos pendientes</h3>
+                <p>Todos los pedidos han sido procesados correctamente.</p>
+              </div>
             ) : (
-              <table className="orders-table">
+              <table className="ao-orders-table">
                 <thead>
                   <tr>
                     <th>Nº Pedido</th>
@@ -189,19 +230,24 @@ const AdminOrders = () => {
                 </thead>
                 <tbody>
                   {orders.map(order => (
-                    <tr key={order.NumeroPedido}>
-                      <td>{order.NumeroPedido}</td>
-                      <td>{formatDate(order.FechaPedido)}</td>
-                      <td>{order.RazonSocial}</td>
-                      <td>{order.CifDni}</td>
-                      <td>{order.NumeroLineas}</td>
-                      <td>{formatCurrency(order.BaseImponible)}</td>
-                      <td>{formatDate(order.FechaNecesaria)}</td>
-                      <td>
+                    <tr key={order.NumeroPedido} className="ao-order-row">
+                      <td className="ao-order-id">{order.NumeroPedido}</td>
+                      <td className="ao-order-date">{formatDate(order.FechaPedido)}</td>
+                      <td className="ao-order-client">{order.RazonSocial}</td>
+                      <td className="ao-order-cif">{order.CifDni}</td>
+                      <td className="ao-order-lines">{order.NumeroLineas}</td>
+                      <td className="ao-order-amount">{formatCurrency(order.BaseImponible)}</td>
+                      <td className="ao-order-delivery">
+                        <span className={new Date(order.FechaNecesaria) < new Date() ? 'ao-urgent' : ''}>
+                          {formatDate(order.FechaNecesaria)}
+                        </span>
+                      </td>
+                      <td className="ao-order-actions">
                         <button 
                           onClick={() => fetchOrderDetails(order.NumeroPedido)}
-                          className="details-btn"
+                          className="ao-view-btn"
                         >
+                          <FaEye />
                           Ver detalles
                         </button>
                       </td>
@@ -215,39 +261,55 @@ const AdminOrders = () => {
       )}
       
       {selectedOrder && editedOrder && (
-        <div className="order-modal">
-          <div className="modal-content">
-            <h2>Detalles del Pedido #{selectedOrder.NumeroPedido}</h2>
+        <div className="ao-modal-overlay">
+          <div className="ao-modal">
+            <div className="ao-modal-header">
+              <h2>Detalles del Pedido #{selectedOrder.NumeroPedido}</h2>
+              <button 
+                onClick={() => {
+                  setSelectedOrder(null);
+                  setEditedOrder(null);
+                }}
+                className="ao-close-btn"
+              >
+                <FaTimes />
+              </button>
+            </div>
             
-            <div className="order-info-grid">
-              <div className="info-card">
-                <h3>Información del cliente</h3>
-                <div className="info-row">
-                  <span className="info-label">Nombre:</span>
-                  <span>{selectedOrder.RazonSocial}</span>
+            <div className="ao-modal-grid">
+              <div className="ao-info-card">
+                <div className="ao-card-header">
+                  <h3>Información del cliente</h3>
+                  <div className="ao-card-icon">👤</div>
                 </div>
-                <div className="info-row">
-                  <span className="info-label">CIF/DNI:</span>
-                  <span>{selectedOrder.CifDni}</span>
+                <div className="ao-info-row">
+                  <span className="ao-info-label">Nombre:</span>
+                  <span className="ao-info-value">{selectedOrder.RazonSocial}</span>
                 </div>
-                <div className="info-row">
-                  <span className="info-label">Dirección:</span>
-                  <span>{selectedOrder.Domicilio}, {selectedOrder.CodigoPostal} {selectedOrder.Municipio}, {selectedOrder.Provincia}</span>
+                <div className="ao-info-row">
+                  <span className="ao-info-label">CIF/DNI:</span>
+                  <span className="ao-info-value">{selectedOrder.CifDni}</span>
                 </div>
-                <div className="info-row">
-                  <span className="info-label">Fecha necesaria:</span>
-                  <span>{formatDate(selectedOrder.FechaNecesaria)}</span>
+                <div className="ao-info-row">
+                  <span className="ao-info-label">Dirección:</span>
+                  <span className="ao-info-value">
+                    {selectedOrder.Domicilio}, {selectedOrder.CodigoPostal} {selectedOrder.Municipio}, {selectedOrder.Provincia}
+                  </span>
                 </div>
-                <div className="info-row">
-                  <span className="info-label">Observaciones:</span>
-                  <span>{selectedOrder.ObservacionesPedido || 'Ninguna'}</span>
+                <div className="ao-info-row">
+                  <span className="ao-info-label">Fecha necesaria:</span>
+                  <span className="ao-info-value">{formatDate(selectedOrder.FechaNecesaria)}</span>
+                </div>
+                <div className="ao-info-row">
+                  <span className="ao-info-label">Observaciones:</span>
+                  <span className="ao-info-value">{selectedOrder.ObservacionesPedido || 'Ninguna'}</span>
                 </div>
               </div>
             </div>
             
-            <h3 className="products-title">Productos</h3>
-            <div className="products-table-container">
-              <table className="products-table">
+            <h3 className="ao-products-title">Productos</h3>
+            <div className="ao-products-container">
+              <table className="ao-products-table">
                 <thead>
                   <tr>
                     <th>Código</th>
@@ -259,42 +321,49 @@ const AdminOrders = () => {
                 </thead>
                 <tbody>
                   {editedOrder.Productos && editedOrder.Productos.map((product, index) => (
-                    <tr key={generateProductKey(product, index)}>
-                      <td>{product.CodigoArticulo}</td>
-                      <td>{product.DescripcionArticulo}</td>
-                      <td>
+                    <tr key={generateProductKey(product, index)} className="ao-product-row">
+                      <td className="ao-product-code">{product.CodigoArticulo}</td>
+                      <td className="ao-product-desc">{product.DescripcionArticulo}</td>
+                      <td className="ao-product-quantity">
                         <input
                           type="number"
                           value={product.UnidadesPedidas}
                           onChange={(e) => handleQuantityChange(index, e.target.value)}
                           min="1"
-                          className="quantity-input"
+                          className="ao-quantity-input"
                         />
                       </td>
-                      <td>{formatCurrency(product.Precio)}</td>
-                      <td>{product.NombreProveedor || 'No especificado'}</td>
+                      <td className="ao-product-price">{formatCurrency(product.Precio)}</td>
+                      <td className="ao-product-supplier">{product.NombreProveedor || 'No especificado'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             
-            <div className="modal-actions">
+            <div className="ao-modal-actions">
               <button 
                 onClick={handleApproveOrder}
-                className="approve-btn"
+                className="ao-approve-btn"
                 disabled={loading}
               >
-                {loading ? 'Procesando...' : 'Aprobar Pedido y Generar Pedidos a Proveedores'}
+                {loading ? (
+                  <>
+                    <div className="ao-button-spinner"></div>
+                    Procesando...
+                  </>
+                ) : (
+                  'Aprobar Pedido y Generar Pedidos a Proveedores'
+                )}
               </button>
               <button 
                 onClick={() => {
                   setSelectedOrder(null);
                   setEditedOrder(null);
                 }}
-                className="cancel-btn"
+                className="ao-cancel-btn"
               >
-                Cerrar
+                Cancelar
               </button>
             </div>
           </div>

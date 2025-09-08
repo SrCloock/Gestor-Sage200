@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FaCheckCircle,FaCalendarCheck, FaFileInvoice, FaArrowLeft, FaShoppingCart } from 'react-icons/fa';
+import { FaCheckCircle, FaCalendarCheck, FaFileInvoice, FaArrowLeft, FaShoppingCart } from 'react-icons/fa';
 import '../styles/OrderReview.css';
 
 const OrderReview = () => {
@@ -16,49 +16,61 @@ const OrderReview = () => {
   }
 
   return (
-    <div className="order-review">
-      <div className="review-card">
-        <div className="review-header">
-          <h2><FaFileInvoice /> Confirmación de Pedido</h2>
-          <div className="success-icon">
+    <div className="orw-container">
+      <div className="orw-card">
+        <div className="orw-header">
+          <div className="orw-icon-container">
+            <FaFileInvoice className="orw-main-icon" />
+          </div>
+          <h2 className="orw-title">Confirmación de Pedido</h2>
+          <div className="orw-success-icon">
             <FaCheckCircle />
           </div>
         </div>
         
-        <div className="review-content">
-          <p>
+        <div className="orw-content">
+          <p className="orw-message">
             Su pedido de suministros dentales <strong>#{seriePedido}-{orderId}</strong><br />
             ha sido registrado exitosamente en nuestro sistema.
           </p>
           
           {deliveryDate && (
-            <div className="delivery-info">
-              <FaCalendarCheck />
-              <span>
-                <strong>Fecha solicitada:</strong> {new Date(deliveryDate).toLocaleDateString()}
-              </span>
+            <div className="orw-delivery-info">
+              <FaCalendarCheck className="orw-delivery-icon" />
+              <div className="orw-delivery-content">
+                <span className="orw-delivery-label">Fecha solicitada:</span>
+                <span className="orw-delivery-date">{new Date(deliveryDate).toLocaleDateString()}</span>
+              </div>
             </div>
           )}
           
-          <p>
+          <p className="orw-confirmation-message">
             Recibirá una confirmación por correo electrónico con<br />
             los detalles de su pedido y seguimiento.
           </p>
         </div>
         
-        <div className="review-actions">
+        <div className="orw-actions">
           <button 
             onClick={() => navigate('/crear-pedido')} 
-            className="action-button another-order"
+            className="orw-button orw-primary-button"
           >
-            <FaShoppingCart /> Nuevo Pedido
+            <FaShoppingCart className="orw-button-icon" />
+            Nuevo Pedido
           </button>
           <button 
             onClick={() => navigate('/mis-pedidos')} 
-            className="action-button view-orders"
+            className="orw-button orw-secondary-button"
           >
-            <FaArrowLeft /> Ver Historial
+            <FaArrowLeft className="orw-button-icon" />
+            Ver Historial
           </button>
+        </div>
+
+        <div className="orw-footer">
+          <p className="orw-footer-text">
+            ¿Necesita ayuda? <a href="#" className="orw-footer-link">Contacte con soporte</a>
+          </p>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import React, { useContext, useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { FaUser, FaPowerOff, FaCaretDown } from 'react-icons/fa';
+import { FaUser, FaPowerOff, FaCaretDown, FaHome, FaBox, FaShoppingCart, FaChartBar, FaCrown } from 'react-icons/fa';
 import '../styles/Navbar.css';
 
 const Navbar = () => {
@@ -36,35 +36,41 @@ const Navbar = () => {
     <nav className="nv-navbar">
       <div className="nv-left">
         <h1 className="nv-app-title">Gestor de Pedidos</h1>
+        <span className="nv-app-subtitle">Sage200 Integration</span>
       </div>
 
       <div className="nv-center">
         <ul className="nv-links">
           <li className="nv-link-item">
             <Link to="/" className={`nv-link ${isActive('/') ? 'nv-active' : ''}`}>
-              <span className="nv-icon">🏠</span> Inicio
+              <FaHome className="nv-icon" />
+              <span className="nv-link-text">Inicio</span>
             </Link>
           </li>
           <li className="nv-link-item">
             <Link to="/catalogo" className={`nv-link ${isActive('/catalogo') ? 'nv-active' : ''}`}>
-              <span className="nv-icon">📦</span> Catálogo
+              <FaBox className="nv-icon" />
+              <span className="nv-link-text">Catálogo</span>
             </Link>
           </li>
           <li className="nv-link-item">
             <Link to="/crear-pedido" className={`nv-link ${isActive('/crear-pedido') ? 'nv-active' : ''}`}>
-              <span className="nv-icon">🛒</span> Nuevo Pedido
+              <FaShoppingCart className="nv-icon" />
+              <span className="nv-link-text">Nuevo Pedido</span>
             </Link>
           </li>
           <li className="nv-link-item">
             <Link to="/mis-pedidos" className={`nv-link ${isActive('/mis-pedidos') ? 'nv-active' : ''}`}>
-              <span className="nv-icon">📊</span> Historial
+              <FaChartBar className="nv-icon" />
+              <span className="nv-link-text">Historial</span>
             </Link>
           </li>
           
           {user?.isAdmin && (
             <li className="nv-link-item">
               <Link to="/admin/orders" className={`nv-link ${isActive('/admin/orders') ? 'nv-active' : ''}`}>
-                <span className="nv-icon">👑</span> Administración
+                <FaCrown className="nv-icon" />
+                <span className="nv-link-text">Administración</span>
               </Link>
             </li>
           )}
@@ -76,16 +82,25 @@ const Navbar = () => {
           className="nv-user-section" 
           onClick={() => setDropdownOpen(!dropdownOpen)}
         >
-          <div className="nv-user-icon">
-            <FaUser />
+          <div className="nv-user-avatar">
+            <FaUser className="nv-user-icon" />
           </div>
-          <span className="nv-username">{user?.username || 'Usuario'}</span>
-          <FaCaretDown className="nv-caret" />
+          <div className="nv-user-info">
+            <span className="nv-username">{user?.username || 'Usuario'}</span>
+            <span className="nv-user-role">{user?.isAdmin ? 'Administrador' : 'Usuario'}</span>
+          </div>
+          <FaCaretDown className={`nv-caret ${dropdownOpen ? 'nv-caret-up' : ''}`} />
           
           {dropdownOpen && (
             <div className="nv-dropdown">
+              <div className="nv-dropdown-header">
+                <span className="nv-dropdown-username">{user?.username}</span>
+                <span className="nv-dropdown-email">{user?.email || user?.username}</span>
+              </div>
+              <div className="nv-dropdown-divider"></div>
               <button className="nv-logout-button" onClick={handleLogout}>
-                <FaPowerOff className="nv-logout-icon" /> Cerrar Sesión
+                <FaPowerOff className="nv-logout-icon" />
+                <span>Cerrar Sesión</span>
               </button>
             </div>
           )}

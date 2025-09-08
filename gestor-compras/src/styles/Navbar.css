@@ -2,87 +2,173 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(90deg, #004d40, #00796b);
-  padding: 0 2rem;
-  height: 70px;
+  background: linear-gradient(135deg, #1a3c34 0%, #2e7d67 100%);
+  padding: 0 2.5rem;
+  height: 80px;
   position: sticky;
   top: 0;
   z-index: 1000;
-  font-family: 'Inter', sans-serif;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.nv-left, .nv-center, .nv-right {
+.nv-left {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .nv-app-title {
   margin: 0;
   color: #ffffff;
-  font-size: 1.4rem;
-  font-weight: 600;
+  font-size: 1.6rem;
+  font-weight: 700;
   letter-spacing: 0.5px;
+}
+
+.nv-app-subtitle {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
+  font-weight: 400;
+  margin-top: 0.2rem;
 }
 
 .nv-center {
   flex: 1;
+  display: flex;
   justify-content: center;
 }
 
 .nv-links {
   display: flex;
-  gap: 1.5rem;
+  gap: 0.5rem;
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
+.nv-link-item {
+  display: flex;
+}
+
 .nv-link {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.8rem;
   color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
   font-size: 1rem;
   font-weight: 500;
-  padding: 0.8rem 1.2rem;
-  border-radius: 8px;
-  transition: all 0.3s ease;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
 }
 
-.nv-link:hover, .nv-active {
-  background: rgba(255, 255, 255, 0.15);
+.nv-link::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.nv-link:hover::before,
+.nv-active::before {
+  opacity: 1;
+}
+
+.nv-link:hover,
+.nv-active {
   color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .nv-icon {
-  font-size: 1.3rem;
+  font-size: 1.2rem;
+  transition: transform 0.3s ease;
+}
+
+.nv-link:hover .nv-icon,
+.nv-active .nv-icon {
+  transform: scale(1.1);
+}
+
+.nv-link-text {
+  position: relative;
+  z-index: 1;
+}
+
+.nv-right {
+  position: relative;
 }
 
 .nv-user-section {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
-  position: relative;
+  gap: 1rem;
   color: #ffffff;
   cursor: pointer;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  transition: background 0.3s;
+  padding: 0.8rem 1.2rem;
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
 }
 
 .nv-user-section:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+}
+
+.nv-user-avatar {
+  width: 45px;
+  height: 45px;
+  background: linear-gradient(135deg, #4ca788 0%, #2e7d67 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
 .nv-user-icon {
-  font-size: 1.4rem;
+  font-size: 1.2rem;
+  color: #ffffff;
+}
+
+.nv-user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .nv-username {
   font-size: 1rem;
-  font-weight: 500;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.nv-user-role {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 400;
+}
+
+.nv-caret {
+  font-size: 1.1rem;
+  transition: transform 0.3s ease;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.nv-caret-up {
+  transform: rotate(180deg);
 }
 
 .nv-dropdown {
@@ -90,48 +176,115 @@
   top: 100%;
   right: 0;
   background: #ffffff;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
-  border-radius: 8px;
-  min-width: 200px;
-  display: none;
-  z-index: 10;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  border-radius: 16px;
+  min-width: 250px;
+  z-index: 1001;
   overflow: hidden;
+  margin-top: 0.8rem;
+  border: 1px solid #f3f4f6;
+  animation: nv-dropdown-fade 0.3s ease;
 }
 
-.nv-user-section:hover .nv-dropdown {
+@keyframes nv-dropdown-fade {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nv-dropdown-header {
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.nv-dropdown-username {
   display: block;
+  font-weight: 600;
+  color: #1a3c34;
+  margin-bottom: 0.3rem;
+  font-size: 1.1rem;
+}
+
+.nv-dropdown-email {
+  display: block;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.nv-dropdown-divider {
+  height: 1px;
+  background: #f3f4f6;
 }
 
 .nv-logout-button {
   width: 100%;
-  padding: 1rem;
+  padding: 1.2rem 1.5rem;
   background: none;
   border: none;
   text-align: left;
   font-size: 1rem;
-  color: #424242;
+  color: #dc2626;
   display: flex;
   align-items: center;
   gap: 0.8rem;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
   cursor: pointer;
 }
 
 .nv-logout-button:hover {
-  background: #f5f5f5;
-  color: #d32f2f;
+  background: #fef2f2;
 }
 
 .nv-logout-icon {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
 }
 
-@media (max-width: 992px) {
+@media (max-width: 1024px) {
+  .nv-navbar {
+    padding: 0 1.5rem;
+  }
+  
+  .nv-links {
+    gap: 0.3rem;
+  }
+  
+  .nv-link {
+    padding: 1rem 1.2rem;
+    font-size: 0.9rem;
+  }
+  
+  .nv-link-text {
+    display: none;
+  }
+  
+  .nv-icon {
+    font-size: 1.4rem;
+    margin: 0;
+  }
+  
+  .nv-user-info {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
   .nv-navbar {
     flex-direction: column;
     height: auto;
     padding: 1rem;
     gap: 1rem;
+  }
+  
+  .nv-left {
+    order: 1;
+    align-items: center;
+    text-align: center;
   }
   
   .nv-center {
@@ -140,27 +293,80 @@
     margin-top: 1rem;
   }
   
+  .nv-right {
+    order: 2;
+    margin-left: auto;
+  }
+  
   .nv-links {
     flex-wrap: wrap;
     justify-content: center;
-  }
-  
-  .nv-right {
-    margin-left: auto;
-  }
-}
-
-@media (max-width: 576px) {
-  .nv-links {
     gap: 0.5rem;
   }
   
   .nv-link {
-    padding: 0.6rem;
-    font-size: 0.9rem;
+    padding: 0.8rem 1rem;
+  }
+  
+  .nv-link-text {
+    display: block;
+  }
+  
+  .nv-user-info {
+    display: flex;
+  }
+}
+
+@media (max-width: 480px) {
+  .nv-app-title {
+    font-size: 1.4rem;
+  }
+  
+  .nv-links {
+    gap: 0.2rem;
+  }
+  
+  .nv-link {
+    padding: 0.7rem 0.9rem;
+    font-size: 0.8rem;
+  }
+  
+  .nv-link-text {
+    font-size: 0.8rem;
   }
   
   .nv-icon {
+    font-size: 1.1rem;
+  }
+  
+  .nv-user-section {
+    padding: 0.6rem;
+  }
+  
+  .nv-user-avatar {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .nv-username {
+    font-size: 0.9rem;
+  }
+  
+  .nv-user-role {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .nv-link-text {
+    display: none;
+  }
+  
+  .nv-icon {
+    font-size: 1.3rem;
+  }
+  
+  .nv-user-info {
     display: none;
   }
 }

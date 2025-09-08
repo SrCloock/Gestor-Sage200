@@ -20,7 +20,7 @@ const OrderDetail = () => {
         const response = await api.get(`/api/orders/${orderId}`, {
           params: {
             codigoCliente: user?.codigoCliente,
-            seriePedido: 'Web' 
+            seriePedido: 'Web'
           }
         });
         setOrder(response.data.order);
@@ -37,96 +37,134 @@ const OrderDetail = () => {
     }
   }, [orderId, user]);
 
-  if (loading) return <div className="loading">Cargando detalles del pedido...</div>;
-  if (error) return <div className="error">{error}</div>;
-  if (!order) return <div>No se encontró el pedido</div>;
+  if (loading) return (
+    <div className="od-loading-container">
+      <div className="od-spinner"></div>
+      <p>Cargando detalles del pedido...</p>
+    </div>
+  );
+
+  if (error) return (
+    <div className="od-error-container">
+      <div className="od-error-icon">⚠️</div>
+      <p>{error}</p>
+    </div>
+  );
+
+  if (!order) return (
+    <div className="od-not-found">
+      <div className="od-not-found-icon">❌</div>
+      <h3>No se encontró el pedido</h3>
+      <p>El pedido solicitado no existe o no tienes permisos para verlo</p>
+    </div>
+  );
 
   return (
-    <div className="order-detail-container">
-      <button onClick={() => navigate(-1)} className="back-button">
-        &larr; Volver al Historial
+    <div className="od-container">
+      <button onClick={() => navigate(-1)} className="od-back-button">
+        ← Volver al Historial
       </button>
       
-      <div className="order-header">
-        <h2>Pedido #{order.NumeroPedido}</h2>
-        <span className={`status-badge ${order.Estado === 'Preparando' ? 'preparing' : 'served'}`}>
-          {order.Estado}
-        </span>
+      <div className="od-header">
+        <div className="od-title-section">
+          <h2>Pedido #{order.NumeroPedido}</h2>
+          <span className={`od-status-badge ${order.Estado === 'Preparando' ? 'od-status-preparing' : 'od-status-served'}`}>
+            {order.Estado}
+          </span>
+        </div>
+        <p className="od-order-date">
+          Realizado el {new Date(order.FechaPedido).toLocaleDateString()}
+        </p>
       </div>
       
-      <div className="order-info-grid">
-        <div className="info-card">
-          <h3>Información General</h3>
-          <div className="info-row">
-            <span className="info-label">Fecha de Pedido:</span>
-            <span>{new Date(order.FechaPedido).toLocaleDateString()}</span>
+      <div className="od-info-grid">
+        <div className="od-info-card">
+          <div className="od-card-header">
+            <h3>Información General</h3>
+            <div className="od-card-icon">📦</div>
+          </div>
+          <div className="od-info-row">
+            <span className="od-info-label">Fecha de Pedido:</span>
+            <span className="od-info-value">{new Date(order.FechaPedido).toLocaleDateString()}</span>
           </div>
           {order.FechaNecesaria && (
-            <div className="info-row">
-              <span className="info-label">Fecha Necesaria:</span>
-              <span>{new Date(order.FechaNecesaria).toLocaleDateString()}</span>
+            <div className="od-info-row">
+              <span className="od-info-label">Fecha Necesaria:</span>
+              <span className="od-info-value">{new Date(order.FechaNecesaria).toLocaleDateString()}</span>
             </div>
           )}
-          <div className="info-row">
-            <span className="info-label">Total Artículos:</span>
-            <span>{order.Productos.length}</span>
+          <div className="od-info-row">
+            <span className="od-info-label">Total Artículos:</span>
+            <span className="od-info-value">{order.Productos.length}</span>
           </div>
         </div>
         
-        <div className="info-card">
-          <h3>Información del Cliente</h3>
-          <div className="info-row">
-            <span className="info-label">Razón Social:</span>
-            <span>{order.RazonSocial}</span>
+        <div className="od-info-card">
+          <div className="od-card-header">
+            <h3>Información del Cliente</h3>
+            <div className="od-card-icon">👤</div>
           </div>
-          <div className="info-row">
-            <span className="info-label">CIF/DNI:</span>
-            <span>{order.CifDni || 'No disponible'}</span>
+          <div className="od-info-row">
+            <span className="od-info-label">Razón Social:</span>
+            <span className="od-info-value">{order.RazonSocial}</span>
           </div>
-          <div className="info-row">
-            <span className="info-label">Dirección:</span>
-            <span>
+          <div className="od-info-row">
+            <span className="od-info-label">CIF/DNI:</span>
+            <span className="od-info-value">{order.CifDni || 'No disponible'}</span>
+          </div>
+          <div className="od-info-row">
+            <span className="od-info-label">Dirección:</span>
+            <span className="od-info-value">
               {order.Domicilio}, {order.CodigoPostal} {order.Municipio}, {order.Provincia}
             </span>
           </div>
         </div>
       </div>
       
-      <div className="order-actions">
+      <div className="od-actions">
         {order.Estado === 'Preparando' && (
           <button 
             onClick={() => navigate(`/mis-pedidos/${orderId}/recepcion`)}
-            className="reception-button"
+            className="od-action-button od-primary-button"
           >
             Confirmar Recepción
           </button>
         )}
       </div>
 
-      <h3 className="products-title">Artículos del Pedido</h3>
-      <div className="products-table-container">
-        <table className="products-table">
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Descripción</th>
-              <th>Cantidad</th>
-              <th>Precio Unitario</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {order.Productos.map((product, index) => (
-              <tr key={index}>
-                <td>{product.CodigoArticulo}</td>
-                <td>{product.DescripcionArticulo}</td>
-                <td>{product.UnidadesPedidas}</td>
-                <td>{product.Precio ? product.Precio.toFixed(2) + ' €' : '-'}</td>
-                <td>{product.ImporteLiquido ? product.ImporteLiquido.toFixed(2) + ' €' : '-'}</td>
+      <div className="od-products-section">
+        <div className="od-section-header">
+          <h3>Artículos del Pedido</h3>
+          <span className="od-items-count">{order.Productos.length} productos</span>
+        </div>
+        <div className="od-table-container">
+          <table className="od-products-table">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Descripción</th>
+                <th>Cantidad</th>
+                <th>Precio Unitario</th>
+                <th>Total</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {order.Productos.map((product, index) => (
+                <tr key={index} className="od-product-row">
+                  <td className="od-product-code">{product.CodigoArticulo}</td>
+                  <td className="od-product-description">{product.DescripcionArticulo}</td>
+                  <td className="od-product-quantity">{product.UnidadesPedidas}</td>
+                  <td className="od-product-price">
+                    {product.Precio ? `${product.Precio.toFixed(2)} €` : '-'}
+                  </td>
+                  <td className="od-product-total">
+                    {product.ImporteLiquido ? `${product.ImporteLiquido.toFixed(2)} €` : '-'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

@@ -13,7 +13,6 @@ const OrderList = () => {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  // Fetch orders
   useEffect(() => {
     const fetchOrders = async () => {
       try {
@@ -39,7 +38,6 @@ const OrderList = () => {
     }
   }, [user]);
 
-  // Filter and sort orders
   const filteredOrders = useMemo(() => {
     let result = [...orders];
     
@@ -66,13 +64,11 @@ const OrderList = () => {
     return result;
   }, [searchTerm, sortBy, orders]);
 
-  // Handlers
   const handleViewDetails = (orderId, seriePedido) => {
     navigate(`/mis-pedidos/${orderId}`, { state: { seriePedido } });
   };
 
   const handleEditOrder = (orderId, seriePedido) => {
-    // Solo permitir editar pedidos en preparación (Estado = 0)
     const order = orders.find(o => o.NumeroPedido === orderId);
     if (order && order.Estado === 'Preparando') {
       navigate(`/editar-pedido/${orderId}`, { state: { seriePedido } });
@@ -80,25 +76,28 @@ const OrderList = () => {
   };
 
   if (loading) return (
-    <div className="ol-loading">
+    <div className="ol-loading-container">
       <div className="ol-spinner"></div>
       <p>Cargando pedidos...</p>
     </div>
   );
 
   if (error) return (
-    <div className="ol-error">
-      <div className="ol-error-icon">!</div>
+    <div className="ol-error-container">
+      <div className="ol-error-icon">⚠️</div>
       <p>{error}</p>
     </div>
   );
 
   return (
     <div className="ol-container">
-      <h2 className="ol-title">Historial de Pedidos</h2>
+      <div className="ol-header">
+        <h2 className="ol-title">Historial de Pedidos</h2>
+        <p className="ol-subtitle">Gestiona y revisa tus pedidos realizados</p>
+      </div>
       
-      <div className="ol-controls">
-        <div className="ol-search-box">
+      <div className="ol-controls-panel">
+        <div className="ol-search-container">
           <input
             type="text"
             placeholder="Buscar por #Pedido..."
@@ -109,15 +108,15 @@ const OrderList = () => {
           <span className="ol-search-icon">🔍</span>
         </div>
         
-        <div className="ol-sort-options">
-          <label className="ol-sort-label">Ordenar por:</label>
+        <div className="ol-filter-container">
+          <label className="ol-filter-label">Ordenar por:</label>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="ol-sort-select"
+            className="ol-filter-select"
           >
-            <option value="recent">Más recientes primero</option>
-            <option value="oldest">Más antiguos primero</option>
+            <option value="recent">Más recientes</option>
+            <option value="oldest">Más antiguos</option>
             <option value="id-asc">#Pedido (ascendente)</option>
             <option value='id-desc'>#Pedido (descendente)</option>
           </select>
@@ -125,13 +124,13 @@ const OrderList = () => {
       </div>
       
       {filteredOrders.length === 0 ? (
-        <div className="ol-no-orders">
-          <div className="ol-no-orders-icon">📭</div>
+        <div className="ol-empty-state">
+          <div className="ol-empty-icon">📭</div>
           <h3>No se encontraron pedidos</h3>
           <p>No hay pedidos que coincidan con los filtros aplicados</p>
         </div>
       ) : (
-        <div className="ol-orders-table-container">
+        <div className="ol-table-container">
           <table className="ol-orders-table">
             <thead>
               <tr>
@@ -145,7 +144,7 @@ const OrderList = () => {
             </thead>
             <tbody>
               {filteredOrders.map(order => (
-                <tr key={`${order.SeriePedido}-${order.NumeroPedido}`} className="ol-order-row">
+                <tr key={`${order.SeriePedido}-${order.NumeroPedido}`} className="ol-table-row">
                   <td className="ol-order-id">{order.NumeroPedido}</td>
                   <td className="ol-order-date">{new Date(order.FechaPedido).toLocaleDateString()}</td>
                   <td className="ol-delivery-date">
@@ -155,22 +154,22 @@ const OrderList = () => {
                   </td>
                   <td className="ol-items-count">{order.NumeroLineas}</td>
                   <td>
-                    <span className={`ol-status-badge ${order.Estado === 'Preparando' ? 'ol-preparing' : 'ol-served'}`}>
+                    <span className={`ol-status-badge ${order.Estado === 'Preparando' ? 'ol-status-preparing' : 'ol-status-served'}`}>
                       {order.Estado}
                     </span>
                   </td>
                   <td>
-                    <div className="ol-actions-container">
+                    <div className="ol-actions">
                       <button 
                         onClick={() => handleViewDetails(order.NumeroPedido, order.SeriePedido)}
-                        className="ol-view-button"
+                        className="ol-btn ol-btn-primary"
                       >
                         Ver Detalle
                       </button>
                       {order.Estado === 'Preparando' && (
                         <button 
                           onClick={() => handleEditOrder(order.NumeroPedido, order.SeriePedido)}
-                          className="ol-edit-button"
+                          className="ol-btn ol-btn-secondary"
                         >
                           Editar
                         </button>

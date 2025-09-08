@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { FaArrowLeft, FaArrowRight } from 'react-icons/fa';
+import { FaArrowLeft, FaArrowRight, FaPlus } from 'react-icons/fa';
 import '../styles/ProductGrid.css';
 
 const ProductGrid = memo(({ 
@@ -47,23 +47,28 @@ const ProductGrid = memo(({
                   e.target.className = 'pg-product-image pg-default-image';
                 }}
               />
-            </div>
-
-            <div className="pg-product-header">
-              <h3 className="pg-product-name">{product.DescripcionArticulo}</h3>
-              <span className="pg-product-code">{product.CodigoArticulo}</span>
-            </div>
-
-            {product.NombreProveedor && (
-              <div className="pg-product-supplier">
-                <span>Proveedor:</span> {product.NombreProveedor}
+              <div className="pg-product-overlay">
+                <FaPlus className="pg-add-icon" />
               </div>
-            )}
+            </div>
 
-            <div className="pg-product-actions">
-              <button className="pg-add-button">
-                Añadir al pedido
-              </button>
+            <div className="pg-product-content">
+              <div className="pg-product-header">
+                <h3 className="pg-product-name">{product.DescripcionArticulo}</h3>
+                <span className="pg-product-code">{product.CodigoArticulo}</span>
+              </div>
+
+              {product.NombreProveedor && (
+                <div className="pg-product-supplier">
+                  <span>Proveedor:</span> {product.NombreProveedor}
+                </div>
+              )}
+
+              <div className="pg-product-actions">
+                <button className="pg-add-button">
+                  Añadir al pedido
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -82,7 +87,7 @@ const ProductGrid = memo(({
           <button
             onClick={() => onPageChange(currentPage - 1)}
             disabled={currentPage === 1}
-            className="pg-pagination-button"
+            className="pg-pagination-button pg-pagination-prev"
           >
             <FaArrowLeft />
           </button>
@@ -91,7 +96,7 @@ const ProductGrid = memo(({
             <button
               key={index}
               onClick={() => page !== '...' && onPageChange(page)}
-              className={`pg-pagination-button ${currentPage === page ? 'pg-active' : ''}`}
+              className={`pg-pagination-button ${currentPage === page ? 'pg-active' : ''} ${page === '...' ? 'pg-ellipsis' : ''}`}
               disabled={page === '...'}
             >
               {page}
@@ -101,7 +106,7 @@ const ProductGrid = memo(({
           <button
             onClick={() => onPageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
-            className="pg-pagination-button"
+            className="pg-pagination-button pg-pagination-next"
           >
             <FaArrowRight />
           </button>

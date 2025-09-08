@@ -24,7 +24,6 @@ const OrderReception = () => {
         
         if (response.data.success) {
           setOrder(response.data.order);
-          // Inicializar los items para recepción
           const items = response.data.order.Productos.map(product => ({
             ...product,
             UnidadesRecibidas: product.UnidadesRecibidas || product.UnidadesPedidas,
@@ -72,13 +71,11 @@ const OrderReception = () => {
       
       if (response.data.success) {
         setSuccess('Recepción confirmada correctamente');
-        // Actualizar el estado local
         setOrder({
           ...order,
           Estado: 2
         });
         
-        // Redirigir después de 2 segundos
         setTimeout(() => {
           navigate(`/mis-pedidos/${orderId}`);
         }, 2000);
@@ -102,31 +99,74 @@ const OrderReception = () => {
   };
 
   if (loading) {
-    return <div className="reception-loading">Cargando datos del pedido...</div>;
+    return (
+      <div className="orr-loading-container">
+        <div className="orr-spinner"></div>
+        <p>Cargando datos del pedido...</p>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="reception-error">{error}</div>;
+    return (
+      <div className="orr-error-container">
+        <div className="orr-error-icon">⚠️</div>
+        <p>{error}</p>
+      </div>
+    );
   }
 
   return (
-    <div className="reception-container">
-      <div className="reception-header">
-        <h2>Confirmar Recepción del Pedido #{order.NumeroPedido}</h2>
-        <div className="reception-status">
-          Estado: <span className={`status-${order.Estado}`}>
-            {getReceptionStatusText(order.Estado)}
-          </span>
+    <div className="orr-container">
+      <div className="orr-header">
+        <div className="orr-title-section">
+          <h2>Confirmar Recepción del Pedido #{order.NumeroPedido}</h2>
+          <div className="orr-status">
+            Estado: <span className={`orr-status-badge orr-status-${order.Estado}`}>
+              {getReceptionStatusText(order.Estado)}
+            </span>
+          </div>
         </div>
+        <button onClick={() => navigate(`/mis-pedidos/${orderId}`)} className="orr-back-button">
+          ← Volver al detalle
+        </button>
       </div>
 
-      <div className="reception-info">
-        <p><strong>Cliente:</strong> {order.RazonSocial}</p>
-        <p><strong>Fecha de pedido:</strong> {new Date(order.FechaPedido).toLocaleDateString()}</p>
+      <div className="orr-info-cards">
+        <div className="orr-info-card">
+          <div className="orr-card-icon">👤</div>
+          <div className="orr-card-content">
+            <h4>Cliente</h4>
+            <p>{order.RazonSocial}</p>
+          </div>
+        </div>
+        
+        <div className="orr-info-card">
+          <div className="orr-card-icon">📅</div>
+          <div className="orr-card-content">
+            <h4>Fecha de pedido</h4>
+            <p>{new Date(order.FechaPedido).toLocaleDateString()}</p>
+          </div>
+        </div>
+        
+        {order.FechaNecesaria && (
+          <div className="orr-info-card">
+            <div className="orr-card-icon">🚚</div>
+            <div className="orr-card-content">
+              <h4>Fecha necesaria</h4>
+              <p>{new Date(order.FechaNecesaria).toLocaleDateString()}</p>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="reception-table-container">
-        <table className="reception-table">
+      <div className="orr-table-container">
+        <div className="orr-table-header">
+          <h3>Artículos del Pedido</h3>
+          <p>Confirme las cantidades recibidas y agregue comentarios si es necesario</p>
+        </div>
+        
+        <table className="orr-reception-table">
           <thead>
             <tr>
               <th>Artículo</th>
@@ -138,11 +178,11 @@ const OrderReception = () => {
           </thead>
           <tbody>
             {receptionItems.map((item, index) => (
-              <tr key={index} className={item.UnidadesRecibidas !== item.UnidadesPedidas ? 'partial-reception' : ''}>
-                <td>{item.DescripcionArticulo}</td>
-                <td>{item.CodigoArticulo}</td>
-                <td>{item.UnidadesPedidas}</td>
-                <td>
+              <tr key={index} className={item.UnidadesRecibidas !== item.UnidadesPedidas ? 'orr-partial-reception' : ''}>
+                <td className="orr-item-description">{item.DescripcionArticulo}</td>
+                <td className="orr-item-code">{item.CodigoArticulo}</td>
+                <td className="orr-item-ordered">{item.UnidadesPedidas}</td>
+                <td className="orr-item-received">
                   <input
                     type="number"
                     min="0"
@@ -150,15 +190,17 @@ const OrderReception = () => {
                     value={item.UnidadesRecibidas}
                     onChange={(e) => handleQuantityChange(index, e.target.value)}
                     disabled={order.Estado === 2}
+                    className="orr-quantity-input"
                   />
                 </td>
-                <td>
+                <td className="orr-item-comments">
                   <input
                     type="text"
                     placeholder="Comentarios sobre la recepción"
                     value={item.ComentarioRecepcion}
                     onChange={(e) => handleCommentChange(index, e.target.value)}
                     disabled={order.Estado === 2}
+                    className="orr-comment-input"
                   />
                 </td>
               </tr>
@@ -167,12 +209,17 @@ const OrderReception = () => {
         </table>
       </div>
 
-      {success && <div className="reception-success">{success}</div>}
+      {success && (
+        <div className="orr-success-message">
+          <div className="orr-success-icon">✅</div>
+          <p>{success}</p>
+        </div>
+      )}
 
-      <div className="reception-actions">
+      <div className="orr-actions">
         <button 
           onClick={() => navigate(`/mis-pedidos/${orderId}`)}
-          className="back-button"
+          className="orr-button orr-secondary-button"
         >
           Volver al detalle
         </button>
@@ -181,9 +228,16 @@ const OrderReception = () => {
           <button 
             onClick={handleSubmit}
             disabled={submitting}
-            className="confirm-button"
+            className="orr-button orr-primary-button"
           >
-            {submitting ? 'Confirmando...' : 'Confirmar Recepción'}
+            {submitting ? (
+              <>
+                <div className="orr-button-spinner"></div>
+                Confirmando...
+              </>
+            ) : (
+              'Confirmar Recepción'
+            )}
           </button>
         )}
       </div>
