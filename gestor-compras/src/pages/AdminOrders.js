@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import { FaSync, FaEye, FaCheckCircle, FaTimes } from 'react-icons/fa';
+import { FaSync, FaEye, FaCheckCircle, FaTimes, FaFilter, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
 import '../styles/AdminOrders.css';
 
 const AdminOrders = () => {
@@ -11,19 +11,52 @@ const AdminOrders = () => {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const { user } = useContext(AuthContext);
+  
+  // Estados para filtros y paginación
+  const [filtros, setFiltros] = useState({
+    cliente: '',
+    estado: '',
+    fechaDesde: '',
+    fechaHasta: ''
+  });
+  
+  const [ordenamiento, setOrdenamiento] = useState({
+    campo: 'FechaPedido',
+    direccion: 'DESC'
+  });
+  
+  const [paginacion, setPaginacion] = useState({
+    pagina: 1,
+    porPagina: 10,
+    total: 0,
+    totalPaginas: 0
+  });
+  
+  const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
   useEffect(() => {
     if (user && user.isAdmin) {
       fetchPendingOrders();
     }
-  }, [user]);
+  }, [user, paginacion.pagina, paginacion.porPagina, ordenamiento, filtros]);
 
   const fetchPendingOrders = async () => {
     try {
       setLoading(true);
       setError('');
       
-      const response = await fetch('http://localhost:5000/api/admin/orders/pending', {
+      const params = new URLSearchParams({
+        page: paginacion.pagina,
+        limit: paginacion.porPagina,
+        ordenarPor: ordenamiento.campo,
+        orden: ordenamiento.direccion,
+        ...(filtros.cliente && { cliente: filtros.cliente }),
+        ...(filtros.estado !== '' && { estado: filtros.estado }),
+        ...(filtros.fechaDesde && { fechaDesde: filtros.fechaDesde }),
+        ...(filtros.fechaHasta && { fechaHasta: filtros.fechaHasta })
+      }).toString();
+
+      const response = await fetch(`http://localhost:5000/api/admin/orders/pending?${params}`, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -41,6 +74,11 @@ const AdminOrders = () => {
       
       if (data.success) {
         setOrders(data.orders);
+        setPaginacion(prev => ({
+          ...prev,
+          total: data.paginacion.total,
+          totalPaginas: data.paginacion.totalPaginas
+        }));
       } else {
         setError(data.message || 'Error al cargar los pedidos');
       }
@@ -125,6 +163,57 @@ const AdminOrders = () => {
     }
   };
 
+  const handleFiltroChange = (e) => {
+    const { name, value } = e.target;
+    setFiltros(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const aplicarFiltros = () => {
+    setPaginacion(prev => ({ ...prev, pagina: 1 }));
+    // No es necesario llamar a fetchPendingOrders porque el useEffect se disparará con el cambio de estado
+  };
+
+  const limpiarFiltros = () => {
+    setFiltros({
+      cliente: '',
+      estado: '',
+      fechaDesde: '',
+      fechaHasta: ''
+    });
+    setPaginacion(prev => ({ ...prev, pagina: 1 }));
+  };
+
+  const cambiarOrdenamiento = (campo) => {
+    if (ordenamiento.campo === campo) {
+      setOrdenamiento(prev => ({
+        campo,
+        direccion: prev.direccion === 'ASC' ? 'DESC' : 'ASC'
+      }));
+    } else {
+      setOrdenamiento({
+        campo,
+        direccion: 'DESC'
+      });
+    }
+  };
+
+  const cambiarPagina = (nuevaPagina) => {
+    if (nuevaPagina >= 1 && nuevaPagina <= paginacion.totalPaginas) {
+      setPaginacion(prev => ({ ...prev, pagina: nuevaPagina }));
+    }
+  };
+
+  const cambiarItemsPorPagina = (cantidad) => {
+    setPaginacion(prev => ({ 
+      ...prev, 
+      porPagina: cantidad,
+      pagina: 1
+    }));
+  };
+
   const generateProductKey = (product, index) => {
     return `${product.Orden}-${product.CodigoArticulo}-${product.CodigoProveedor || 'no-prov'}-${index}`;
   };
@@ -140,6 +229,13 @@ const AdminOrders = () => {
       style: 'currency',
       currency: 'EUR'
     }).format(amount || 0);
+  };
+
+  const renderSortIcon = (campo) => {
+    if (ordenamiento.campo !== campo) return <FaSort className="ao-sort-icon" />;
+    return ordenamiento.direccion === 'ASC' 
+      ? <FaSortUp className="ao-sort-icon" /> 
+      : <FaSortDown className="ao-sort-icon" />;
   };
 
   if (!user || !user.isAdmin) {
@@ -162,6 +258,13 @@ const AdminOrders = () => {
           <p>Gestión de pedidos pendientes de aprobación</p>
         </div>
         <div className="ao-header-actions">
+          <button 
+            onClick={() => setMostrarFiltros(!mostrarFiltros)} 
+            className="ao-filter-btn"
+          >
+            <FaFilter className="ao-filter-icon" />
+            Filtros
+          </button>
           <button onClick={fetchPendingOrders} className="ao-refresh-btn">
             <FaSync className="ao-refresh-icon" />
             Actualizar
@@ -183,6 +286,67 @@ const AdminOrders = () => {
         </div>
       )}
       
+      {mostrarFiltros && (
+        <div className="ao-filtros-panel">
+          <h3>Filtrar Pedidos</h3>
+          <div className="ao-filtros-grid">
+            <div className="ao-filtro-group">
+              <label>Cliente:</label>
+              <input
+                type="text"
+                name="cliente"
+                value={filtros.cliente}
+                onChange={handleFiltroChange}
+                placeholder="Buscar por nombre de cliente"
+              />
+            </div>
+            
+            <div className="ao-filtro-group">
+              <label>Estado:</label>
+              <select
+                name="estado"
+                value={filtros.estado}
+                onChange={handleFiltroChange}
+              >
+                <option value="">Todos los estados</option>
+                <option value="0">Pendiente</option>
+                <option value="-1">Aprobado</option>
+                <option value="1">Servido/Completado</option>
+              </select>
+            </div>
+            
+            <div className="ao-filtro-group">
+              <label>Fecha desde:</label>
+              <input
+                type="date"
+                name="fechaDesde"
+                value={filtros.fechaDesde}
+                onChange={handleFiltroChange}
+              />
+            </div>
+            
+            <div className="ao-filtro-group">
+              <label>Fecha hasta:</label>
+              <input
+                type="date"
+                name="fechaHasta"
+                value={filtros.fechaHasta}
+                onChange={handleFiltroChange}
+              />
+            </div>
+          </div>
+          
+          <div className="ao-filtros-acciones">
+            <button onClick={aplicarFiltros} className="ao-aplicar-btn">
+              Aplicar Filtros
+            </button>
+            <button onClick={limpiarFiltros} className="ao-limpiar-btn">
+              Limpiar Filtros
+            </button>
+          </div>
+        </div>
+      )}
+      
       {loading ? (
         <div className="ao-loading">
           <div className="ao-spinner"></div>
@@ -194,8 +358,8 @@ const AdminOrders = () => {
             <div className="ao-stat-card">
               <div className="ao-stat-icon">📦</div>
               <div className="ao-stat-content">
-                <span className="ao-stat-value">{orders.length}</span>
-                <span className="ao-stat-label">Pedidos pendientes</span>
+                <span className="ao-stat-value">{paginacion.total}</span>
+                <span className="ao-stat-label">Total pedidos</span>
               </div>
             </div>
             <div className="ao-stat-card">
@@ -205,26 +369,58 @@ const AdminOrders = () => {
                 <span className="ao-stat-label">Urgentes</span>
               </div>
             </div>
+            <div className="ao-stat-card">
+              <div className="ao-stat-icon">✅</div>
+              <div className="ao-stat-content">
+                <span className="ao-stat-value">{orders.filter(o => o.StatusAprobado === -1).length}</span>
+                <span className="ao-stat-label">Aprobados</span>
+              </div>
+            </div>
           </div>
           
           <div className="ao-table-container">
             {orders.length === 0 ? (
               <div className="ao-empty-state">
                 <div className="ao-empty-icon">📭</div>
-                <h3>No hay pedidos pendientes</h3>
-                <p>Todos los pedidos han sido procesados correctamente.</p>
+                <h3>No hay pedidos</h3>
+                <p>No se encontraron pedidos con los filtros aplicados.</p>
               </div>
             ) : (
               <table className="ao-orders-table">
                 <thead>
                   <tr>
-                    <th>Nº Pedido</th>
-                    <th>Fecha</th>
-                    <th>Cliente</th>
+                    <th>
+                      <div className="ao-order-header" onClick={() => cambiarOrdenamiento('NumeroPedido')}>
+                        Nº Pedido {renderSortIcon('NumeroPedido')}
+                      </div>
+                    </th>
+                    <th>
+                      <div className="ao-order-header" onClick={() => cambiarOrdenamiento('FechaPedido')}>
+                        Fecha {renderSortIcon('FechaPedido')}
+                      </div>
+                    </th>
+                    <th>
+                      <div className="ao-order-header" onClick={() => cambiarOrdenamiento('RazonSocial')}>
+                        Cliente {renderSortIcon('RazonSocial')}
+                      </div>
+                    </th>
                     <th>CIF/DNI</th>
-                    <th>Líneas</th>
-                    <th>Importe</th>
-                    <th>Fecha necesaria</th>
+                    <th>
+                      <div className="ao-order-header" onClick={() => cambiarOrdenamiento('NumeroLineas')}>
+                        Líneas {renderSortIcon('NumeroLineas')}
+                      </div>
+                    </th>
+                    <th>
+                      <div className="ao-order-header" onClick={() => cambiarOrdenamiento('BaseImponible')}>
+                        Importe {renderSortIcon('BaseImponible')}
+                      </div>
+                    </th>
+                    <th>
+                      <div className="ao-order-header" onClick={() => cambiarOrdenamiento('FechaNecesaria')}>
+                        Fecha necesaria {renderSortIcon('FechaNecesaria')}
+                      </div>
+                    </th>
+                    <th>Estado</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
@@ -242,6 +438,10 @@ const AdminOrders = () => {
                           {formatDate(order.FechaNecesaria)}
                         </span>
                       </td>
+                      <td className="ao-order-status">
+                        {order.StatusAprobado === 0 ? 'Pendiente' : 
+                         order.StatusAprobado === -1 ? 'Aprobado' : 'Servido'}
+                      </td>
                       <td className="ao-order-actions">
                         <button 
                           onClick={() => fetchOrderDetails(order.NumeroPedido)}
@@ -257,6 +457,74 @@ const AdminOrders = () => {
               </table>
             )}
           </div>
+          
+          {orders.length > 0 && (
+            <div className="ao-paginacion">
+              <div className="ao-paginacion-info">
+                Mostrando {((paginacion.pagina - 1) * paginacion.porPagina) + 1} - {Math.min(paginacion.pagina * paginacion.porPagina, paginacion.total)} de {paginacion.total} pedidos
+              </div>
+              
+              <div className="ao-paginacion-controles">
+                <button 
+                  onClick={() => cambiarPagina(1)} 
+                  disabled={paginacion.pagina === 1}
+                >
+                  «
+                </button>
+                <button 
+                  onClick={() => cambiarPagina(paginacion.pagina - 1)} 
+                  disabled={paginacion.pagina === 1}
+                >
+                  ‹
+                </button>
+                
+                {[...Array(Math.min(5, paginacion.totalPaginas))].map((_, i) => {
+                  const paginaNum = Math.max(1, Math.min(
+                    paginacion.totalPaginas - 4,
+                    paginacion.pagina - 2
+                  )) + i;
+                  
+                  if (paginaNum > paginacion.totalPaginas) return null;
+                  
+                  return (
+                    <button
+                      key={paginaNum}
+                      onClick={() => cambiarPagina(paginaNum)}
+                      className={paginacion.pagina === paginaNum ? 'ao-pagina-activa' : ''}
+                    >
+                      {paginaNum}
+                    </button>
+                  );
+                })}
+                
+                <button 
+                  onClick={() => cambiarPagina(paginacion.pagina + 1)} 
+                  disabled={paginacion.pagina === paginacion.totalPaginas}
+                >
+                  ›
+                </button>
+                <button 
+                  onClick={() => cambiarPagina(paginacion.totalPaginas)} 
+                  disabled={paginacion.pagina === paginacion.totalPaginas}
+                >
+                  »
+                </button>
+              </div>
+              
+              <div className="ao-items-por-pagina">
+                <label>Mostrar:</label>
+                <select
+                  value={paginacion.porPagina}
+                  onChange={(e) => cambiarItemsPorPagina(parseInt(e.target.value))}
+                >
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
+            </div>
+          )}
         </>
       )}
       

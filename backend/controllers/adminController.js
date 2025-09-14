@@ -2,8 +2,60 @@ const { getPool } = require('../db/Sage200db');
 
 const getPendingOrders = async (req, res) => {
   try {
+    const {
+      page = 1,
+      limit = 10,
+      cliente,
+      estado,
+      fechaDesde,
+      fechaHasta,
+      ordenarPor = 'FechaPedido',
+      orden = 'DESC'
+    } = req.query;
+
     const pool = await getPool();
-    const result = await pool.request().query(`
+    
+    // Construir condiciones WHERE dinámicamente
+    let whereConditions = ["SeriePedido = 'Web'"];
+    let inputParams = {};
+    
+    if (cliente) {
+      whereConditions.push('RazonSocial LIKE @cliente');
+      inputParams.cliente = `%${cliente}%`;
+    }
+    
+    if (estado !== undefined) {
+      whereConditions.push('StatusAprobado = @estado');
+      inputParams.estado = parseInt(estado);
+    } else {
+      // Por defecto, solo pendientes (StatusAprobado = 0)
+      whereConditions.push('StatusAprobado = 0');
+    }
+    
+    if (fechaDesde) {
+      whereConditions.push('CONVERT(DATE, FechaPedido) >= @fechaDesde');
+      inputParams.fechaDesde = fechaDesde;
+    }
+    
+    if (fechaHasta) {
+      whereConditions.push('CONVERT(DATE, FechaPedido) <= @fechaHasta');
+      inputParams.fechaHasta = fechaHasta;
+    }
+    
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+    
+    // Validar parámetros de ordenación
+    const columnasPermitidas = ['NumeroPedido', 'FechaPedido', 'RazonSocial', 'CifDni', 'NumeroLineas', 'StatusAprobado', 'BaseImponible', 'FechaNecesaria'];
+    const ordenPermitido = ['ASC', 'DESC'];
+    
+    const ordenarPorValido = columnasPermitidas.includes(ordenarPor) ? ordenarPor : 'FechaPedido';
+    const ordenValido = ordenPermitido.includes(orden.toUpperCase()) ? orden.toUpperCase() : 'DESC';
+    
+    // Calcular offset para paginación
+    const offset = (page - 1) * limit;
+    
+    // Consulta para los datos
+    let query = `
       SELECT 
         NumeroPedido,
         FechaPedido,
@@ -17,15 +69,47 @@ const getPendingOrders = async (req, res) => {
         ObservacionesPedido,
         CodigoCliente
       FROM CabeceraPedidoCliente
-      WHERE SeriePedido = 'Web' AND StatusAprobado = 0
-      ORDER BY FechaPedido DESC
-    `);
+      ${whereClause}
+      ORDER BY ${ordenarPorValido} ${ordenValido}
+      OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
+    `;
+    
+    let request = pool.request();
+    
+    // Agregar parámetros a la solicitud
+    Object.keys(inputParams).forEach(key => {
+      request = request.input(key, inputParams[key]);
+    });
+    
+    const result = await request.query(query);
+    
+    // Consulta para el total de registros (para paginación)
+    let countQuery = `
+      SELECT COUNT(*) as total
+      FROM CabeceraPedidoCliente
+      ${whereClause}
+    `;
+    
+    let countRequest = pool.request();
+    Object.keys(inputParams).forEach(key => {
+      countRequest = countRequest.input(key, inputParams[key]);
+    });
+    
+    const countResult = await countRequest.query(countQuery);
+    const total = countResult.recordset[0].total;
+    const totalPaginas = Math.ceil(total / limit);
 
-    console.log('Pedidos pendientes encontrados:', result.recordset.length);
+    console.log('Pedidos encontrados:', result.recordset.length);
 
     res.status(200).json({
       success: true,
-      orders: result.recordset
+      orders: result.recordset,
+      paginacion: {
+        pagina: parseInt(page),
+        porPagina: parseInt(limit),
+        total,
+        totalPaginas
+      }
     });
   } catch (error) {
     console.error('Error al obtener pedidos pendientes:', error);
@@ -55,10 +139,18 @@ const getOrderForReview = async (req, res) => {
           c.Municipio,
           c.Provincia,
           c.StatusAprobado,
+          c.Estado,
           c.ObservacionesPedido,
           c.FechaNecesaria,
           c.CodigoEmpresa,
-          c.EjercicioPedido
+          c.EjercicioPedido,
+          CASE 
+            WHEN c.StatusAprobado = 0 THEN 'Pendiente'
+            WHEN c.StatusAprobado = -1 AND (c.Estado IS NULL OR c.Estado = 0) THEN 'Preparación'
+            WHEN c.StatusAprobado = -1 AND c.Estado = 1 THEN 'Parcial'
+            WHEN c.StatusAprobado = -1 AND c.Estado = 2 THEN 'Servido'
+            ELSE 'Desconocido'
+          END as Status
         FROM CabeceraPedidoCliente c
         WHERE c.NumeroPedido = @NumeroPedido
       `);
@@ -199,13 +291,15 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
         .input('TotalIVA', totalIVATotal)
         .input('ImporteLiquido', importeLiquidoTotal)
         .input('StatusAprobado', -1)
+        .input('Estado', 0) // Estado pasa a Preparación
         .query(`
           UPDATE CabeceraPedidoCliente 
           SET 
             BaseImponible = @BaseImponible,
             TotalIva = @TotalIVA,
             ImporteLiquido = @ImporteLiquido,
-            StatusAprobado = @StatusAprobado
+            StatusAprobado = @StatusAprobado,
+            Estado = @Estado
           WHERE NumeroPedido = @NumeroPedido
         `);
 

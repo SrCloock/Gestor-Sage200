@@ -360,18 +360,119 @@ const createOrder = async (req, res) => {
           AND (sysNumeroSerie = 'Web' OR sysNumeroSerie IS NULL)
         `);
 
+      // ============================================
+      // GENERACIÓN AUTOMÁTICA DEL ALBARÁN
+      // ============================================
+      
+      // 1. Obtener el próximo número de albarán
+      const nextAlbaranResult = await transaction.request()
+        .input('codigoEmpresa', codigoEmpresa)
+        .input('ejercicio', fechaActual.getFullYear())
+        .input('serie', 'Web')
+        .query(`
+          SELECT ISNULL(MAX(NumeroAlbaran), 0) + 1 AS SiguienteNumero
+          FROM CabeceraAlbaranCliente
+          WHERE CodigoEmpresa = @codigoEmpresa
+            AND EjercicioAlbaran = @ejercicio
+            AND (SerieAlbaran = @serie OR (@serie = '' AND SerieAlbaran IS NULL))
+        `);
+
+      const numeroAlbaran = nextAlbaranResult.recordset[0].SiguienteNumero;
+
+      // 2. Insertar cabecera del albarán
+      await transaction.request()
+        .input('CodigoEmpresa', codigoEmpresa)
+        .input('EjercicioAlbaran', fechaActual.getFullYear())
+        .input('SerieAlbaran', 'Web')
+        .input('NumeroAlbaran', numeroAlbaran)
+        .input('FechaAlbaran', fechaActual)
+        .input('CodigoCliente', codigoCliente)
+        .input('RazonSocial', cliente.RazonSocial || '')
+        .input('Domicilio', domicilio)
+        .input('Municipio', municipio)
+        .input('CodigoPostal', codigoPostal)
+        .input('Provincia', provincia)
+        .input('Nacion', nacion)
+        .input('CodigoNacion', codigoNacion)
+        .input('CodigoProvincia', codigoProvincia)
+        .input('CodigoMunicipio', codigoMunicipio)
+        .input('NumeroLineas', numeroLineas)
+        .input('ImporteLiquido', importeLiquidoTotal)
+        .input('StatusFacturado', 0)
+        .input('CodigoCondiciones', 3)
+        .input('FormadePago', 'Tres plazos a 30, 60 y 90')
+        .input('ObservacionesAlbaran', comment || '')
+        .query(`
+          INSERT INTO CabeceraAlbaranCliente (
+            CodigoEmpresa, EjercicioAlbaran, SerieAlbaran, NumeroAlbaran,
+            FechaAlbaran, CodigoCliente, RazonSocial, Domicilio, Municipio,
+            CodigoPostal, Provincia, Nacion, CodigoNacion, CodigoProvincia, CodigoMunicipio,
+            NumeroLineas, ImporteLiquido, StatusFacturado,
+            CodigoCondiciones, FormadePago, ObservacionesAlbaran
+          ) VALUES (
+            @CodigoEmpresa, @EjercicioAlbaran, @SerieAlbaran, @NumeroAlbaran,
+            @FechaAlbaran, @CodigoCliente, @RazonSocial, @Domicilio, @Municipio,
+            @CodigoPostal, @Provincia, @Nacion, @CodigoNacion, @CodigoProvincia, @CodigoMunicipio,
+            @NumeroLineas, @ImporteLiquido, @StatusFacturado,
+            @CodigoCondiciones, @FormadePago, @ObservacionesAlbaran
+          )
+        `);
+
+      // 3. Insertar líneas del albarán
+      for (const [index, item] of items.entries()) {
+        const articuloResult = await transaction.request()
+          .input('CodigoArticulo', item.CodigoArticulo)
+          .input('CodigoProveedor', item.CodigoProveedor || '')
+          .input('CodigoEmpresa', codigoEmpresa)
+          .query(`
+            SELECT DescripcionArticulo, DescripcionLinea 
+            FROM Articulos
+            WHERE CodigoArticulo = @CodigoArticulo
+            AND (CodigoProveedor = @CodigoProveedor OR @CodigoProveedor = '')
+            AND CodigoEmpresa = @CodigoEmpresa
+          `);
+
+        const articulo = articuloResult.recordset[0];
+        const descripcionLinea = articulo.DescripcionLinea || '';
+
+        await transaction.request()
+          .input('CodigoEmpresa', codigoEmpresa)
+          .input('EjercicioAlbaran', fechaActual.getFullYear())
+          .input('SerieAlbaran', 'Web')
+          .input('NumeroAlbaran', numeroAlbaran)
+          .input('Orden', index + 1)
+          .input('CodigoArticulo', item.CodigoArticulo)
+          .input('DescripcionArticulo', articulo.DescripcionArticulo)
+          .input('DescripcionLinea', descripcionLinea)
+          .input('Unidades', item.Cantidad)
+          .input('Precio', item.PrecioCompra || 0)
+          .query(`
+            INSERT INTO LineasAlbaranCliente (
+              CodigoEmpresa, EjercicioAlbaran, SerieAlbaran, NumeroAlbaran, Orden,
+              CodigoArticulo, DescripcionArticulo, DescripcionLinea,
+              Unidades, Precio
+            ) VALUES (
+              @CodigoEmpresa, @EjercicioAlbaran, @SerieAlbaran, @NumeroAlbaran, @Orden,
+              @CodigoArticulo, @DescripcionArticulo, @DescripcionLinea,
+              @Unidades, @Precio
+            )
+          `);
+      }
+
       await transaction.commit();
 
       return res.status(201).json({
         success: true,
         orderId: numeroPedido,
         seriePedido: 'Web',
+        albaranId: numeroAlbaran,
+        serieAlbaran: 'Web',
         baseImponible: baseImponibleTotal,
         totalIVA: totalIVATotal,
         importeLiquido: importeLiquidoTotal,
         numeroLineas: numeroLineas,
         deliveryDate: deliveryDate || null,
-        message: 'Pedido creado correctamente'
+        message: 'Pedido y albarán creados correctamente'
       });
 
     } catch (err) {

@@ -5,11 +5,8 @@ const path = require('path');
 const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/productRoutes');
 const orderRoutes = require('./routes/orderRoutes');
-const supplierOrderController = require('./routes/orderSupplierRoutes');
-const offerRoutes = require('./routes/offerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const receptionRoutes = require('./routes/receptionRoutes');
-
 
 const { connect } = require('./db/Sage200db');
 const { syncImagesWithDB } = require('./controllers/productController');
@@ -46,7 +43,7 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Credentials', true);
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type', 'Authorization');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   next();
 });
 
@@ -65,10 +62,8 @@ connect().then(async () => {
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/supplier-orders', supplierOrderController);
-app.use('/api/offers', offerRoutes);
 app.use('/api/reception', receptionRoutes);
-app.use('/api/admin', adminRoutes); // Asegúrate de que esta línea esté presente
+app.use('/api/admin', adminRoutes);
 
 // Middleware de errores
 app.use((err, req, res, next) => {

@@ -2,9 +2,8 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api';
-import { FaSearch, FaBoxOpen, FaShoppingCart } from 'react-icons/fa';
+import { FaSearch, FaBoxOpen } from 'react-icons/fa';
 import ProductGrid from '../components/ProductGrid';
-import CartPreview from '../components/CartPreview';
 import '../styles/ProductCatalog.css';
 
 const ProductCatalog = () => {
@@ -15,7 +14,6 @@ const ProductCatalog = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedProducts, setSelectedProducts] = useState([]);
   
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -110,33 +108,9 @@ const ProductCatalog = () => {
   const currentProducts = filteredProducts.slice(indexOfLast - productsPerPage, indexOfLast);
   const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
 
-  const handleAddToCart = (product) => {
-    setSelectedProducts(prev => {
-      const existingIndex = prev.findIndex(p => 
-        generateProductKey(p) === generateProductKey(product)
-      );
-      
-      if (existingIndex >= 0) {
-        const updated = [...prev];
-        updated[existingIndex] = {
-          ...updated[existingIndex],
-          Cantidad: updated[existingIndex].Cantidad + 1
-        };
-        return updated;
-      } else {
-        return [...prev, { ...product, Cantidad: 1 }];
-      }
-    });
-  };
-
-  const handleRemoveFromCart = (productKey) => {
-    setSelectedProducts(prev => prev.filter(p => 
-      generateProductKey(p) !== productKey
-    ));
-  };
-
-  const handleGoToOrder = () => {
-    navigate('/crear-pedido', { state: { selectedProducts } });
+  const handleAddToOrder = (product) => {
+    // Navegar a la página de crear pedido con el producto seleccionado
+    navigate('/crear-pedido', { state: { selectedProduct: product } });
   };
 
   const handlePageChange = (newPage) => 
@@ -190,7 +164,7 @@ const ProductCatalog = () => {
 
       <ProductGrid
         products={currentProducts}
-        onAddProduct={handleAddToCart}
+        onAddProduct={handleAddToOrder}
         currentPage={currentPage}
         totalPages={totalPages}
         onPageChange={handlePageChange}
@@ -198,13 +172,6 @@ const ProductCatalog = () => {
         generateProductKey={generateProductKey}
       />
       
-      <CartPreview 
-        products={selectedProducts} 
-        onRemove={handleRemoveFromCart}
-        onGoToOrder={handleGoToOrder}
-        generateProductKey={generateProductKey}
-      />
-
       {!currentProducts.length && (
         <div className="pc-empty-state">
           <FaBoxOpen className="pc-empty-icon" />
