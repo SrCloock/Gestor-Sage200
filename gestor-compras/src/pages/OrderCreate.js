@@ -24,15 +24,9 @@ const OrderCreate = () => {
   const [comment, setComment] = useState('');
   const productsPerPage = 20;
 
+  // Función mejorada para generar claves únicas
   const generateProductKey = (product) => {
-    const str = `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}`;
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    return hash.toString(36);
+    return `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}-${user?.codigoCliente || '00'}`;
   };
 
   const checkImageExists = (url) => {
@@ -61,6 +55,7 @@ const OrderCreate = () => {
           return { ...product, FinalImage: imagePath };
         }));
         
+        // Eliminar duplicados basados en clave única
         const uniqueProducts = [];
         const seenKeys = new Set();
         
@@ -89,8 +84,9 @@ const OrderCreate = () => {
     fetchProducts();
 
     if (location.state?.selectedProduct) {
+      const selectedProduct = location.state.selectedProduct;
       setOrderItems([{
-        ...location.state.selectedProduct,
+        ...selectedProduct,
         Cantidad: 1,
         CodigoCliente: user?.codigoCliente,
         CifDni: user?.cifDni
@@ -112,6 +108,7 @@ const OrderCreate = () => {
       });
     }
 
+    // Eliminar duplicados
     const uniqueProducts = [];
     const seenKeys = new Set();
     
@@ -191,15 +188,25 @@ const OrderCreate = () => {
         throw new Error('Datos de usuario incompletos. Por favor, inicie sesión nuevamente.');
       }
 
-      const itemsToSend = orderItems.map(item => ({
-        CodigoArticulo: item.CodigoArticulo,
-        DescripcionArticulo: item.DescripcionArticulo,
-        Cantidad: Number(item.Cantidad),
-        PrecioCompra: item.PrecioCompra,
-        CodigoProveedor: item.CodigoProveedor || null,
-        CodigoCliente: user.codigoCliente,
-        CifDni: user.cifDni
-      }));
+      // Verificar que no hay productos duplicados
+      const itemsMap = new Map();
+      const itemsToSend = [];
+      
+      orderItems.forEach(item => {
+        const key = generateProductKey(item);
+        if (!itemsMap.has(key)) {
+          itemsMap.set(key, true);
+          itemsToSend.push({
+            CodigoArticulo: item.CodigoArticulo,
+            DescripcionArticulo: item.DescripcionArticulo,
+            Cantidad: Number(item.Cantidad),
+            PrecioCompra: item.PrecioCompra,
+            CodigoProveedor: item.CodigoProveedor || null,
+            CodigoCliente: user.codigoCliente,
+            CifDni: user.cifDni
+          });
+        }
+      });
 
       const orderData = {
         items: itemsToSend,
@@ -258,54 +265,45 @@ const OrderCreate = () => {
         <div className="oc-review-card">
           <div className="oc-review-summary">
             <h3>Resumen del Pedido</h3>
-            <div className="oc-summary-details">
-              <p><strong>Número de productos:</strong> {orderItems.length}</p>
-              {deliveryDate && (
-                <p><strong>Fecha de entrega:</strong> {new Date(deliveryDate).toLocaleDateString()}</p>
-              )}
+            <p>Número de productos: {orderItems.length}</p>
+            
+            <div className="oc-products-list">
+              <h4>Productos en el pedido</h4>
+              {orderItems.map((item, index) => (
+                <div key={generateProductKey(item) + index} className="oc-review-product">
+                  <div className="oc-product-info">
+                    <h5>{item.DescripcionArticulo}</h5>
+                    <p>Código: {item.CodigoArticulo}</p>
+                    {item.CodigoProveedor && <p>Proveedor: {item.CodigoProveedor}</p>}
+                  </div>
+                  <div className="oc-product-quantity">
+                    <span>Cantidad: {item.Cantidad}</span>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-          
-          <div className="oc-review-items">
-            <h4>Productos en el pedido</h4>
-            {orderItems.map((item) => (
-              <div key={generateProductKey(item)} className="oc-review-item">
-                <div className="oc-item-info">
-                  <h5>{item.DescripcionArticulo}</h5>
-                  <p>Código: {item.CodigoArticulo}</p>
-                  {item.CodigoProveedor && <p>Proveedor: {item.CodigoProveedor}</p>}
-                </div>
-                <div className="oc-item-quantity">
-                  <span>Cantidad: {item.Cantidad}</span>
-                </div>
+            
+            {deliveryDate && (
+              <div className="oc-delivery-info">
+                <h4>Fecha de entrega solicitada</h4>
+                <p>{new Date(deliveryDate).toLocaleDateString()}</p>
               </div>
-            ))}
-          </div>
-          
-          <div className="oc-review-comment">
-            <label>Comentarios para el pedido:</label>
-            <textarea 
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              rows="3"
-              placeholder="Escriba aquí cualquier observación adicional..."
-              className="oc-comment-textarea"
-            />
+            )}
+            
+            {comment && (
+              <div className="oc-comment-info">
+                <h4>Comentarios</h4>
+                <p>{comment}</p>
+              </div>
+            )}
           </div>
           
           <div className="oc-review-actions">
-            <button onClick={handleSubmitOrder} className="oc-confirm-button" disabled={loading.submit}>
-              {loading.submit ? (
-                <>
-                  <div className="oc-button-spinner"></div>
-                  Procesando...
-                </>
-              ) : (
-                <>
-                  <FaCheck />
-                  Confirmar Pedido
-                </>
-              )}
+            <button onClick={handleSubmitOrder} disabled={loading.submit} className="oc-submit-button">
+              {loading.submit ? 'Creando pedido...' : 'Confirmar Pedido'}
+            </button>
+            <button onClick={handleBackToEdit} className="oc-cancel-button">
+              Cancelar
             </button>
           </div>
         </div>
@@ -313,165 +311,122 @@ const OrderCreate = () => {
     );
   }
 
-  if (loading.products) return (
-    <div className="oc-loading-container">
-      <div className="oc-spinner"></div>
-      <p>Cargando productos...</p>
-    </div>
-  );
-
-  if (error) return (
-    <div className="oc-error-container">
-      <div className="oc-error-icon">⚠️</div>
-      <p>{error}</p>
-    </div>
-  );
-
   return (
     <div className="oc-container">
       <div className="oc-header">
+        <button onClick={() => navigate(-1)} className="oc-back-button">
+          <FaArrowLeft />
+          Volver
+        </button>
         <h2>Crear Nuevo Pedido</h2>
-        <p>Seleccione los productos que desea incluir en su pedido</p>
       </div>
 
       {error && (
         <div className="oc-error-message">
           <p>{error}</p>
-          <button onClick={() => setError('')} className="oc-error-close">×</button>
+          <button onClick={() => setError('')} className="oc-error-close">
+            ×
+          </button>
         </div>
       )}
 
-      <div className="oc-delivery-section">
-        <div className="oc-delivery-card">
-          <FaCalendarAlt className="oc-delivery-icon" />
-          <div className="oc-delivery-content">
-            <label htmlFor="deliveryDate">Fecha de entrega deseada (opcional):</label>
+      <div className="oc-content">
+        <div className="oc-order-summary">
+          <h3>Resumen del Pedido</h3>
+          <p>Número de productos: {orderItems.length}</p>
+          
+          {orderItems.length > 0 && (
+            <div className="oc-products-list">
+              {orderItems.map((item, index) => (
+                <div key={generateProductKey(item) + index} className="oc-order-item">
+                  <div className="oc-item-info">
+                    <h4>{item.DescripcionArticulo}</h4>
+                    <p>Código: {item.CodigoArticulo}</p>
+                    {item.CodigoProveedor && <p>Proveedor: {item.CodigoProveedor}</p>}
+                  </div>
+                  <div className="oc-item-controls">
+                    <input
+                      type="number"
+                      min="1"
+                      value={item.Cantidad}
+                      onChange={(e) => handleUpdateQuantity(item, e.target.value)}
+                      className="oc-quantity-input"
+                    />
+                    <button
+                      onClick={() => handleRemoveItem(item)}
+                      className="oc-remove-button"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <div className="oc-delivery-section">
+            <label htmlFor="deliveryDate">
+              <FaCalendarAlt />
+              Fecha de entrega deseada (opcional):
+            </label>
             <input
               type="date"
               id="deliveryDate"
               value={deliveryDate}
               onChange={(e) => setDeliveryDate(e.target.value)}
               min={new Date().toISOString().split('T')[0]}
-              className="oc-date-input"
             />
           </div>
-          {deliveryDate && (
-            <button 
-              className="oc-clear-date"
-              onClick={() => setDeliveryDate('')}
-            >
-              Limpiar fecha
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="oc-controls-panel">
-        <div className="oc-search-container">
-          <input
-            type="text"
-            placeholder="Buscar productos por nombre, código o proveedor..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="oc-search-input"
-          />
-          <FaSearch className="oc-search-icon" />
-        </div>
-
-        <div className="oc-filter-container">
-          <label className="oc-filter-label">Ordenar por:</label>
-          <select
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value)}
-            className="oc-filter-select"
-          >
-            <option value="asc">Ordenar A-Z</option>
-            <option value="desc">Ordenar Z-A</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="oc-main-content">
-        <div className="oc-order-summary">
-          <div className="oc-summary-header">
-            <h3>Resumen del Pedido</h3>
-            <span className="oc-items-count">{orderItems.length} productos</span>
+          
+          <div className="oc-comment-section">
+            <label htmlFor="comment">Comentarios (opcional):</label>
+            <textarea
+              id="comment"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows="3"
+              placeholder="Agregue comentarios sobre su pedido..."
+            />
           </div>
           
-          {deliveryDate && (
-            <div className="oc-delivery-info">
-              <FaCalendarAlt className="oc-info-icon" />
-              <span>Entrega: {new Date(deliveryDate).toLocaleDateString()}</span>
-            </div>
-          )}
-
-          {orderItems.length === 0 ? (
-            <div className="oc-empty-cart">
-              <p>No hay productos en el pedido</p>
-              <span>Agregue productos desde el catálogo</span>
-            </div>
-          ) : (
-            <>
-              <div className="oc-order-items">
-                {orderItems.map((item) => (
-                  <div key={generateProductKey(item)} className="oc-order-item">
-                    <div className="oc-item-details">
-                      <h4>{item.DescripcionArticulo}</h4>
-                      <p>Código: {item.CodigoArticulo}</p>
-                      {item.NombreProveedor && <p>Proveedor: {item.NombreProveedor}</p>}
-                    </div>
-                    <div className="oc-item-controls">
-                      <div className="oc-quantity-control">
-                        <button
-                          onClick={() => handleUpdateQuantity(item, item.Cantidad - 1)}
-                          className="oc-quantity-btn"
-                        >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          min="1"
-                          value={item.Cantidad}
-                          onChange={(e) => handleUpdateQuantity(item, e.target.value)}
-                          className="oc-quantity-input"
-                        />
-                        <button
-                          onClick={() => handleUpdateQuantity(item, item.Cantidad + 1)}
-                          className="oc-quantity-btn"
-                        >
-                          +
-                        </button>
-                      </div>
-                      <button
-                        className="oc-remove-button"
-                        onClick={() => handleRemoveItem(item)}
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button
-                className="oc-review-button"
-                onClick={handleReviewOrder}
-                disabled={orderItems.length === 0 || loading.submit}
-              >
-                {loading.submit ? 'Procesando...' : 'Revisar y Confirmar Pedido'}
-              </button>
-            </>
-          )}
+          <div className="oc-actions">
+            <button
+              onClick={handleReviewOrder}
+              disabled={orderItems.length === 0}
+              className="oc-review-button"
+            >
+              <FaCheck />
+              Revisar y Confirmar Pedido
+            </button>
+          </div>
         </div>
 
-        <div className="oc-product-section">
-          <div className="oc-product-header">
-            <h3>Catálogo de Productos</h3>
-            <span className="oc-products-count">{filteredProducts.length} productos disponibles</span>
+        <div className="oc-product-selection">
+          <div className="oc-search-section">
+            <div className="oc-search-container">
+              <FaSearch className="oc-search-icon" />
+              <input
+                type="text"
+                placeholder="Buscar productos por nombre, código o proveedor..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="oc-search-input"
+              />
+            </div>
+            
+            <div className="oc-sort-container">
+              <label>Ordenar por:</label>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="oc-sort-select"
+              >
+                <option value="asc">Nombre (A-Z)</option>
+                <option value="desc">Nombre (Z-A)</option>
+              </select>
+            </div>
           </div>
-
+          
           <ProductGrid
             products={currentProducts}
             onAddProduct={handleAddItem}

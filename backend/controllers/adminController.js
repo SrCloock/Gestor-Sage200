@@ -16,7 +16,7 @@ const getPendingOrders = async (req, res) => {
     const pool = await getPool();
     
     // Construir condiciones WHERE dinámicamente
-    let whereConditions = ["SeriePedido = 'Web'"];
+    let whereConditions = ["SeriePedido = 'WebCD'"];
     let inputParams = {};
     
     if (cliente) {
@@ -162,10 +162,11 @@ const getOrderForReview = async (req, res) => {
       });
     }
 
+    // CORRECCIÓN: Query mejorada para evitar duplicados
     const linesResult = await pool.request()
       .input('NumeroPedido', orderId)
       .query(`
-        SELECT 
+        SELECT DISTINCT
           l.Orden,
           l.CodigoArticulo,
           l.DescripcionArticulo,
@@ -174,7 +175,7 @@ const getOrderForReview = async (req, res) => {
           l.CodigoProveedor,
           l.CodigoIva,
           t.[%Iva] as PorcentajeIva,
-          p.RazonSocial as NombreProveedor
+          COALESCE(p.RazonSocial, 'No especificado') as NombreProveedor
         FROM LineasPedidoCliente l
         LEFT JOIN Proveedores p ON l.CodigoProveedor = p.CodigoProveedor
         LEFT JOIN tiposiva t ON l.CodigoIva = t.CodigoIva AND t.CodigoTerritorio = 0
