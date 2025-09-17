@@ -7,6 +7,7 @@ const getOrderReception = async (req, res) => {
 
     const result = await pool.request()
       .input('NumeroPedido', orderId)
+      .input('SeriePedido', 'WebCD') // Añadido filtro por serie
       .query(`
         SELECT 
           c.NumeroPedido,
@@ -21,8 +22,9 @@ const getOrderReception = async (req, res) => {
           l.ComentarioRecepcion,
           l.FechaRecepcion
         FROM CabeceraPedidoCliente c
-        JOIN LineasPedidoCliente l ON c.NumeroPedido = l.NumeroPedido
+        JOIN LineasPedidoCliente l ON c.NumeroPedido = l.NumeroPedido AND c.SeriePedido = l.SeriePedido
         WHERE c.NumeroPedido = @NumeroPedido
+        AND c.SeriePedido = @SeriePedido
         ORDER BY l.Orden
       `);
 
@@ -33,13 +35,25 @@ const getOrderReception = async (req, res) => {
       });
     }
 
+    // Eliminar duplicados
+    const uniqueProducts = [];
+    const seenKeys = new Set();
+    
+    result.recordset.forEach(item => {
+      const key = `${item.Orden}-${item.CodigoArticulo}`;
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        uniqueProducts.push(item);
+      }
+    });
+
     // Organizar los datos
     const orderInfo = {
       NumeroPedido: result.recordset[0].NumeroPedido,
       RazonSocial: result.recordset[0].RazonSocial,
       FechaPedido: result.recordset[0].FechaPedido,
       Estado: result.recordset[0].Estado,
-      Productos: result.recordset.map(item => ({
+      Productos: uniqueProducts.map(item => ({
         Orden: item.Orden,
         CodigoArticulo: item.CodigoArticulo,
         DescripcionArticulo: item.DescripcionArticulo,
@@ -78,6 +92,7 @@ const confirmReception = async (req, res) => {
       for (const item of items) {
         await transaction.request()
           .input('NumeroPedido', orderId)
+          .input('SeriePedido', 'WebCD') // Añadido filtro por serie
           .input('Orden', item.Orden)
           .input('UnidadesRecibidas', item.UnidadesRecibidas)
           .input('ComentarioRecepcion', item.ComentarioRecepcion || '')
@@ -88,18 +103,22 @@ const confirmReception = async (req, res) => {
               UnidadesRecibidas = @UnidadesRecibidas,
               ComentarioRecepcion = @ComentarioRecepcion,
               FechaRecepcion = @FechaRecepcion
-            WHERE NumeroPedido = @NumeroPedido AND Orden = @Orden
+            WHERE NumeroPedido = @NumeroPedido 
+            AND SeriePedido = @SeriePedido 
+            AND Orden = @Orden
           `);
       }
 
       // Actualizar estado del pedido a Servido (2)
       await transaction.request()
         .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD') // Añadido filtro por serie
         .input('Estado', 2)
         .query(`
           UPDATE CabeceraPedidoCliente 
           SET Estado = @Estado
           WHERE NumeroPedido = @NumeroPedido
+          AND SeriePedido = @SeriePedido
         `);
 
       await transaction.commit();
@@ -113,23 +132,18 @@ const confirmReception = async (req, res) => {
     } catch (err) {
       await transaction.rollback();
       console.error('Error en la transacción de recepción:', err);
-      
-      let errorMessage = 'Error al procesar la transacción de recepción';
-      if (err.number === 132) {
-        errorMessage = 'Error de duplicación en la base de datos';
-      }
-      
-      res.status(500).json({
-        success: false,
-        message: errorMessage,
+      res.status(500).json({ 
+        success: false, 
+        message: 'Error al confirmar la recepción',
         error: process.env.NODE_ENV === 'development' ? err.message : undefined
       });
     }
   } catch (error) {
     console.error('Error al confirmar recepción:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al confirmar la recepción'
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error al confirmar la recepción',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

@@ -128,6 +128,7 @@ const getOrderForReview = async (req, res) => {
 
     const orderResult = await pool.request()
       .input('NumeroPedido', orderId)
+      .input('SeriePedido', 'WebCD') // Añadido filtro por serie
       .query(`
         SELECT 
           c.NumeroPedido,
@@ -153,6 +154,7 @@ const getOrderForReview = async (req, res) => {
           END as Status
         FROM CabeceraPedidoCliente c
         WHERE c.NumeroPedido = @NumeroPedido
+        AND c.SeriePedido = @SeriePedido
       `);
 
     if (orderResult.recordset.length === 0) {
@@ -165,6 +167,7 @@ const getOrderForReview = async (req, res) => {
     // CORRECCIÓN: Query mejorada para evitar duplicados
     const linesResult = await pool.request()
       .input('NumeroPedido', orderId)
+      .input('SeriePedido', 'WebCD') // Añadido filtro por serie
       .query(`
         SELECT DISTINCT
           l.Orden,
@@ -180,6 +183,7 @@ const getOrderForReview = async (req, res) => {
         LEFT JOIN Proveedores p ON l.CodigoProveedor = p.CodigoProveedor
         LEFT JOIN tiposiva t ON l.CodigoIva = t.CodigoIva AND t.CodigoTerritorio = 0
         WHERE l.NumeroPedido = @NumeroPedido
+        AND l.SeriePedido = @SeriePedido
         ORDER BY l.Orden
       `);
 
@@ -225,6 +229,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
       // 1. Obtener información completa del pedido
       const orderResult = await transaction.request()
         .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD') // Cambiado de 'Web' a 'WebCD'
         .query(`
           SELECT 
             CodigoEmpresa, 
@@ -239,7 +244,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
             IdDelegacion,
             CodigoContable
           FROM CabeceraPedidoCliente
-          WHERE NumeroPedido = @NumeroPedido AND SeriePedido = 'Web'
+          WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
         `);
 
       if (orderResult.recordset.length === 0) {
@@ -253,6 +258,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
       for (const item of items) {
         await transaction.request()
           .input('NumeroPedido', orderId)
+          .input('SeriePedido', 'WebCD') // Añadido filtro por serie
           .input('Orden', item.Orden)
           .input('UnidadesPedidas', item.UnidadesPedidas)
           .input('UnidadesPendientes', item.UnidadesPedidas)
@@ -265,13 +271,16 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
               UnidadesPendientes = @UnidadesPendientes,
               Unidades2_ = @Unidades2_,
               UnidadesPendientesFabricar = @UnidadesPendientesFabricar
-            WHERE NumeroPedido = @NumeroPedido AND Orden = @Orden
+            WHERE NumeroPedido = @NumeroPedido 
+            AND SeriePedido = @SeriePedido 
+            AND Orden = @Orden
           `);
       }
 
       // 3. Recalcular totales del pedido
       const totalesResult = await transaction.request()
         .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD') // Añadido filtro por serie
         .query(`
           SELECT 
             SUM(UnidadesPedidas * Precio) AS BaseImponible,
@@ -279,6 +288,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           FROM LineasPedidoCliente l
           LEFT JOIN tiposiva t ON l.CodigoIva = t.CodigoIva AND t.CodigoTerritorio = 0
           WHERE l.NumeroPedido = @NumeroPedido
+          AND l.SeriePedido = @SeriePedido
         `);
 
       const baseImponibleTotal = parseFloat(totalesResult.recordset[0].BaseImponible) || 0;
@@ -288,6 +298,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
       // 4. Actualizar cabecera con nuevos totales y estado
       await transaction.request()
         .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD') // Añadido filtro por serie
         .input('BaseImponible', baseImponibleTotal)
         .input('TotalIVA', totalIVATotal)
         .input('ImporteLiquido', importeLiquidoTotal)
@@ -302,6 +313,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
             StatusAprobado = @StatusAprobado,
             Estado = @Estado
           WHERE NumeroPedido = @NumeroPedido
+          AND SeriePedido = @SeriePedido
         `);
 
       // 5. Crear pedidos a proveedores (agrupados por proveedor)
@@ -322,7 +334,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
       const contadorResult = await transaction.request()
         .input('sysGrupo', CodigoEmpresa)
         .input('sysNombreContador', 'PEDIDOS_PRO')
-        .input('sysNumeroSerie', 'Web')
+        .input('sysNumeroSerie', 'WebCD') // Cambiado de 'Web' a 'WebCD'
         .query(`
           SELECT sysContadorValor 
           FROM LSYSCONTADORES
@@ -337,7 +349,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
         const maxResult = await transaction.request()
           .input('CodigoEmpresa', CodigoEmpresa)
           .input('EjercicioPedido', EjercicioPedido)
-          .input('SeriePedido', 'Web')
+          .input('SeriePedido', 'WebCD') // Cambiado de 'Web' a 'WebCD'
           .query(`
             SELECT MAX(NumeroPedido) as MaxNumero
             FROM CabeceraPedidoProveedor
@@ -351,7 +363,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
         await transaction.request()
           .input('sysGrupo', CodigoEmpresa)
           .input('sysNombreContador', 'PEDIDOS_PRO')
-          .input('sysNumeroSerie', 'Web')
+          .input('sysNumeroSerie', 'WebCD') // Cambiado de 'Web' a 'WebCD'
           .input('sysContadorValor', numeroPedidoProveedor)
           .query(`
             INSERT INTO LSYSCONTADORES (sysGrupo, sysNombreContador, sysNumeroSerie, sysContadorValor)
@@ -413,7 +425,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
         const existePedido = await transaction.request()
           .input('CodigoEmpresa', CodigoEmpresa)
           .input('EjercicioPedido', EjercicioPedido)
-          .input('SeriePedido', 'Web')
+          .input('SeriePedido', 'WebCD') // Cambiado de 'Web' a 'WebCD'
           .input('NumeroPedido', numeroPedidoProveedor)
           .query(`
             SELECT COUNT(*) as Existe
@@ -429,7 +441,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           let existeNuevo = await transaction.request()
             .input('CodigoEmpresa', CodigoEmpresa)
             .input('EjercicioPedido', EjercicioPedido)
-            .input('SeriePedido', 'Web')
+            .input('SeriePedido', 'WebCD') // Cambiado de 'Web' a 'WebCD'
             .input('NumeroPedido', nuevoNumero)
             .query(`
               SELECT COUNT(*) as Existe
@@ -445,7 +457,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
             existeNuevo = await transaction.request()
               .input('CodigoEmpresa', CodigoEmpresa)
               .input('EjercicioPedido', EjercicioPedido)
-              .input('SeriePedido', 'Web')
+              .input('SeriePedido', 'WebCD') // Cambiado de 'Web' a 'WebCD'
               .input('NumeroPedido', nuevoNumero)
               .query(`
                 SELECT COUNT(*) as Existe
@@ -467,7 +479,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
         await transaction.request()
           .input('CodigoEmpresa', CodigoEmpresa)
           .input('EjercicioPedido', EjercicioPedido)
-          .input('SeriePedido', 'Web')
+          .input('SeriePedido', 'WebCD') // Cambiado de 'Web' a 'WebCD'
           .input('NumeroPedido', numeroPedidoProveedor)
           .input('IdDelegacion', IdDelegacion || '')
           .input('CodigoProveedor', codigoProveedor)
@@ -535,7 +547,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           await transaction.request()
             .input('CodigoEmpresa', CodigoEmpresa)
             .input('EjercicioPedido', EjercicioPedido)
-            .input('SeriePedido', 'Web')
+            .input('SeriePedido', 'WebCD') // Cambiado de 'Web' a 'WebCD'
             .input('NumeroPedido', numeroPedidoProveedor)
             .input('Orden', index + 1)
             .input('CodigoArticulo', item.CodigoArticulo)
@@ -570,7 +582,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
         await transaction.request()
           .input('CodigoEmpresa', CodigoEmpresa)
           .input('EjercicioPedido', EjercicioPedido)
-          .input('SeriePedido', 'Web')
+          .input('SeriePedido', 'WebCD') // Cambiado de 'Web' a 'WebCD'
           .input('NumeroPedido', numeroPedidoProveedor)
           .input('BaseImponible', baseImponibleProveedor)
           .input('TotalIVA', totalIVAProveedor)
@@ -595,7 +607,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
       await transaction.request()
         .input('sysGrupo', CodigoEmpresa)
         .input('sysNombreContador', 'PEDIDOS_PRO')
-        .input('sysNumeroSerie', 'Web')
+        .input('sysNumeroSerie', 'WebCD') // Cambiado de 'Web' a 'WebCD'
         .input('sysContadorValor', numeroPedidoProveedor - 1)
         .query(`
           UPDATE LSYSCONTADORES 
