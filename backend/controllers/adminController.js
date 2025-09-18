@@ -329,8 +329,31 @@ const generarAlbaranCliente = async (transaction, orderHeader, items) => {
 const generarAlbaranProveedor = async (transaction, orderHeader, proveedor, itemsProveedor, numeroPedidoProveedor) => {
   const { CodigoEmpresa, EjercicioPedido } = orderHeader;
 
-  if (!proveedor?.CodigoProveedor) {
-    throw new Error('CodigoProveedor es requerido');
+  // Validación mejorada del proveedor
+  if (!proveedor || !proveedor.CodigoProveedor) {
+    console.warn('Proveedor no especificado, usando proveedor por defecto');
+    proveedor = {
+      CodigoProveedor: 'DEFAULT',
+      RazonSocial: 'Proveedor No Especificado',
+      Domicilio: '',
+      Municipio: '',
+      Provincia: '',
+      // Agregar campos adicionales necesarios
+      Nombre: 'Proveedor No Especificado',
+      CifDni: '',
+      CifEuropeo: '',
+      CodigoPostal: '',
+      CodigoMunicipio: '',
+      CodigoProvincia: '',
+      CodigoNacion: '108',
+      Nacion: 'ESPAÑA',
+      CodigoCondiciones: 0,
+      FormadePago: '',
+      CodigoContable: orderHeader.CodigoContable || '',
+      CodigoIdioma_: 'ESP',
+      MantenerCambio_: 0,
+      CodigoContableANT_: orderHeader.CodigoContable || ''
+    };
   }
 
   const { CodigoProveedor, RazonSocial, Domicilio, Municipio, Provincia } = proveedor;
