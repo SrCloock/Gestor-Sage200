@@ -9,15 +9,18 @@ const adminRoutes = require('./routes/adminRoutes');
 const receptionRoutes = require('./routes/receptionRoutes');
 
 const { connect } = require('./db/Sage200db');
-const { syncImagesWithDB } = require('./controllers/productController');
+const { syncImagesWithDB, preCacheImages } = require('./controllers/productController');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware para servir imágenes
-app.use('/images', express.static(path.join(__dirname, 'public', 'images')));
+// Middleware para servir imágenes con cache
+app.use('/images', express.static(path.join(__dirname, 'public', 'images'), {
+  maxAge: '7d',
+  etag: false
+}));
 
-// Configuración CORS detallada
+// Configuración CORS
 const allowedOrigins = ['http://localhost:3000'];
 
 const corsOptions = {
@@ -34,11 +37,8 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-// Preflight
 app.options('*', cors(corsOptions));
 
-// Headers manuales
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Credentials', true);
@@ -47,13 +47,14 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Conectar a la base de datos y sincronizar imágenes
 connect().then(async () => {
   console.log('✅ Base de datos conectada');
   await syncImagesWithDB();
+  await preCacheImages(); // Pre-cache al iniciar
 }).catch(err => {
   console.error('❌ Error al conectar a la base de datos:', err);
 });
@@ -64,6 +65,15 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/reception', receptionRoutes);
 app.use('/api/admin', adminRoutes);
+
+// Health check
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
 
 // Middleware de errores
 app.use((err, req, res, next) => {

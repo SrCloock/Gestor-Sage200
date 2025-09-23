@@ -10,8 +10,28 @@ const OrderList = () => {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('recent');
+  
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
+
+  // Función para obtener texto del estado
+  const getStatusText = useMemo(() => (order) => {
+    if (order.StatusAprobado === 0) return 'Revisando';
+    if (order.StatusAprobado === -1) {
+      switch (order.Estado) {
+        case 0: return 'Preparando';
+        case 1: return 'Parcial';
+        case 2: return 'Servido';
+        default: return 'Preparando';
+      }
+    }
+    return 'Desconocido';
+  }, []);
+
+  // Función para verificar si es editable
+  const canEditOrder = useMemo(() => (order) => {
+    return order.StatusAprobado === 0; // Solo editable en "Revisando"
+  }, []);
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -19,12 +39,14 @@ const OrderList = () => {
         setLoading(true);
         setError('');
         const response = await api.get('/api/orders', {
-          params: {
-            codigoCliente: user?.codigoCliente,
-            seriePedido: 'Web'
-          }
+          params: { codigoCliente: user?.codigoCliente }
         });
-        setOrders(response.data.orders);
+        
+        if (response.data.success) {
+          setOrders(response.data.orders);
+        } else {
+          setError(response.data.message || 'Error al cargar pedidos');
+        }
       } catch (err) {
         setError('Error al cargar los pedidos');
         console.error('Error fetching orders:', err);
@@ -44,7 +66,8 @@ const OrderList = () => {
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(order => 
-        order.NumeroPedido.toString().toLowerCase().includes(term)
+        order.NumeroPedido.toString().includes(term) ||
+        order.RazonSocial.toLowerCase().includes(term)
       );
     }
     
@@ -64,14 +87,14 @@ const OrderList = () => {
     return result;
   }, [searchTerm, sortBy, orders]);
 
-  const handleViewDetails = (orderId, seriePedido) => {
-    navigate(`/mis-pedidos/${orderId}`, { state: { seriePedido } });
+  const handleViewDetails = (orderId) => {
+    navigate(`/mis-pedidos/${orderId}`);
   };
 
-  const handleEditOrder = (orderId, seriePedido) => {
+  const handleEditOrder = (orderId) => {
     const order = orders.find(o => o.NumeroPedido === orderId);
-    if (order && order.Estado === 'Preparando') {
-      navigate(`/editar-pedido/${orderId}`, { state: { seriePedido } });
+    if (order && canEditOrder(order)) {
+      navigate(`/editar-pedido/${orderId}`);
     }
   };
 
@@ -100,7 +123,7 @@ const OrderList = () => {
         <div className="ol-search-container">
           <input
             type="text"
-            placeholder="Buscar por #Pedido..."
+            placeholder="Buscar por #Pedido o cliente..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="ol-search-input"
@@ -109,7 +132,6 @@ const OrderList = () => {
         </div>
         
         <div className="ol-filter-container">
-          <label className="ol-filter-label">Ordenar por:</label>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
@@ -118,7 +140,7 @@ const OrderList = () => {
             <option value="recent">Más recientes</option>
             <option value="oldest">Más antiguos</option>
             <option value="id-asc">#Pedido (ascendente)</option>
-            <option value='id-desc'>#Pedido (descendente)</option>
+            <option value="id-desc">#Pedido (descendente)</option>
           </select>
         </div>
       </div>
@@ -136,48 +158,51 @@ const OrderList = () => {
               <tr>
                 <th>#Pedido</th>
                 <th>Fecha Pedido</th>
-                <th>Fecha Entrega</th>
+                <th>Cliente</th>
                 <th>Artículos</th>
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {filteredOrders.map(order => (
-                <tr key={`${order.SeriePedido}-${order.NumeroPedido}`} className="ol-table-row">
-                  <td className="ol-order-id">{order.NumeroPedido}</td>
-                  <td className="ol-order-date">{new Date(order.FechaPedido).toLocaleDateString()}</td>
-                  <td className="ol-delivery-date">
-                    {order.FechaNecesaria 
-                      ? new Date(order.FechaNecesaria).toLocaleDateString() 
-                      : 'No especificada'}
-                  </td>
-                  <td className="ol-items-count">{order.NumeroLineas}</td>
-                  <td>
-                    <span className={`ol-status-badge ${order.Estado === 'Preparando' ? 'ol-status-preparing' : 'ol-status-served'}`}>
-                      {order.Estado}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="ol-actions">
-                      <button 
-                        onClick={() => handleViewDetails(order.NumeroPedido, order.SeriePedido)}
-                        className="ol-btn ol-btn-primary"
-                      >
-                        Ver Detalle
-                      </button>
-                      {order.Estado === 'Preparando' && (
+              {filteredOrders.map(order => {
+                const statusText = getStatusText(order);
+                const editable = canEditOrder(order);
+                
+                return (
+                  <tr key={order.NumeroPedido} className="ol-table-row">
+                    <td className="ol-order-id">#{order.NumeroPedido}</td>
+                    <td className="ol-order-date">
+                      {new Date(order.FechaPedido).toLocaleDateString('es-ES')}
+                    </td>
+                    <td className="ol-order-client">{order.RazonSocial}</td>
+                    <td className="ol-items-count">{order.NumeroLineas}</td>
+                    <td>
+                      <span className={`ol-status-badge ol-status-${statusText.toLowerCase()}`}>
+                        {statusText}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="ol-actions">
                         <button 
-                          onClick={() => handleEditOrder(order.NumeroPedido, order.SeriePedido)}
-                          className="ol-btn ol-btn-secondary"
+                          onClick={() => handleViewDetails(order.NumeroPedido)}
+                          className="ol-btn ol-btn-primary"
                         >
-                          Editar
+                          Ver Detalle
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {editable && (
+                          <button 
+                            onClick={() => handleEditOrder(order.NumeroPedido)}
+                            className="ol-btn ol-btn-secondary"
+                          >
+                            Editar
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

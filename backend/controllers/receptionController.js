@@ -7,13 +7,14 @@ const getOrderReception = async (req, res) => {
 
     const result = await pool.request()
       .input('NumeroPedido', orderId)
-      .input('SeriePedido', 'WebCD') // Añadido filtro por serie
+      .input('SeriePedido', 'WebCD')
       .query(`
         SELECT 
           c.NumeroPedido,
           c.RazonSocial,
           c.FechaPedido,
           c.Estado,
+          c.FechaNecesaria,
           l.Orden,
           l.CodigoArticulo,
           l.DescripcionArticulo,
@@ -52,6 +53,7 @@ const getOrderReception = async (req, res) => {
       NumeroPedido: result.recordset[0].NumeroPedido,
       RazonSocial: result.recordset[0].RazonSocial,
       FechaPedido: result.recordset[0].FechaPedido,
+      FechaNecesaria: result.recordset[0].FechaNecesaria,
       Estado: result.recordset[0].Estado,
       Productos: uniqueProducts.map(item => ({
         Orden: item.Orden,
@@ -78,6 +80,37 @@ const getOrderReception = async (req, res) => {
   }
 };
 
+// Función auxiliar para recalcular totales del albarán
+const recalculateAlbaranTotals = async (transaction, numeroAlbaran) => {
+  const totalesResult = await transaction.request()
+    .input('NumeroAlbaran', numeroAlbaran)
+    .query(`
+      SELECT 
+        SUM(Unidades * Precio) AS BaseImponible,
+        SUM((Unidades * Precio) * ([%Iva] / 100.0)) AS TotalIVA
+      FROM LineasAlbaranCliente
+      WHERE NumeroAlbaran = @NumeroAlbaran
+    `);
+
+  const baseImponible = parseFloat(totalesResult.recordset[0].BaseImponible) || 0;
+  const totalIVA = parseFloat(totalesResult.recordset[0].TotalIVA) || 0;
+  const importeLiquido = baseImponible + totalIVA;
+
+  await transaction.request()
+    .input('NumeroAlbaran', numeroAlbaran)
+    .input('BaseImponible', baseImponible)
+    .input('TotalIVA', totalIVA)
+    .input('ImporteLiquido', importeLiquido)
+    .query(`
+      UPDATE CabeceraAlbaranCliente
+      SET 
+        BaseImponible = @BaseImponible,
+        TotalIVA = @TotalIVA,
+        ImporteLiquido = @ImporteLiquido
+      WHERE NumeroAlbaran = @NumeroAlbaran
+    `);
+};
+
 const confirmReception = async (req, res) => {
   const { orderId } = req.params;
   const { items } = req.body;
@@ -88,11 +121,11 @@ const confirmReception = async (req, res) => {
     await transaction.begin();
 
     try {
-      // Actualizar cada línea del pedido
+      // 1. Actualizar líneas del pedido
       for (const item of items) {
         await transaction.request()
           .input('NumeroPedido', orderId)
-          .input('SeriePedido', 'WebCD') // Añadido filtro por serie
+          .input('SeriePedido', 'WebCD')
           .input('Orden', item.Orden)
           .input('UnidadesRecibidas', item.UnidadesRecibidas)
           .input('ComentarioRecepcion', item.ComentarioRecepcion || '')
@@ -109,11 +142,55 @@ const confirmReception = async (req, res) => {
           `);
       }
 
-      // Actualizar estado del pedido a Servido (2)
+      // 2. Actualizar albarán de cliente (SOLO albarán de cliente)
+      const albaranResult = await transaction.request()
+        .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD')
+        .query(`
+          SELECT NumeroAlbaran 
+          FROM CabeceraAlbaranCliente 
+          WHERE NumeroPedido = @NumeroPedido
+          AND SeriePedido = @SeriePedido
+        `);
+
+      if (albaranResult.recordset.length > 0) {
+        const numeroAlbaran = albaranResult.recordset[0].NumeroAlbaran;
+        
+        // Actualizar líneas del albarán con unidades recibidas
+        for (const item of items) {
+          await transaction.request()
+            .input('NumeroAlbaran', numeroAlbaran)
+            .input('Orden', item.Orden)
+            .input('Unidades', item.UnidadesRecibidas)
+            .query(`
+              UPDATE LineasAlbaranCliente 
+              SET Unidades = @Unidades 
+              WHERE NumeroAlbaran = @NumeroAlbaran AND Orden = @Orden
+            `);
+        }
+
+        // Recalcular totales del albarán
+        await recalculateAlbaranTotals(transaction, numeroAlbaran);
+      }
+
+      // 3. Determinar nuevo estado del pedido
+      const pendingResult = await transaction.request()
+        .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD')
+        .query(`
+          SELECT SUM(UnidadesPedidas - UnidadesRecibidas) as Pendiente
+          FROM LineasPedidoCliente
+          WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
+        `);
+
+      const pendiente = pendingResult.recordset[0].Pendiente || 0;
+      const nuevoEstado = pendiente > 0 ? 1 : 2; // 1=Parcial, 2=Servido
+
+      // 4. Actualizar estado del pedido
       await transaction.request()
         .input('NumeroPedido', orderId)
-        .input('SeriePedido', 'WebCD') // Añadido filtro por serie
-        .input('Estado', 2)
+        .input('SeriePedido', 'WebCD')
+        .input('Estado', nuevoEstado)
         .query(`
           UPDATE CabeceraPedidoCliente 
           SET Estado = @Estado
@@ -126,7 +203,8 @@ const confirmReception = async (req, res) => {
       res.status(200).json({
         success: true,
         message: 'Recepción confirmada correctamente',
-        estado: 2
+        estado: nuevoEstado,
+        estadoTexto: nuevoEstado === 1 ? 'Parcial' : 'Servido'
       });
 
     } catch (err) {
