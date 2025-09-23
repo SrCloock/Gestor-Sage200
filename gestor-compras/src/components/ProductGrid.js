@@ -28,50 +28,91 @@ const ProductGrid = memo(({
     return pageNumbers;
   };
 
+  // Función mejorada para formatear precios
+  const formatPrice = (price) => {
+    if (!price && price !== 0) return 'Consultar precio';
+    return new Intl.NumberFormat('es-ES', {
+      style: 'currency',
+      currency: 'EUR'
+    }).format(price);
+  };
+
+  // Función optimizada para manejar clics
+  const handleProductClick = (product, event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onAddProduct(product);
+  };
+
   return (
     <>
       <div className="pg-product-grid">
-        {products.map(product => (
-          <div
-            key={generateProductKey(product)}
-            className="pg-product-card"
-            onClick={() => onAddProduct(product)}
-          >
-            <div className="pg-product-image-container">
-              <img
-                src={product.FinalImage || '/images/default.jpg'}
-                alt={product.DescripcionArticulo}
-                className="pg-product-image"
-                onError={(e) => {
-                  e.target.src = '/images/default.jpg';
-                  e.target.className = 'pg-product-image pg-default-image';
-                }}
-              />
-              <div className="pg-product-overlay">
-                <FaPlus className="pg-add-icon" />
-              </div>
-            </div>
-
-            <div className="pg-product-content">
-              <div className="pg-product-header">
-                <h3 className="pg-product-name">{product.DescripcionArticulo}</h3>
-                <span className="pg-product-code">{product.CodigoArticulo}</span>
-              </div>
-
-              {product.NombreProveedor && (
-                <div className="pg-product-supplier">
-                  <span>Proveedor:</span> {product.NombreProveedor}
+        {products.map(product => {
+          const productKey = generateProductKey(product);
+          return (
+            <div
+              key={productKey}
+              className="pg-product-card"
+              onClick={(e) => handleProductClick(product, e)}
+              tabIndex={0}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  handleProductClick(product, e);
+                }
+              }}
+            >
+              <div className="pg-product-image-container">
+                <img
+                  src={product.FinalImage || '/images/default.jpg'}
+                  alt={product.DescripcionArticulo}
+                  className="pg-product-image"
+                  loading="lazy"
+                  onError={(e) => {
+                    e.target.src = '/images/default.jpg';
+                    e.target.className = 'pg-product-image pg-default-image';
+                  }}
+                />
+                <div className="pg-product-overlay">
+                  <FaPlus className="pg-add-icon" />
+                  <span className="pg-add-text">Añadir</span>
                 </div>
-              )}
+              </div>
 
-              <div className="pg-product-actions">
-                <button className="pg-add-button">
-                  Añadir al pedido
-                </button>
+              <div className="pg-product-content">
+                <div className="pg-product-header">
+                  <h3 className="pg-product-name" title={product.DescripcionArticulo}>
+                    {product.DescripcionArticulo}
+                  </h3>
+                  <span className="pg-product-code">{product.CodigoArticulo}</span>
+                </div>
+
+                {/* Sección de Precio */}
+                <div className="pg-product-price-section">
+                  <span className="pg-price-label">Precio:</span>
+                  <span className="pg-price-value">
+                    {formatPrice(product.PrecioVenta || product.PrecioCompra)}
+                  </span>
+                </div>
+
+                {product.NombreProveedor && (
+                  <div className="pg-product-supplier">
+                    <span className="pg-supplier-label">Proveedor:</span>
+                    <span className="pg-supplier-value">{product.NombreProveedor}</span>
+                  </div>
+                )}
+
+                <div className="pg-product-actions">
+                  <button 
+                    className="pg-add-button"
+                    onClick={(e) => handleProductClick(product, e)}
+                  >
+                    Añadir al pedido
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         
         {products.length === 0 && (
           <div className="pg-no-results">
@@ -88,6 +129,7 @@ const ProductGrid = memo(({
             onClick={() => onPageChange(currentPage - 1)}
             disabled={currentPage === 1}
             className="pg-pagination-button pg-pagination-prev"
+            aria-label="Página anterior"
           >
             <FaArrowLeft />
           </button>
@@ -98,6 +140,8 @@ const ProductGrid = memo(({
               onClick={() => page !== '...' && onPageChange(page)}
               className={`pg-pagination-button ${currentPage === page ? 'pg-active' : ''} ${page === '...' ? 'pg-ellipsis' : ''}`}
               disabled={page === '...'}
+              aria-label={page === '...' ? 'Más páginas' : `Ir a página ${page}`}
+              aria-current={currentPage === page ? 'page' : undefined}
             >
               {page}
             </button>
@@ -107,6 +151,7 @@ const ProductGrid = memo(({
             onClick={() => onPageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
             className="pg-pagination-button pg-pagination-next"
+            aria-label="Página siguiente"
           >
             <FaArrowRight />
           </button>
