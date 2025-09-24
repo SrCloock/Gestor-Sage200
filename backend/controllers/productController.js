@@ -5,228 +5,143 @@ const { getPool } = require('../db/Sage200db');
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'];
 const IMAGE_FOLDER = path.join(__dirname, '../public/images');
 
-// Cache optimizado
-const imageCache = new Map();
-const failedImageCache = new Set();
-let cacheLoaded = false;
-
-// Pre-cache ultra rápido
-const preCacheImages = async () => {
-  if (cacheLoaded) return;
-  
-  try {
-    console.log('🔄 Cargando cache de imágenes...');
-    const files = await fs.promises.readdir(IMAGE_FOLDER);
-    
-    let cachedCount = 0;
-    for (const file of files) {
-      const ext = path.extname(file).toLowerCase();
-      if (IMAGE_EXTENSIONS.includes(ext)) {
-        const codigo = path.basename(file, ext);
-        imageCache.set(codigo, file);
-        cachedCount++;
-      }
-    }
-    
-    cacheLoaded = true;
-    console.log(`✅ Pre-cache de ${cachedCount} imágenes completado`);
-  } catch (error) {
-    console.error('❌ Error en pre-cache:', error);
-  }
+// Función mejorada para verificar existencia de archivos
+const fileExists = (filePath) => {
+  return new Promise((resolve) => {
+    fs.access(filePath, fs.constants.F_OK, (err) => {
+      resolve(!err);
+    });
+  });
 };
 
-// Verificación de archivos optimizada
-const fileExists = async (filePath) => {
-  try {
-    await fs.promises.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-// Función de imagen ultra-rápida
+// Función optimizada para obtener imagen del producto
 const getProductImage = async (codigoArticulo) => {
-  if (!codigoArticulo) return 'default.jpg';
-
-  // Cache hit (más rápido)
-  if (imageCache.has(codigoArticulo)) {
-    return imageCache.get(codigoArticulo);
-  }
-  
-  if (failedImageCache.has(codigoArticulo)) {
-    return 'default.jpg';
-  }
-
-  // Búsqueda optimizada en disco
   for (const ext of IMAGE_EXTENSIONS) {
-    const fileName = `${codigoArticulo}${ext}`;
-    const filePath = path.join(IMAGE_FOLDER, fileName);
-    
+    const filePath = path.join(IMAGE_FOLDER, `${codigoArticulo}${ext}`);
     if (await fileExists(filePath)) {
-      imageCache.set(codigoArticulo, fileName);
-      return fileName;
+      return `${codigoArticulo}${ext}`;
     }
   }
-
-  // Cache de fallos
-  failedImageCache.add(codigoArticulo);
-  return 'default.jpg';
+  return null;
 };
 
-// Controlador principal OPTIMIZADO
+// Controlador principal de productos - MEJORADO
 const getProducts = async (req, res) => {
   try {
-    const startTime = Date.now();
-    const { page = 1, limit = 48, search = '', sort = 'DescripcionArticulo', order = 'asc' } = req.query;
-    const offset = (page - 1) * limit;
-
     const pool = await getPool();
     
-    // CONSULTA OPTIMIZADA CON PAGINACIÓN
-    let query = `
+    // Consulta mejorada con PrecioVenta
+    const result = await pool.request().query(`
       SELECT 
         a.CodigoArticulo, 
         a.DescripcionArticulo, 
         a.CodigoProveedor, 
         a.PrecioCompra, 
-        a.PrecioVenta,
+        a.PrecioVenta,  -- NUEVO CAMPO AÑADIDO
         a.RutaImagen,
         p.RazonSocial AS NombreProveedor
       FROM Articulos a
       LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor
       WHERE a.CodigoArticulo IS NOT NULL 
         AND a.DescripcionArticulo IS NOT NULL
-        AND a.CodigoArticulo != ''
-    `;
+      ORDER BY a.DescripcionArticulo
+    `);
 
-    const params = {};
-    
-    if (search && search.trim() !== '') {
-      query += ` AND (
-        a.DescripcionArticulo LIKE '%' + @search + '%' OR 
-        a.CodigoArticulo LIKE '%' + @search + '%' OR
-        p.RazonSocial LIKE '%' + @search + '%'
-      )`;
-      params.search = search.trim();
-    }
-
-    // Ordenación optimizada
-    const safeSort = ['CodigoArticulo', 'DescripcionArticulo', 'PrecioVenta', 'NombreProveedor'].includes(sort) 
-      ? sort : 'DescripcionArticulo';
-    const safeOrder = order.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
-    
-    query += ` ORDER BY ${safeSort} ${safeOrder}
-               OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY`;
-
-    const request = pool.request();
-    if (params.search) {
-      request.input('search', params.search);
-    }
-    
-    const result = await request.query(query);
-
-    // Contador optimizado
-    const countQuery = `
-      SELECT COUNT(*) as total 
-      FROM Articulos a
-      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor
-      WHERE a.CodigoArticulo IS NOT NULL 
-        AND a.DescripcionArticulo IS NOT NULL
-        AND a.CodigoArticulo != ''
-        ${params.search ? `AND (
-          a.DescripcionArticulo LIKE '%' + @search + '%' OR 
-          a.CodigoArticulo LIKE '%' + @search + '%' OR
-          p.RazonSocial LIKE '%' + @search + '%'
-        )` : ''}
-    `;
-
-    const countRequest = pool.request();
-    if (params.search) {
-      countRequest.input('search', params.search);
-    }
-    const countResult = await countRequest.query(countQuery);
-
-    const total = countResult.recordset[0].total;
     const serverUrl = `${req.protocol}://${req.get('host')}`;
-    
-    // Procesamiento paralelo de imágenes
-    const imageProcessing = result.recordset.map(async (product) => {
-      const imageName = await getProductImage(product.CodigoArticulo);
-      return {
-        ...product,
-        RutaImagen: `${serverUrl}/images/${imageName}`,
-        // Asegurar precios
-        PrecioVenta: product.PrecioVenta || product.PrecioCompra || 0,
-        PrecioCompra: product.PrecioCompra || product.PrecioVenta || 0
-      };
-    });
+    const updatedProducts = [];
 
-    const productsWithImages = await Promise.all(imageProcessing);
+    // Procesamiento optimizado de productos
+    for (const product of result.recordset) {
+      try {
+        const codigo = product.CodigoArticulo;
+        
+        if (!codigo) continue; // Saltar productos sin código
 
-    const endTime = Date.now();
-    console.log(`✅ API Products: ${productsWithImages.length} productos en ${endTime - startTime}ms`);
+        const dbImage = product.RutaImagen;
+        const imagenFisica = await getProductImage(codigo);
 
-    res.json({
-      success: true,
-      products: productsWithImages,
-      pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(total / limit),
-        totalProducts: total,
-        hasNextPage: offset + limit < total,
-        limit: parseInt(limit)
+        let finalImage = 'default.jpg';
+
+        if (imagenFisica) {
+          finalImage = imagenFisica;
+
+          // Sincronización mejorada con manejo de errores
+          if (imagenFisica !== dbImage) {
+            try {
+              await pool.request()
+                .input('RutaImagen', imagenFisica)
+                .input('CodigoArticulo', codigo)
+                .query(`
+                  UPDATE Articulos
+                  SET RutaImagen = @RutaImagen
+                  WHERE CodigoArticulo = @CodigoArticulo
+                `);
+            } catch (updateError) {
+              console.warn(`No se pudo actualizar imagen para ${codigo}:`, updateError.message);
+            }
+          }
+        } else if (dbImage) {
+          finalImage = dbImage;
+        }
+
+        // Producto con todos los datos necesarios
+        updatedProducts.push({
+          ...product,
+          RutaImagen: `${serverUrl}/images/${finalImage}`,
+          PrecioVenta: product.PrecioVenta || product.PrecioCompra // Fallback a PrecioCompra
+        });
+      } catch (productError) {
+        console.warn(`Error procesando producto ${product.CodigoArticulo}:`, productError.message);
+        continue; // Continuar con el siguiente producto
       }
-    });
+    }
 
+    res.status(200).json(updatedProducts);
   } catch (error) {
-    console.error('❌ Error en getProducts:', error);
-    res.status(500).json({ 
-      success: false,
+    console.error('Error al obtener productos:', error);
+    res.status(500).json({
       error: 'Error al obtener productos',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
 
-// Sincronización mejorada
+// Función de sincronización mejorada
 const syncImagesWithDB = async () => {
   try {
     const files = await fs.promises.readdir(IMAGE_FOLDER);
     const pool = await getPool();
 
-    const updates = [];
-    const batchSize = 100;
+    const imageUpdates = [];
 
-    for (let i = 0; i < files.length; i += batchSize) {
-      const batch = files.slice(i, i + batchSize);
-      const batchUpdates = batch.map(file => {
-        const ext = path.extname(file).toLowerCase();
-        if (!IMAGE_EXTENSIONS.includes(ext)) return null;
-        
-        const codigoArticulo = path.basename(file, ext);
-        return pool.request()
+    for (const file of files) {
+      const ext = path.extname(file).toLowerCase();
+      if (!IMAGE_EXTENSIONS.includes(ext)) continue;
+
+      const codigoArticulo = path.basename(file, ext);
+      
+      imageUpdates.push(
+        pool.request()
           .input('RutaImagen', file)
           .input('CodigoArticulo', codigoArticulo)
-          .query(`UPDATE Articulos SET RutaImagen = @RutaImagen WHERE CodigoArticulo = @CodigoArticulo`);
-      }).filter(Boolean);
-
-      updates.push(Promise.allSettled(batchUpdates));
+          .query(`
+            UPDATE Articulos
+            SET RutaImagen = @RutaImagen
+            WHERE CodigoArticulo = @CodigoArticulo
+          `)
+      );
     }
 
-    await Promise.all(updates);
-    console.log('✅ Sincronización de imágenes completada');
+    // Ejecutar todas las actualizaciones en paralelo
+    await Promise.allSettled(imageUpdates);
+    
+    console.log('✅ Imágenes sincronizadas con la base de datos');
   } catch (error) {
-    console.error('❌ Error en syncImagesWithDB:', error);
+    console.error('❌ Error en sincronización de imágenes:', error);
   }
 };
 
 module.exports = {
   getProducts,
-  syncImagesWithDB,
-  preCacheImages,
-  getProductImage // Exportar para uso externo
+  syncImagesWithDB
 };
-
-// Iniciar pre-cache al cargar el módulo
-preCacheImages().catch(console.error);
