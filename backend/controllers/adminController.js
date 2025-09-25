@@ -215,9 +215,9 @@ const getOrderForReview = async (req, res) => {
   }
 };
 
-// Función para generar albarán de cliente
+// Función para generar albarán de cliente - MODIFICADA para incluir todos los campos necesarios
 const generarAlbaranCliente = async (transaction, orderHeader, items) => {
-  const { CodigoEmpresa, EjercicioPedido, CodigoCliente, RazonSocial, Domicilio, Municipio, Provincia } = orderHeader;
+  const { CodigoEmpresa, EjercicioPedido, CodigoCliente, RazonSocial, Domicilio, Municipio, Provincia, NumeroPedido } = orderHeader;
 
   // Obtener el próximo número de albarán
   const albaranResult = await transaction.request()
@@ -253,12 +253,13 @@ const generarAlbaranCliente = async (transaction, orderHeader, items) => {
 
   const importeLiquidoTotal = baseImponibleTotal + totalIVATotal;
 
-  // Insertar cabecera del albarán
+  // Insertar cabecera del albarán - AHORA INCLUYE NumeroPedido
   await transaction.request()
     .input('CodigoEmpresa', CodigoEmpresa)
     .input('EjercicioAlbaran', EjercicioPedido)
     .input('SerieAlbaran', 'WebCD')
     .input('NumeroAlbaran', numeroAlbaran)
+    .input('NumeroPedido', NumeroPedido) // ← NUEVO CAMPO
     .input('CodigoCliente', CodigoCliente)
     .input('RazonSocial', RazonSocial)
     .input('Domicilio', Domicilio || '')
@@ -272,19 +273,19 @@ const generarAlbaranCliente = async (transaction, orderHeader, items) => {
     .input('StatusFacturado', 0)
     .query(`
       INSERT INTO CabeceraAlbaranCliente (
-        CodigoEmpresa, EjercicioAlbaran, SerieAlbaran, NumeroAlbaran,
+        CodigoEmpresa, EjercicioAlbaran, SerieAlbaran, NumeroAlbaran, NumeroPedido,
         CodigoCliente, RazonSocial, Domicilio, Municipio, Provincia,
         FechaAlbaran, NumeroLineas, BaseImponible, TotalIVA, ImporteLiquido,
         StatusFacturado
       ) VALUES (
-        @CodigoEmpresa, @EjercicioAlbaran, @SerieAlbaran, @NumeroAlbaran,
+        @CodigoEmpresa, @EjercicioAlbaran, @SerieAlbaran, @NumeroAlbaran, @NumeroPedido,
         @CodigoCliente, @RazonSocial, @Domicilio, @Municipio, @Provincia,
         @FechaAlbaran, @NumeroLineas, @BaseImponible, @TotalIVA, @ImporteLiquido,
         @StatusFacturado
       )
     `);
 
-  // Insertar líneas del albarán
+  // Insertar líneas del albarán - AHORA INCLUYE UnidadesServidas y ComentarioRecepcion
   for (const [index, item] of items.entries()) {
     const precio = item.Precio || 0;
     const unidades = item.UnidadesPedidas || 0;
@@ -303,167 +304,28 @@ const generarAlbaranCliente = async (transaction, orderHeader, items) => {
       .input('CodigoArticulo', item.CodigoArticulo)
       .input('DescripcionArticulo', item.DescripcionArticulo)
       .input('Unidades', unidades)
+      .input('UnidadesServidas', 0) // Inicialmente 0, se actualizará en recepción
       .input('Precio', precio)
       .input('BaseImponible', importeLinea)
       .input('PorcentajeIva', porcentajeIva)
       .input('CuotaIva', ivaLinea)
       .input('ImporteLiquido', importeLiquido)
+      .input('ComentarioRecepcion', '') // Inicialmente vacío
       .query(`
         INSERT INTO LineasAlbaranCliente (
           CodigoEmpresa, EjercicioAlbaran, SerieAlbaran, NumeroAlbaran, Orden,
-          CodigoArticulo, DescripcionArticulo, Unidades, Precio,
-          BaseImponible, [%Iva], CuotaIva, ImporteLiquido
+          CodigoArticulo, DescripcionArticulo, Unidades, UnidadesServidas, Precio,
+          BaseImponible, [%Iva], CuotaIva, ImporteLiquido, ComentarioRecepcion
         ) VALUES (
           @CodigoEmpresa, @EjercicioAlbaran, @SerieAlbaran, @NumeroAlbaran, @Orden,
-          @CodigoArticulo, @DescripcionArticulo, @Unidades, @Precio,
-          @BaseImponible, @PorcentajeIva, @CuotaIva, @ImporteLiquido
+          @CodigoArticulo, @DescripcionArticulo, @Unidades, @UnidadesServidas, @Precio,
+          @BaseImponible, @PorcentajeIva, @CuotaIva, @ImporteLiquido, @ComentarioRecepcion
         )
       `);
   }
 
   return numeroAlbaran;
 };
-
-
-// Función para generar albarán de proveedor
-const generarAlbaranProveedor = async (transaction, orderHeader, proveedor, itemsProveedor, numeroPedidoProveedor) => {
-  const { CodigoEmpresa, EjercicioPedido } = orderHeader;
-
-  // Validación mejorada del proveedor
-  if (!proveedor || !proveedor.CodigoProveedor) {
-    console.warn('Proveedor no especificado, usando proveedor por defecto');
-    proveedor = {
-      CodigoProveedor: 'DEFAULT',
-      RazonSocial: 'Proveedor No Especificado',
-      Domicilio: '',
-      Municipio: '',
-      Provincia: '',
-      // Agregar campos adicionales necesarios
-      Nombre: 'Proveedor No Especificado',
-      CifDni: '',
-      CifEuropeo: '',
-      CodigoPostal: '',
-      CodigoMunicipio: '',
-      CodigoProvincia: '',
-      CodigoNacion: '108',
-      Nacion: 'ESPAÑA',
-      CodigoCondiciones: 0,
-      FormadePago: '',
-      CodigoContable: orderHeader.CodigoContable || '',
-      CodigoIdioma_: 'ESP',
-      MantenerCambio_: 0,
-      CodigoContableANT_: orderHeader.CodigoContable || ''
-    };
-  }
-
-  const { CodigoProveedor, RazonSocial, Domicilio, Municipio, Provincia } = proveedor;
-
-  // Obtener el próximo número de albarán
-  const albaranResult = await transaction.request()
-    .input('CodigoEmpresa', CodigoEmpresa)
-    .input('EjercicioAlbaran', EjercicioPedido)
-    .input('SerieAlbaran', 'WebCD')
-    .query(`
-      SELECT ISNULL(MAX(NumeroAlbaran), 0) + 1 AS SiguienteNumero
-      FROM CabeceraAlbaranProveedor
-      WHERE CodigoEmpresa = @CodigoEmpresa
-        AND EjercicioAlbaran = @EjercicioAlbaran
-        AND SerieAlbaran = @SerieAlbaran
-    `);
-
-  const numeroAlbaran = albaranResult.recordset[0].SiguienteNumero;
-  const fechaActual = new Date();
-
-  // Calcular totales
-  let baseImponibleTotal = 0;
-  let totalIVATotal = 0;
-
-  itemsProveedor.forEach(item => {
-    const precio = item.Precio || 0;
-    const unidades = item.UnidadesPedidas || 0;
-    const porcentajeIva = item.PorcentajeIva || 21;
-
-    const importeLinea = unidades * precio;
-    const ivaLinea = importeLinea * porcentajeIva / 100;
-
-    baseImponibleTotal += importeLinea;
-    totalIVATotal += ivaLinea;
-  });
-
-  const importeLiquidoTotal = baseImponibleTotal + totalIVATotal;
-
-  // Insertar cabecera del albarán
-  await transaction.request()
-    .input('CodigoEmpresa', CodigoEmpresa)
-    .input('EjercicioAlbaran', EjercicioPedido)
-    .input('SerieAlbaran', 'WebCD')
-    .input('NumeroAlbaran', numeroAlbaran)
-    .input('CodigoProveedor', CodigoProveedor)
-    .input('RazonSocial', RazonSocial)
-    .input('Domicilio', Domicilio || '')
-    .input('Municipio', Municipio || '')
-    .input('Provincia', Provincia || '')
-    .input('FechaAlbaran', fechaActual)
-    .input('NumeroLineas', itemsProveedor.length)
-    .input('BaseImponible', baseImponibleTotal)
-    .input('TotalIVA', totalIVATotal)
-    .input('ImporteLiquido', importeLiquidoTotal)
-    .input('StatusFacturado', 0)
-    .query(`
-      INSERT INTO CabeceraAlbaranProveedor (
-        CodigoEmpresa, EjercicioAlbaran, SerieAlbaran, NumeroAlbaran,
-        CodigoProveedor, RazonSocial, Domicilio, Municipio, Provincia,
-        FechaAlbaran, NumeroLineas, BaseImponible, TotalIVA, ImporteLiquido,
-        StatusFacturado
-      ) VALUES (
-        @CodigoEmpresa, @EjercicioAlbaran, @SerieAlbaran, @NumeroAlbaran,
-        @CodigoProveedor, @RazonSocial, @Domicilio, @Municipio, @Provincia,
-        @FechaAlbaran, @NumeroLineas, @BaseImponible, @TotalIVA, @ImporteLiquido,
-        @StatusFacturado
-      )
-    `);
-
-  // Insertar líneas del albarán
-  for (const [index, item] of itemsProveedor.entries()) {
-    const precio = item.Precio || 0;
-    const unidades = item.UnidadesPedidas || 0;
-    const porcentajeIva = item.PorcentajeIva || 21;
-
-    const importeLinea = unidades * precio;
-    const ivaLinea = importeLinea * porcentajeIva / 100;
-    const importeLiquido = importeLinea + ivaLinea;
-
-    await transaction.request()
-      .input('CodigoEmpresa', CodigoEmpresa)
-      .input('EjercicioAlbaran', EjercicioPedido)
-      .input('SerieAlbaran', 'WebCD')
-      .input('NumeroAlbaran', numeroAlbaran)
-      .input('Orden', index + 1)
-      .input('CodigoArticulo', item.CodigoArticulo)
-      .input('DescripcionArticulo', item.DescripcionArticulo)
-      .input('Unidades', unidades)
-      .input('Precio', precio)
-      .input('BaseImponible', importeLinea)
-      .input('PorcentajeIva', porcentajeIva)
-      .input('CuotaIva', ivaLinea)
-      .input('ImporteLiquido', importeLiquido)
-      .query(`
-        INSERT INTO LineasAlbaranProveedor (
-          CodigoEmpresa, EjercicioAlbaran, SerieAlbaran, NumeroAlbaran, Orden,
-          CodigoArticulo, DescripcionArticulo, Unidades, Precio,
-          BaseImponible, [%Iva], CuotaIva, ImporteLiquido
-        ) VALUES (
-          @CodigoEmpresa, @EjercicioAlbaran, @SerieAlbaran, @NumeroAlbaran, @Orden,
-          @CodigoArticulo, @DescripcionArticulo, @Unidades, @Precio,
-          @BaseImponible, @PorcentajeIva, @CuotaIva, @ImporteLiquido
-        )
-      `);
-  }
-
-  return numeroAlbaran;
-};
-
-
 
 const updateOrderQuantitiesAndApprove = async (req, res) => {
   const { orderId } = req.params;
@@ -491,7 +353,8 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
             Municipio,
             Provincia,
             IdDelegacion,
-            CodigoContable
+            CodigoContable,
+            NumeroPedido
           FROM CabeceraPedidoCliente
           WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
         `);
@@ -501,7 +364,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
       }
 
       const orderHeader = orderResult.recordset[0];
-      const { CodigoEmpresa, EjercicioPedido, CodigoCliente, CifDni, RazonSocial, Domicilio, CodigoPostal, Municipio, Provincia, IdDelegacion, CodigoContable } = orderHeader;
+      const { CodigoEmpresa, EjercicioPedido, CodigoCliente, CifDni, RazonSocial, Domicilio, CodigoPostal, Municipio, Provincia, IdDelegacion, CodigoContable, NumeroPedido } = orderHeader;
 
       // 2. Actualizar cantidades en LineasPedidoCliente
       for (const item of items) {
@@ -565,11 +428,11 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           AND SeriePedido = @SeriePedido
         `);
 
-      // 5. Generar albarán para el cliente
+      // 5. Generar albarán para el cliente (SOLO albarán de cliente)
       const numeroAlbaranCliente = await generarAlbaranCliente(transaction, orderHeader, items);
       console.log(`Albarán de cliente generado: ${numeroAlbaranCliente}`);
 
-      // 6. Crear pedidos a proveedores (agrupados por proveedor)
+      // 6. Crear pedidos a proveedores (agrupados por proveedor) - SIN GENERAR ALBARÁN DE PROVEEDOR
       const pedidosPorProveedor = {};
       
       // Agrupar items por proveedor
@@ -624,7 +487,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           `);
       }
 
-      // Crear un pedido por cada proveedor
+      // Crear un pedido por cada proveedor (SOLO PEDIDO, SIN ALBARÁN)
       for (const [codigoProveedor, itemsProveedor] of Object.entries(pedidosPorProveedor)) {
         // Obtener información básica del proveedor
         const proveedorResult = await transaction.request()
@@ -853,15 +716,9 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
               NumeroPedido = @NumeroPedido
           `);
 
-        // 7. Generar albarán para el proveedor
-        const numeroAlbaranProveedor = await generarAlbaranProveedor(
-          transaction, 
-          orderHeader, 
-          proveedor, 
-          itemsProveedor, 
-          numeroPedidoProveedor
-        );
-        console.log(`Albarán de proveedor ${codigoProveedor} generado: ${numeroAlbaranProveedor}`);
+        // NOTA: SE ELIMINA LA GENERACIÓN DEL ALBARÁN DE PROVEEDOR
+        // El albarán de proveedor lo debe generar el proveedor, no el sistema
+        console.log(`Pedido a proveedor ${codigoProveedor} generado: ${numeroPedidoProveedor}`);
 
         numeroPedidoProveedor++;
       }
@@ -884,7 +741,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
 
       res.status(200).json({
         success: true,
-        message: 'Pedido actualizado, aprobado y convertido a pedidos de proveedor correctamente. Albaranes generados automáticamente.'
+        message: 'Pedido actualizado, aprobado y convertido a pedidos de proveedor correctamente. Albarán de cliente generado automáticamente.'
       });
 
     } catch (err) {

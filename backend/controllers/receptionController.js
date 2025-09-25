@@ -80,37 +80,6 @@ const getOrderReception = async (req, res) => {
   }
 };
 
-// Función auxiliar para recalcular totales del albarán
-const recalculateAlbaranTotals = async (transaction, numeroAlbaran) => {
-  const totalesResult = await transaction.request()
-    .input('NumeroAlbaran', numeroAlbaran)
-    .query(`
-      SELECT 
-        SUM(Unidades * Precio) AS BaseImponible,
-        SUM((Unidades * Precio) * ([%Iva] / 100.0)) AS TotalIVA
-      FROM LineasAlbaranCliente
-      WHERE NumeroAlbaran = @NumeroAlbaran
-    `);
-
-  const baseImponible = parseFloat(totalesResult.recordset[0].BaseImponible) || 0;
-  const totalIVA = parseFloat(totalesResult.recordset[0].TotalIVA) || 0;
-  const importeLiquido = baseImponible + totalIVA;
-
-  await transaction.request()
-    .input('NumeroAlbaran', numeroAlbaran)
-    .input('BaseImponible', baseImponible)
-    .input('TotalIVA', totalIVA)
-    .input('ImporteLiquido', importeLiquido)
-    .query(`
-      UPDATE CabeceraAlbaranCliente
-      SET 
-        BaseImponible = @BaseImponible,
-        TotalIVA = @TotalIVA,
-        ImporteLiquido = @ImporteLiquido
-      WHERE NumeroAlbaran = @NumeroAlbaran
-    `);
-};
-
 const confirmReception = async (req, res) => {
   const { orderId } = req.params;
   const { items } = req.body;
@@ -121,7 +90,31 @@ const confirmReception = async (req, res) => {
     await transaction.begin();
 
     try {
-      // 1. Actualizar líneas del pedido
+      // 1. Obtener información completa del pedido
+      const orderResult = await transaction.request()
+        .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD')
+        .query(`
+          SELECT 
+            CodigoEmpresa, 
+            EjercicioPedido,
+            CodigoCliente,
+            RazonSocial,
+            Domicilio,
+            CodigoPostal,
+            Municipio,
+            Provincia
+          FROM CabeceraPedidoCliente
+          WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
+        `);
+
+      if (orderResult.recordset.length === 0) {
+        throw new Error('Pedido no encontrado');
+      }
+
+      const orderInfo = orderResult.recordset[0];
+
+      // 2. Actualizar líneas del pedido con cantidades recibidas
       for (const item of items) {
         await transaction.request()
           .input('NumeroPedido', orderId)
@@ -142,7 +135,7 @@ const confirmReception = async (req, res) => {
           `);
       }
 
-      // 2. Actualizar albarán de cliente (SOLO albarán de cliente)
+      // 3. Buscar el albarán de cliente asociado al pedido
       const albaranResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
@@ -156,24 +149,62 @@ const confirmReception = async (req, res) => {
       if (albaranResult.recordset.length > 0) {
         const numeroAlbaran = albaranResult.recordset[0].NumeroAlbaran;
         
-        // Actualizar líneas del albarán con unidades recibidas
+        console.log(`Encontrado albarán ${numeroAlbaran} para el pedido ${orderId}`);
+        
+        // 4. Actualizar las líneas del albarán de cliente con TODOS los campos necesarios
         for (const item of items) {
           await transaction.request()
             .input('NumeroAlbaran', numeroAlbaran)
             .input('Orden', item.Orden)
-            .input('Unidades', item.UnidadesRecibidas)
+            .input('Unidades', item.UnidadesRecibidas) // Unidades recibidas (7 u 8 en tu caso)
+            .input('UnidadesServidas', item.UnidadesRecibidas) // Mismo valor que Unidades
+            .input('ComentarioRecepcion', item.ComentarioRecepcion || '') // Comentarios de recepción
             .query(`
               UPDATE LineasAlbaranCliente 
-              SET Unidades = @Unidades 
+              SET 
+                Unidades = @Unidades, 
+                UnidadesServidas = @UnidadesServidas,
+                ComentarioRecepcion = @ComentarioRecepcion
               WHERE NumeroAlbaran = @NumeroAlbaran AND Orden = @Orden
             `);
         }
 
-        // Recalcular totales del albarán
-        await recalculateAlbaranTotals(transaction, numeroAlbaran);
+        // 5. Recalcular los totales del albarán de cliente con las nuevas cantidades
+        const totalesResult = await transaction.request()
+          .input('NumeroAlbaran', numeroAlbaran)
+          .query(`
+            SELECT 
+              SUM(Unidades * Precio) AS BaseImponible,
+              SUM((Unidades * Precio) * ([%Iva] / 100.0)) AS TotalIVA
+            FROM LineasAlbaranCliente
+            WHERE NumeroAlbaran = @NumeroAlbaran
+          `);
+
+        const baseImponible = parseFloat(totalesResult.recordset[0].BaseImponible) || 0;
+        const totalIVA = parseFloat(totalesResult.recordset[0].TotalIVA) || 0;
+        const importeLiquido = baseImponible + totalIVA;
+
+        // 6. Actualizar la cabecera del albarán con los nuevos totales
+        await transaction.request()
+          .input('NumeroAlbaran', numeroAlbaran)
+          .input('BaseImponible', baseImponible)
+          .input('TotalIVA', totalIVA)
+          .input('ImporteLiquido', importeLiquido)
+          .query(`
+            UPDATE CabeceraAlbaranCliente
+            SET 
+              BaseImponible = @BaseImponible,
+              TotalIVA = @TotalIVA,
+              ImporteLiquido = @ImporteLiquido
+            WHERE NumeroAlbaran = @NumeroAlbaran
+          `);
+
+        console.log(`Albarán ${numeroAlbaran} actualizado con nuevas cantidades y comentarios`);
+      } else {
+        console.warn(`No se encontró albarán para el pedido ${orderId}`);
       }
 
-      // 3. Determinar nuevo estado del pedido
+      // 7. Determinar nuevo estado del pedido
       const pendingResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
@@ -186,7 +217,7 @@ const confirmReception = async (req, res) => {
       const pendiente = pendingResult.recordset[0].Pendiente || 0;
       const nuevoEstado = pendiente > 0 ? 1 : 2; // 1=Parcial, 2=Servido
 
-      // 4. Actualizar estado del pedido
+      // 8. Actualizar estado del pedido
       await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
@@ -202,7 +233,7 @@ const confirmReception = async (req, res) => {
 
       res.status(200).json({
         success: true,
-        message: 'Recepción confirmada correctamente',
+        message: 'Recepción confirmada correctamente. Albarán actualizado con las cantidades recibidas y comentarios.',
         estado: nuevoEstado,
         estadoTexto: nuevoEstado === 1 ? 'Parcial' : 'Servido'
       });
