@@ -25,31 +25,7 @@ const OrderEdit = () => {
   const productsPerPage = 20;
 
   const generateProductKey = (product) => {
-    const str = `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}`;
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    return `prod-${hash.toString(36)}`;
-  };
-
-  const checkImageExists = (url) => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.src = url;
-      img.onload = () => resolve(true);
-      img.onerror = () => resolve(false);
-    });
-  };
-
-  const getProductImage = async (product) => {
-    const localImagePath = `/images/${product.CodigoArticulo}.jpg`;
-    const exists = await checkImageExists(localImagePath);
-    if (exists) return localImagePath;
-    if (product.RutaImagen) return product.RutaImagen;
-    return '/images/default.jpg';
+    return `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}-${product.Familia || '00'}-${product.Subfamilia || '00'}`;
   };
 
   useEffect(() => {
@@ -59,17 +35,17 @@ const OrderEdit = () => {
         const response = await api.get(`/api/orders/${orderId}`, {
           params: {
             codigoCliente: user?.codigoCliente,
-            seriePedido: 'Web'
+            seriePedido: 'WebCD'
           }
         });
         
         const order = response.data.order;
-        setOriginalItems(order.Productos.map(item => ({
+        setOriginalItems(order.productos.map(item => ({
           ...item,
           Cantidad: item.UnidadesPedidas
         })));
         
-        setOrderItems(order.Productos.map(item => ({
+        setOrderItems(order.productos.map(item => ({
           ...item,
           Cantidad: item.UnidadesPedidas
         })));
@@ -90,17 +66,13 @@ const OrderEdit = () => {
         setLoading(prev => ({ ...prev, products: true }));
         const response = await api.get('/api/products');
         
-        const productsWithImages = await Promise.all(
-          response.data.map(async (product) => {
-            const imagePath = await getProductImage(product);
-            return { ...product, FinalImage: imagePath };
-          })
-        );
+        let productsData = response.data.products || response.data;
         
+        // Eliminar duplicados
         const uniqueProducts = [];
         const seenKeys = new Set();
         
-        productsWithImages.forEach(product => {
+        productsData.forEach(product => {
           const key = generateProductKey(product);
           if (!seenKeys.has(key)) {
             seenKeys.add(key);

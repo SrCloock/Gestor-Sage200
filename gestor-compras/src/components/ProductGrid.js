@@ -1,5 +1,5 @@
 import React, { memo, useState, useCallback } from 'react';
-import { FaArrowLeft, FaArrowRight, FaPlus, FaBox } from 'react-icons/fa';
+import { FaArrowLeft, FaArrowRight, FaPlus, FaBox, FaExpand } from 'react-icons/fa';
 import '../styles/ProductGrid.css';
 
 const ProductGrid = memo(({ 
@@ -14,6 +14,7 @@ const ProductGrid = memo(({
 }) => {
   const [loadedImages, setLoadedImages] = useState(new Set());
   const [imageErrors, setImageErrors] = useState(new Set());
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   const handleImageLoad = useCallback((productKey) => {
     setLoadedImages(prev => new Set(prev).add(productKey));
@@ -22,6 +23,11 @@ const ProductGrid = memo(({
   const handleImageError = useCallback((productKey) => {
     setImageErrors(prev => new Set(prev).add(productKey));
   }, []);
+
+  const showFullDescription = (product, e) => {
+    e.stopPropagation();
+    setSelectedProduct(product);
+  };
 
   const createPageNumbers = () => {
     const pageNumbers = [];
@@ -105,8 +111,18 @@ const ProductGrid = memo(({
 
               <div className="pg-product-content">
                 <div className="pg-product-header">
-                  <h3 className="pg-product-name" title={product.DescripcionArticulo}>
-                    {product.DescripcionArticulo}
+                  <h3 
+                    className="pg-product-name" 
+                    onClick={(e) => showFullDescription(product, e)}
+                    title="Click para ver descripción completa"
+                  >
+                    {product.DescripcionArticulo.length > 50 
+                      ? `${product.DescripcionArticulo.substring(0, 50)}...` 
+                      : product.DescripcionArticulo
+                    }
+                    {product.DescripcionArticulo.length > 50 && (
+                      <FaExpand className="pg-expand-icon" />
+                    )}
                   </h3>
                   <span className="pg-product-code">{product.CodigoArticulo}</span>
                 </div>
@@ -201,6 +217,32 @@ const ProductGrid = memo(({
           >
             <FaArrowRight />
           </button>
+        </div>
+      )}
+
+      {/* Modal para descripción completa */}
+      {selectedProduct && (
+        <div className="pg-modal-overlay" onClick={() => setSelectedProduct(null)}>
+          <div className="pg-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="pg-modal-header">
+              <h3>Descripción Completa</h3>
+              <button className="pg-modal-close" onClick={() => setSelectedProduct(null)}>×</button>
+            </div>
+            <div className="pg-modal-body">
+              <p><strong>Artículo:</strong> {selectedProduct.DescripcionArticulo}</p>
+              <p><strong>Código:</strong> {selectedProduct.CodigoArticulo}</p>
+              {selectedProduct.NombreProveedor && (
+                <p><strong>Proveedor:</strong> {selectedProduct.NombreProveedor}</p>
+              )}
+              {selectedProduct.Familia && (
+                <p><strong>Familia:</strong> {selectedProduct.Familia}</p>
+              )}
+              {selectedProduct.Subfamilia && (
+                <p><strong>Subfamilia:</strong> {selectedProduct.Subfamilia}</p>
+              )}
+              <p><strong>Precio:</strong> {formatPrice(selectedProduct.PrecioVenta || selectedProduct.PrecioCompra || selectedProduct.Precio)}</p>
+            </div>
+          </div>
         </div>
       )}
     </>

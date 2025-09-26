@@ -53,7 +53,6 @@ app.use(express.urlencoded({ extended: true }));
 // Conectar a la base de datos y sincronizar imágenes
 connect().then(async () => {
   console.log('✅ Base de datos conectada');
-  await syncImagesWithDB();
 }).catch(err => {
   console.error('❌ Error al conectar a la base de datos:', err);
 });

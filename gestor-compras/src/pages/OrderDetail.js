@@ -20,7 +20,7 @@ const OrderDetail = () => {
         const response = await api.get(`/api/orders/${orderId}`, {
           params: {
             codigoCliente: user?.codigoCliente,
-            seriePedido: 'Web'
+            seriePedido: 'WebCD'
           }
         });
         setOrder(response.data.order);
@@ -95,7 +95,13 @@ const OrderDetail = () => {
           )}
           <div className="od-info-row">
             <span className="od-info-label">Total Artículos:</span>
-            <span className="od-info-value">{order.Productos.length}</span>
+            <span className="od-info-value">{order.productos.length}</span>
+          </div>
+          <div className="od-info-row">
+            <span className="od-info-label">Total del Pedido:</span>
+            <span className="od-info-value">
+              {order.ImporteLiquido ? `${order.ImporteLiquido.toFixed(2)} €` : 'N/A'}
+            </span>
           </div>
         </div>
         
@@ -135,7 +141,7 @@ const OrderDetail = () => {
       <div className="od-products-section">
         <div className="od-section-header">
           <h3>Artículos del Pedido</h3>
-          <span className="od-items-count">{order.Productos.length} productos</span>
+          <span className="od-items-count">{order.productos.length} productos</span>
         </div>
         <div className="od-table-container">
           <table className="od-products-table">
@@ -149,7 +155,7 @@ const OrderDetail = () => {
               </tr>
             </thead>
             <tbody>
-              {order.Productos.map((product, index) => (
+              {order.productos.map((product, index) => (
                 <tr key={index} className="od-product-row">
                   <td className="od-product-code">{product.CodigoArticulo}</td>
                   <td className="od-product-description">{product.DescripcionArticulo}</td>

@@ -9,12 +9,12 @@ const OrderList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [sortBy, setSortBy] = useState('recent');
   
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  // Función para obtener texto del estado
   const getStatusText = useMemo(() => (order) => {
     if (order.StatusAprobado === 0) return 'Revisando';
     if (order.StatusAprobado === -1) {
@@ -28,9 +28,8 @@ const OrderList = () => {
     return 'Desconocido';
   }, []);
 
-  // Función para verificar si es editable
   const canEditOrder = useMemo(() => (order) => {
-    return order.StatusAprobado === 0; // Solo editable en "Revisando"
+    return order.StatusAprobado === 0;
   }, []);
 
   useEffect(() => {
@@ -66,9 +65,15 @@ const OrderList = () => {
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(order => 
-        order.NumeroPedido.toString().includes(term) ||
-        order.RazonSocial.toLowerCase().includes(term)
+        order.NumeroPedido.toString().includes(term)
       );
+    }
+    
+    if (statusFilter) {
+      result = result.filter(order => {
+        const statusText = getStatusText(order).toLowerCase();
+        return statusText.includes(statusFilter.toLowerCase());
+      });
     }
     
     result.sort((a, b) => {
@@ -78,6 +83,8 @@ const OrderList = () => {
       switch(sortBy) {
         case 'recent': return dateB - dateA;
         case 'oldest': return dateA - dateB;
+        case 'amount-asc': return (a.ImporteLiquido || 0) - (b.ImporteLiquido || 0);
+        case 'amount-desc': return (b.ImporteLiquido || 0) - (a.ImporteLiquido || 0);
         case 'id-asc': return a.NumeroPedido - b.NumeroPedido;
         case 'id-desc': return b.NumeroPedido - a.NumeroPedido;
         default: return dateB - dateA;
@@ -85,7 +92,7 @@ const OrderList = () => {
     });
     
     return result;
-  }, [searchTerm, sortBy, orders]);
+  }, [searchTerm, statusFilter, sortBy, orders, getStatusText]);
 
   const handleViewDetails = (orderId) => {
     navigate(`/mis-pedidos/${orderId}`);
@@ -96,6 +103,10 @@ const OrderList = () => {
     if (order && canEditOrder(order)) {
       navigate(`/editar-pedido/${orderId}`);
     }
+  };
+
+  const handleReception = (orderId) => {
+    navigate(`/mis-pedidos/${orderId}/recepcion`);
   };
 
   if (loading) return (
@@ -123,12 +134,26 @@ const OrderList = () => {
         <div className="ol-search-container">
           <input
             type="text"
-            placeholder="Buscar por #Pedido o cliente..."
+            placeholder="Buscar por #Pedido..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="ol-search-input"
           />
           <span className="ol-search-icon">🔍</span>
+        </div>
+        
+        <div className="ol-filter-container">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="ol-filter-select"
+          >
+            <option value="">Todos los estados</option>
+            <option value="revisando">Revisando</option>
+            <option value="preparando">Preparando</option>
+            <option value="parcial">Parcial</option>
+            <option value="servido">Servido</option>
+          </select>
         </div>
         
         <div className="ol-filter-container">
@@ -141,6 +166,8 @@ const OrderList = () => {
             <option value="oldest">Más antiguos</option>
             <option value="id-asc">#Pedido (ascendente)</option>
             <option value="id-desc">#Pedido (descendente)</option>
+            <option value="amount-asc">Importe (ascendente)</option>
+            <option value="amount-desc">Importe (descendente)</option>
           </select>
         </div>
       </div>
@@ -158,8 +185,8 @@ const OrderList = () => {
               <tr>
                 <th>#Pedido</th>
                 <th>Fecha Pedido</th>
-                <th>Cliente</th>
                 <th>Artículos</th>
+                <th>Importe</th>
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
@@ -168,6 +195,7 @@ const OrderList = () => {
               {filteredOrders.map(order => {
                 const statusText = getStatusText(order);
                 const editable = canEditOrder(order);
+                const canReceive = order.StatusAprobado === -1 && order.Estado !== 2;
                 
                 return (
                   <tr key={order.NumeroPedido} className="ol-table-row">
@@ -175,8 +203,10 @@ const OrderList = () => {
                     <td className="ol-order-date">
                       {new Date(order.FechaPedido).toLocaleDateString('es-ES')}
                     </td>
-                    <td className="ol-order-client">{order.RazonSocial}</td>
                     <td className="ol-items-count">{order.NumeroLineas}</td>
+                    <td className="ol-order-amount">
+                      {order.ImporteLiquido ? `${order.ImporteLiquido.toFixed(2)} €` : 'N/A'}
+                    </td>
                     <td>
                       <span className={`ol-status-badge ol-status-${statusText.toLowerCase()}`}>
                         {statusText}
@@ -196,6 +226,14 @@ const OrderList = () => {
                             className="ol-btn ol-btn-secondary"
                           >
                             Editar
+                          </button>
+                        )}
+                        {canReceive && (
+                          <button 
+                            onClick={() => handleReception(order.NumeroPedido)}
+                            className="ol-btn ol-btn-success"
+                          >
+                            Recepción
                           </button>
                         )}
                       </div>

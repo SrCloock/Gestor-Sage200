@@ -13,6 +13,8 @@ import { AuthProvider } from './context/AuthContext';
 import OrderEdit from './pages/OrderEdit';
 import OrderReception from './pages/OrderReception';
 import AdminOrders from './pages/AdminOrders';
+import AllOrders from './pages/AllOrders';
+
 
 import './App.css';
 
@@ -35,6 +37,7 @@ function App() {
               <Route path="/editar-pedido/:orderId" element={<OrderEdit />} />
               <Route path="/mis-pedidos/:orderId/recepcion" element={<OrderReception />} />
               <Route path="/admin/orders" element={<AdminOrders />} />
+              <Route path="/admin/allOrders" element={<AllOrders />} />
             </Route>
 
             <Route path="*" element={<Login />} />

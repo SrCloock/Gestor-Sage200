@@ -1,4 +1,3 @@
-// components/Navbar.js
 import React, { useContext, useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
@@ -86,7 +85,7 @@ const Navbar = () => {
                 </Link>
               </li>
               <li className="nv-link-item">
-                <Link to="/admin/all-orders" className={`nv-link ${isActive('/admin/all-orders') ? 'nv-active' : ''}`}>
+                <Link to="/admin/allOrders" className={`nv-link ${isActive('/admin/all-orders') ? 'nv-active' : ''}`}>
                   <FaListAlt className="nv-icon" />
                   <span className="nv-link-text">Todos los Pedidos</span>
                 </Link>
