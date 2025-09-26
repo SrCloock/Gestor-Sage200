@@ -1,233 +1,277 @@
 .orw-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #f0f9f7 0%, #e0f2f1 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 2rem;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .orw-card {
-  background: #ffffff;
-  border-radius: 24px;
-  padding: 3.5rem;
-  box-shadow: 0 20px 40px rgba(0, 77, 64, 0.15);
-  text-align: center;
-  max-width: 560px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
   width: 100%;
-  position: relative;
+  max-width: 900px;
   overflow: hidden;
-  border: 1px solid #e0f2f1;
-}
-
-.orw-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 6px;
-  background: linear-gradient(90deg, #2e7d67 0%, #4ca788 50%, #2e7d67 100%);
 }
 
 .orw-header {
-  margin-bottom: 2.5rem;
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+  padding: 2.5rem;
+  text-align: center;
   position: relative;
 }
 
 .orw-icon-container {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .orw-main-icon {
   font-size: 3.5rem;
-  color: #2e7d67;
-  background: linear-gradient(135deg, #e0f2f1, #b2dfdb);
-  padding: 1.5rem;
-  border-radius: 50%;
-  box-shadow: 0 8px 20px rgba(46, 125, 103, 0.2);
+  opacity: 0.9;
 }
 
 .orw-title {
-  color: #1a3c34;
+  margin: 0 0 0.5rem 0;
   font-size: 2.2rem;
   font-weight: 700;
-  margin-bottom: 1.5rem;
-  background: linear-gradient(135deg, #2e7d67 0%, #4ca788 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
 
 .orw-success-icon {
-  width: 80px;
-  height: 80px;
-  background: linear-gradient(135deg, #10b981, #059669);
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
   font-size: 2.5rem;
-  box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
-  animation: orw-pulse 2s infinite;
+  color: #4ade80;
 }
 
 .orw-content {
-  margin-bottom: 2.5rem;
-  line-height: 1.6;
+  padding: 2.5rem;
 }
 
 .orw-message {
-  color: #374151;
+  text-align: center;
   font-size: 1.2rem;
+  color: #6b7280;
   margin-bottom: 2rem;
-  line-height: 1.8;
+  line-height: 1.6;
 }
 
-.orw-message strong {
-  color: #2e7d67;
-  font-weight: 700;
+.orw-detalle-pedido h3 {
+  color: #374151;
+  margin-bottom: 1.5rem;
+  font-size: 1.6rem;
+  border-bottom: 3px solid #e5e7eb;
+  padding-bottom: 0.75rem;
 }
 
-.orw-delivery-info {
-  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
-  padding: 1.2rem 1.5rem;
-  border-radius: 16px;
-  display: inline-flex;
-  align-items: center;
+.orw-items-list {
+  margin-bottom: 2.5rem;
+}
+
+.orw-item {
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  transition: transform 0.2s;
+}
+
+.orw-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.orw-item-header {
+  display: flex;
+  align-items: flex-start;
   gap: 1rem;
-  margin: 1.5rem 0;
-  font-size: 1rem;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
-  border: 1px solid #bbf7d0;
+  margin-bottom: 1rem;
+}
+
+.orw-item-icon {
+  color: #6b7280;
+  font-size: 1.8rem;
+  margin-top: 0.25rem;
+}
+
+.orw-item-info h4 {
+  margin: 0 0 0.75rem 0;
+  color: #1f2937;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.orw-item-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.orw-item-details span {
+  background: #e5e7eb;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+.orw-item-financial {
+  border-top: 2px solid #e5e7eb;
+  padding-top: 1rem;
+}
+
+.orw-item-pricing {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 1.1rem;
+}
+
+.orw-item-total {
+  font-weight: 700;
+  color: #059669;
+  font-size: 1.2rem;
+}
+
+.orw-order-summary {
+  background: #f0f9ff;
+  border: 2px solid #bae6fd;
+  border-radius: 10px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.orw-summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  color: #0c4a6e;
+  font-size: 1.1rem;
 }
 
 .orw-delivery-icon {
-  color: #16a34a;
-  font-size: 1.5rem;
-  flex-shrink: 0;
+  margin-right: 0.5rem;
 }
 
-.orw-delivery-content {
+.orw-summary-total {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.3rem;
-}
-
-.orw-delivery-label {
-  color: #166534;
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.orw-delivery-date {
-  color: #1a3c34;
-  font-size: 1.1rem;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 3px solid #bae6fd;
+  font-size: 1.4rem;
   font-weight: 700;
+  color: #0369a1;
+}
+
+.orw-grand-total {
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.orw-comments {
+  background: #fef7ed;
+  border: 2px solid #fdba74;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.orw-comments h4 {
+  margin: 0 0 0.75rem 0;
+  color: #9a3412;
+  font-size: 1.2rem;
+}
+
+.orw-comments p {
+  margin: 0;
+  color: #c2410c;
+  line-height: 1.6;
+  font-size: 1.1rem;
 }
 
 .orw-confirmation-message {
-  color: #6b7280;
+  text-align: center;
   font-size: 1.1rem;
-  margin: 2rem 0 0 0;
-  line-height: 1.8;
+  color: #6b7280;
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: #f9fafb;
+  border-radius: 8px;
 }
 
 .orw-actions {
   display: flex;
+  gap: 1.5rem;
   justify-content: center;
-  gap: 1.2rem;
-  flex-wrap: wrap;
-  margin-bottom: 2rem;
+  padding: 2.5rem;
+  border-top: 2px solid #e5e7eb;
+  background: #f8fafc;
 }
 
 .orw-button {
-  padding: 1.2rem 2.2rem;
+  padding: 1.2rem 2.5rem;
   border: none;
-  border-radius: 14px;
+  border-radius: 8px;
   font-size: 1.1rem;
   font-weight: 600;
   cursor: pointer;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.8rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
-  min-width: 200px;
+  gap: 0.75rem;
+  transition: all 0.3s ease;
   text-decoration: none;
 }
 
 .orw-primary-button {
-  background: linear-gradient(135deg, #2e7d67 0%, #4ca788 100%);
-  color: #ffffff;
+  background: #10b981;
+  color: white;
 }
 
 .orw-primary-button:hover {
-  background: linear-gradient(135deg, #256552 0%, #3a856a 100%);
-  transform: translateY(-3px);
-  box-shadow: 0 10px 25px rgba(46, 125, 103, 0.35);
+  background: #059669;
+  transform: translateY(-2px);
 }
 
 .orw-secondary-button {
-  background: linear-gradient(135deg, #ffffff, #f9fafb);
-  color: #374151;
-  border: 2px solid #e5e7eb;
+  background: #6b7280;
+  color: white;
 }
 
 .orw-secondary-button:hover {
-  background: linear-gradient(135deg, #f9fafb, #f3f4f6);
-  transform: translateY(-3px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-  border-color: #2e7d67;
-  color: #2e7d67;
-}
-
-.orw-button-icon {
-  font-size: 1.2rem;
+  background: #4b5563;
+  transform: translateY(-2px);
 }
 
 .orw-footer {
-  border-top: 2px solid #f3f4f6;
-  padding-top: 1.5rem;
+  background: #1f2937;
+  padding: 1.5rem 2.5rem;
+  text-align: center;
 }
 
 .orw-footer-text {
-  color: #6b7280;
-  font-size: 0.95rem;
   margin: 0;
+  color: #d1d5db;
+  font-size: 0.95rem;
 }
 
 .orw-footer-link {
-  color: #2e7d67;
+  color: #60a5fa;
   text-decoration: none;
-  font-weight: 600;
-  transition: color 0.3s ease;
 }
 
 .orw-footer-link:hover {
-  color: #1a3c34;
   text-decoration: underline;
-}
-
-@keyframes orw-pulse {
-  0% {
-    transform: scale(1);
-    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
-  }
-  50% {
-    transform: scale(1.05);
-    box-shadow: 0 12px 30px rgba(16, 185, 129, 0.4);
-  }
-  100% {
-    transform: scale(1);
-    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
-  }
 }
 
 @media (max-width: 768px) {
@@ -235,72 +279,36 @@
     padding: 1rem;
   }
   
-  .orw-card {
-    padding: 2.5rem 2rem;
-    border-radius: 20px;
+  .orw-header {
+    padding: 2rem 1.5rem;
   }
   
   .orw-title {
     font-size: 1.8rem;
   }
   
-  .orw-main-icon {
-    font-size: 2.5rem;
-    padding: 1.2rem;
-  }
-  
-  .orw-success-icon {
-    width: 70px;
-    height: 70px;
-    font-size: 2rem;
-  }
-  
-  .orw-message {
-    font-size: 1.1rem;
-  }
-  
-  .orw-delivery-info {
-    flex-direction: column;
-    text-align: center;
-    gap: 0.8rem;
-    padding: 1rem;
-  }
-  
-  .orw-delivery-content {
-    align-items: center;
+  .orw-content {
+    padding: 2rem 1.5rem;
   }
   
   .orw-actions {
     flex-direction: column;
-    gap: 1rem;
+    padding: 2rem 1.5rem;
   }
   
   .orw-button {
     width: 100%;
-    min-width: auto;
-    padding: 1.1rem 2rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .orw-card {
-    padding: 2rem 1.5rem;
+    justify-content: center;
   }
   
-  .orw-title {
-    font-size: 1.6rem;
+  .orw-item-details {
+    flex-direction: column;
+    gap: 0.5rem;
   }
   
-  .orw-message {
-    font-size: 1rem;
-  }
-  
-  .orw-confirmation-message {
-    font-size: 1rem;
-  }
-  
-  .orw-button {
-    padding: 1rem 1.5rem;
-    font-size: 1rem;
+  .orw-item-pricing {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
   }
 }

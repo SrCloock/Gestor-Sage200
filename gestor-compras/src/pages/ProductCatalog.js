@@ -1,96 +1,134 @@
-import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api';
-import { FaSearch, FaBoxOpen, FaSync } from 'react-icons/fa';
+import { FaSearch, FaBoxOpen, FaSync, FaFilter } from 'react-icons/fa';
 import ProductGrid from '../components/ProductGrid';
+import FiltrosAvanzados from '../components/FiltrosAvanzados';
 import '../styles/ProductCatalog.css';
 
 const ProductCatalog = () => {
   const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalProducts, setTotalProducts] = useState(0);
+  const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  const [filtros, setFiltros] = useState({
+    familia: '',
+    subfamilia: '',
+    search: ''
+  });
   
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
-  const productsPerPage = 40; // Aumentar productos por página
+  const productsPerPage = 40;
 
-  // Debounce para búsqueda
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const response = await api.get('/api/products');
+        
+        if (response.data.products) {
+          setProducts(response.data.products);
+        } else {
+          setProducts(response.data);
+        }
+      } catch (err) {
+        console.error('Error loading products:', err);
+        setError('Error al cargar el catálogo');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const generateProductKey = useCallback((product) => {
-    return `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}`;
+    fetchProducts();
   }, []);
 
-  // Función optimizada para cargar productos
-  const loadProducts = useCallback(async (page = 1, search = '') => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      const response = await api.get('/api/products', {
-        params: {
-          page,
-          limit: productsPerPage,
-          search: search.trim()
-        }
-      });
+  const generateProductKey = (product) => {
+    return `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}`;
+  };
 
-      if (response.data.products) {
-        setProducts(response.data.products);
-        setTotalPages(response.data.pagination.totalPages);
-        setTotalProducts(response.data.pagination.total);
-        setCurrentPage(response.data.pagination.currentPage);
-      } else {
-        // Fallback para respuesta antigua
-        setProducts(response.data);
-      }
-    } catch (err) {
-      console.error('Error loading products:', err);
-      setError('Error al cargar el catálogo');
-    } finally {
-      setLoading(false);
-    }
-  }, [productsPerPage]);
-
-  // Cargar productos cuando cambia el término de búsqueda o la página
-  useEffect(() => {
-    loadProducts(1, debouncedSearchTerm);
-  }, [debouncedSearchTerm, loadProducts]);
-
-  // Cambiar de página
-  const handlePageChange = useCallback((newPage) => {
-    if (newPage > 0 && newPage <= totalPages) {
-      setCurrentPage(newPage);
-      loadProducts(newPage, debouncedSearchTerm);
-    }
-  }, [totalPages, debouncedSearchTerm, loadProducts]);
-
-  const handleAddToOrder = useCallback((product) => {
+  const handleAddToOrder = (product) => {
     navigate('/crear-pedido', { 
-      state: { selectedProduct: product },
-      replace: true // Evita guardar en historial de navegación
+      state: { selectedProduct: product }
     });
-  }, [navigate]);
+  };
 
-  const handleRefresh = useCallback(() => {
-    loadProducts(currentPage, debouncedSearchTerm);
-  }, [currentPage, debouncedSearchTerm, loadProducts]);
+  const handleRefresh = () => {
+    window.location.reload();
+  };
 
-  const sortedProducts = useMemo(() => {
-    return [...products].sort((a, b) => {
+  const opcionesFamilias = useMemo(() => {
+    const familias = [...new Set(products.map(p => p.Familia).filter(Boolean))];
+    return familias.sort();
+  }, [products]);
+
+  const opcionesSubfamilias = useMemo(() => {
+    const subfamilias = products
+      .filter(p => p.Familia && p.Subfamilia)
+      .map(p => ({ familia: p.Familia, valor: p.Subfamilia }));
+    
+    return [...new Map(subfamilias.map(item => [item.valor, item])).values()];
+  }, [products]);
+
+  const productosFiltrados = useMemo(() => {
+    let result = [...products];
+
+    if (filtros.search) {
+      const term = filtros.search.toLowerCase();
+      result = result.filter(product => 
+        product.DescripcionArticulo?.toLowerCase().includes(term) ||
+        product.CodigoArticulo?.toLowerCase().includes(term) ||
+        product.NombreProveedor?.toLowerCase().includes(term)
+      );
+    }
+
+    if (filtros.familia) {
+      result = result.filter(product => product.Familia === filtros.familia);
+    }
+
+    if (filtros.subfamilia) {
+      result = result.filter(product => product.Subfamilia === filtros.subfamilia);
+    }
+
+    result.sort((a, b) => {
       return sortOrder === 'asc' 
         ? a.DescripcionArticulo.localeCompare(b.DescripcionArticulo)
         : b.DescripcionArticulo.localeCompare(a.DescripcionArticulo);
     });
-  }, [products, sortOrder]);
 
-  if (loading && products.length === 0) {
+    return result;
+  }, [products, filtros, sortOrder]);
+
+  const handleFiltroChange = (e) => {
+    const { name, value } = e.target;
+    setFiltros(prev => {
+      if (name === 'familia') {
+        return { ...prev, familia: value, subfamilia: '' };
+      }
+      return { ...prev, [name]: value };
+    });
+    setCurrentPage(1);
+  };
+
+  const limpiarFiltros = () => {
+    setFiltros({ familia: '', subfamilia: '', search: '' });
+    setCurrentPage(1);
+  };
+
+  const indexOfLastProduct = currentPage * productsPerPage;
+  const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
+  const currentProducts = productosFiltrados.slice(indexOfFirstProduct, indexOfLastProduct);
+  const totalPages = Math.ceil(productosFiltrados.length / productsPerPage);
+
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+  };
+
+  if (loading) {
     return (
       <div className="pc-loading-container">
         <div className="pc-spinner"></div>
@@ -105,30 +143,39 @@ const ProductCatalog = () => {
         <div className="pc-title-section">
           <h2 className="pc-title">Catálogo de Suministros Dentales</h2>
           <p className="pc-subtitle">
-            {totalProducts > 0 ? `${totalProducts} productos disponibles` : 'Buscando productos...'}
-            {debouncedSearchTerm && ` - Filtro: "${debouncedSearchTerm}"`}
+            {productosFiltrados.length} productos disponibles
+            {filtros.search && ` - Filtro: "${filtros.search}"`}
+            {filtros.familia && ` - Familia: ${filtros.familia}`}
+            {filtros.subfamilia && ` - Subfamilia: ${filtros.subfamilia}`}
           </p>
         </div>
-        <button onClick={handleRefresh} className="pc-refresh-btn" title="Actualizar">
-          <FaSync className={loading ? 'pc-refreshing' : ''} />
-        </button>
+        <div className="pc-header-actions">
+          <button 
+            onClick={() => setMostrarFiltros(!mostrarFiltros)} 
+            className="pc-filter-toggle"
+          >
+            <FaFilter /> Filtros
+          </button>
+          <button onClick={handleRefresh} className="pc-refresh-btn">
+            <FaSync />
+          </button>
+        </div>
       </div>
 
       <div className="pc-controls-panel">
         <div className="pc-search-container">
           <input
             type="text"
-            placeholder="Buscar instrumental y suministros..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar por descripción, código o proveedor..."
+            value={filtros.search}
+            onChange={(e) => setFiltros(prev => ({ ...prev, search: e.target.value }))}
             className="pc-search-input"
           />
           <FaSearch className="pc-search-icon" />
-          {searchTerm && (
+          {filtros.search && (
             <button 
-              onClick={() => setSearchTerm('')}
+              onClick={() => setFiltros(prev => ({ ...prev, search: '' }))}
               className="pc-clear-search"
-              title="Limpiar búsqueda"
             >
               ×
             </button>
@@ -147,6 +194,16 @@ const ProductCatalog = () => {
         </div>
       </div>
 
+      {mostrarFiltros && (
+        <FiltrosAvanzados
+          filtros={filtros}
+          onFiltroChange={handleFiltroChange}
+          opcionesFamilias={opcionesFamilias}
+          opcionesSubfamilias={opcionesSubfamilias}
+          onLimpiarFiltros={limpiarFiltros}
+        />
+      )}
+
       {error && (
         <div className="pc-error-container">
           <div className="pc-error-icon">⚠️</div>
@@ -155,45 +212,29 @@ const ProductCatalog = () => {
       )}
 
       <ProductGrid
-        products={sortedProducts}
+        products={currentProducts}
         onAddProduct={handleAddToOrder}
         currentPage={currentPage}
         totalPages={totalPages}
         onPageChange={handlePageChange}
-        searchTerm={debouncedSearchTerm}
+        searchTerm={filtros.search}
         generateProductKey={generateProductKey}
-        loading={loading}
       />
       
-      {!loading && products.length === 0 && (
+      {!loading && productosFiltrados.length === 0 && (
         <div className="pc-empty-state">
           <FaBoxOpen className="pc-empty-icon" />
           <h3>No se encontraron productos</h3>
-          <p>{debouncedSearchTerm 
-            ? `No hay productos que coincidan con "${debouncedSearchTerm}"`
-            : 'No hay productos disponibles en este momento'
-          }</p>
+          <p>
+            {filtros.search || filtros.familia || filtros.subfamilia
+              ? 'No hay productos que coincidan con los filtros aplicados'
+              : 'No hay productos disponibles en este momento'
+            }
+          </p>
         </div>
       )}
     </div>
   );
 };
-
-// Hook para debounce
-function useDebounce(value, delay) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
 
 export default ProductCatalog;
