@@ -1,7 +1,18 @@
+// components/Navbar.js
 import React, { useContext, useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { FaUser, FaPowerOff, FaCaretDown, FaHome, FaBox, FaShoppingCart, FaChartBar, FaCrown } from 'react-icons/fa';
+import { 
+  FaUser, 
+  FaPowerOff, 
+  FaCaretDown, 
+  FaHome, 
+  FaBox, 
+  FaShoppingCart, 
+  FaChartBar, 
+  FaCrown,
+  FaListAlt
+} from 'react-icons/fa';
 import '../styles/Navbar.css';
 
 const Navbar = () => {
@@ -67,12 +78,20 @@ const Navbar = () => {
           </li>
           
           {user?.isAdmin && (
-            <li className="nv-link-item">
-              <Link to="/admin/orders" className={`nv-link ${isActive('/admin/orders') ? 'nv-active' : ''}`}>
-                <FaCrown className="nv-icon" />
-                <span className="nv-link-text">Administración</span>
-              </Link>
-            </li>
+            <>
+              <li className="nv-link-item">
+                <Link to="/admin/orders" className={`nv-link ${isActive('/admin/orders') ? 'nv-active' : ''}`}>
+                  <FaCrown className="nv-icon" />
+                  <span className="nv-link-text">Pendientes</span>
+                </Link>
+              </li>
+              <li className="nv-link-item">
+                <Link to="/admin/all-orders" className={`nv-link ${isActive('/admin/all-orders') ? 'nv-active' : ''}`}>
+                  <FaListAlt className="nv-icon" />
+                  <span className="nv-link-text">Todos los Pedidos</span>
+                </Link>
+              </li>
+            </>
           )}
         </ul>
       </div>
@@ -90,21 +109,35 @@ const Navbar = () => {
             <span className="nv-user-role">{user?.isAdmin ? 'Administrador' : 'Usuario'}</span>
           </div>
           <FaCaretDown className={`nv-caret ${dropdownOpen ? 'nv-caret-up' : ''}`} />
-          
-          {dropdownOpen && (
-            <div className="nv-dropdown">
-              <div className="nv-dropdown-header">
-                <span className="nv-dropdown-username">{user?.username}</span>
-                <span className="nv-dropdown-email">{user?.email || user?.username}</span>
-              </div>
-              <div className="nv-dropdown-divider"></div>
-              <button className="nv-logout-button" onClick={handleLogout}>
-                <FaPowerOff className="nv-logout-icon" />
-                <span>Cerrar Sesión</span>
-              </button>
-            </div>
-          )}
         </div>
+        
+        {dropdownOpen && (
+          <div className="nv-dropdown">
+            <div className="nv-dropdown-header">
+              <span className="nv-dropdown-username">{user?.username}</span>
+              <span className="nv-dropdown-email">{user?.email || user?.username}</span>
+              <span className="nv-dropdown-role">{user?.isAdmin ? 'Administrador' : 'Usuario'}</span>
+            </div>
+            <div className="nv-dropdown-divider"></div>
+            <div className="nv-dropdown-links">
+              <Link to="/mi-perfil" className="nv-dropdown-link" onClick={() => setDropdownOpen(false)}>
+                <FaUser className="nv-dropdown-link-icon" />
+                <span>Mi Perfil</span>
+              </Link>
+              {user?.isAdmin && (
+                <Link to="/admin/configuracion" className="nv-dropdown-link" onClick={() => setDropdownOpen(false)}>
+                  <FaCrown className="nv-dropdown-link-icon" />
+                  <span>Configuración</span>
+                </Link>
+              )}
+            </div>
+            <div className="nv-dropdown-divider"></div>
+            <button className="nv-logout-button" onClick={handleLogout}>
+              <FaPowerOff className="nv-logout-icon" />
+              <span>Cerrar Sesión</span>
+            </button>
+          </div>
+        )}
       </div>
     </nav>
   );
