@@ -66,54 +66,58 @@ const ResumenPedido = ({ items, deliveryDate, comment, onUpdateQuantity, onRemov
       </div>
 
       <div className="oc-items-list">
-        {items.map((item, index) => (
-          <div key={`${item.CodigoArticulo}-${index}`} className="oc-resumen-item">
-            <div className="oc-item-info">
-              <h4 className="oc-item-descripcion" title={item.DescripcionArticulo}>
-                {item.DescripcionArticulo}
-              </h4>
-              <div className="oc-item-details">
-                <span className="oc-item-precio">
-                  Precio: {(item.PrecioVenta || item.PrecioCompra || item.Precio || 0).toFixed(2)} €
-                </span>
-                <span className="oc-item-proveedor">
-                  Proveedor: {item.NombreProveedor || 'No especificado'}
-                </span>
-                {item.Familia && (
-                  <span className="oc-item-familia">Familia: {item.Familia}</span>
-                )}
-                {item.Subfamilia && (
-                  <span className="oc-item-subfamilia">Subfamilia: {item.Subfamilia}</span>
-                )}
-              </div>
-            </div>
-            
-            <div className="oc-item-controls">
-              <div className="oc-item-cantidad">
-                <label>Unidades:</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={item.Cantidad || item.UnidadesPedidas || 1}
-                  onChange={(e) => onUpdateQuantity(item, e.target.value)}
-                  className="oc-cantidad-input"
-                />
+        {items.map((item, index) => {
+          // Generar una clave única para cada item
+          const itemKey = `${item.CodigoArticulo}-${item.CodigoProveedor || 'NP'}-${index}`;
+          return (
+            <div key={itemKey} className="oc-resumen-item">
+              <div className="oc-item-info">
+                <h4 className="oc-item-descripcion" title={item.DescripcionArticulo}>
+                  {item.DescripcionArticulo}
+                </h4>
+                <div className="oc-item-details">
+                  <span className="oc-item-precio">
+                    Precio: {(item.PrecioVenta || item.PrecioCompra || item.Precio || 0).toFixed(2)} €
+                  </span>
+                  <span className="oc-item-proveedor">
+                    Proveedor: {item.NombreProveedor || 'No especificado'}
+                  </span>
+                  {item.Familia && (
+                    <span className="oc-item-familia">Familia: {item.Familia}</span>
+                  )}
+                  {item.Subfamilia && (
+                    <span className="oc-item-subfamilia">Subfamilia: {item.Subfamilia}</span>
+                  )}
+                </div>
               </div>
               
-              <div className="oc-item-subtotal">
-                {((item.PrecioVenta || item.PrecioCompra || item.Precio || 0) * (item.Cantidad || item.UnidadesPedidas || 1)).toFixed(2)} €
+              <div className="oc-item-controls">
+                <div className="oc-item-cantidad">
+                  <label>Unidades:</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={item.Cantidad || item.UnidadesPedidas || 1}
+                    onChange={(e) => onUpdateQuantity(item, e.target.value)}
+                    className="oc-cantidad-input"
+                  />
+                </div>
+                
+                <div className="oc-item-subtotal">
+                  {((item.PrecioVenta || item.PrecioCompra || item.Precio || 0) * (item.Cantidad || item.UnidadesPedidas || 1)).toFixed(2)} €
+                </div>
+                
+                <button 
+                  onClick={() => onRemoveItem(item)}
+                  className="oc-remove-item"
+                  title="Eliminar producto"
+                >
+                  <FaTrash />
+                </button>
               </div>
-              
-              <button 
-                onClick={() => onRemoveItem(item)}
-                className="oc-remove-item"
-                title="Eliminar producto"
-              >
-                <FaTrash />
-              </button>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="oc-resumen-total">
@@ -156,17 +160,47 @@ const OrderCreate = () => {
   });
   const productsPerPage = 20;
 
-  // Función mejorada para generar claves únicas
+  // Función MEJORADA para generar claves únicas
   const generateProductKey = (product) => {
-    return `${product.Ejercicio || '0000'}-${product.CodigoArticulo}-${product.CodigoAlmacen || '00'}-${product.Periodo || '00'}-${product.Partida || '000'}-${product.TipoUnidadMedida_ || '00'}-${product.CodigoColor_ || '000'}-${product.CodigoTalla01_ || '000'}`;
+    return `${product.CodigoArticulo}-${product.CodigoProveedor || 'NP'}-${product.CodigoFamilia || 'NF'}-${product.CodigoSubfamilia || 'NS'}`;
   };
+
+  // Cache simple en memoria
+  const [productsCache, setProductsCache] = useState(null);
+  const [lastFetchTime, setLastFetchTime] = useState(0);
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
   useEffect(() => {
     const fetchProducts = async () => {
+      // Verificar cache primero
+      const now = Date.now();
+      if (productsCache && (now - lastFetchTime) < CACHE_DURATION) {
+        setProducts(productsCache);
+        setLoading(prev => ({ ...prev, products: false }));
+        return;
+      }
+
       try {
         setLoading(prev => ({ ...prev, products: true }));
         const response = await api.get('/api/products');
-        setProducts(response.data.products || response.data);
+        
+        let productsData = response.data.products || response.data;
+
+        // Eliminar duplicados usando la clave única MEJORADA
+        const uniqueProductsMap = new Map();
+        
+        productsData.forEach(product => {
+          const key = generateProductKey(product);
+          if (!uniqueProductsMap.has(key)) {
+            uniqueProductsMap.set(key, product);
+          }
+        });
+
+        const uniqueProducts = Array.from(uniqueProductsMap.values());
+        setProducts(uniqueProducts);
+        setProductsCache(uniqueProducts);
+        setLastFetchTime(Date.now());
+
       } catch (err) {
         console.error('Error al cargar productos:', err);
         setError('Error al cargar productos');
@@ -188,18 +222,30 @@ const OrderCreate = () => {
     }
   }, [location, user]);
 
-  // Filtrar y ordenar productos
+  // Filtrar y ordenar productos - BUSCADOR MEJORADO
   const productosFiltrados = products
     .filter(product => {
-      const matchesSearch = !filtros.search || 
-        product.DescripcionArticulo?.toLowerCase().includes(filtros.search.toLowerCase()) ||
-        product.CodigoArticulo?.toLowerCase().includes(filtros.search.toLowerCase()) ||
-        product.NombreProveedor?.toLowerCase().includes(filtros.search.toLowerCase());
+      if (filtros.search.trim()) {
+        const term = filtros.search.toLowerCase().trim();
+        const descripcion = product.DescripcionArticulo?.toLowerCase() || '';
+        const codigo = product.CodigoArticulo?.toLowerCase() || '';
+        const proveedor = product.NombreProveedor?.toLowerCase() || '';
+        const familia = product.Familia?.toLowerCase() || '';
+        const subfamilia = product.Subfamilia?.toLowerCase() || '';
+
+        if (!descripcion.includes(term) &&
+            !codigo.includes(term) &&
+            !proveedor.includes(term) &&
+            !familia.includes(term) &&
+            !subfamilia.includes(term)) {
+          return false;
+        }
+      }
       
       const matchesFamilia = !filtros.familia || product.Familia === filtros.familia;
       const matchesSubfamilia = !filtros.subfamilia || product.Subfamilia === filtros.subfamilia;
       
-      return matchesSearch && matchesFamilia && matchesSubfamilia;
+      return matchesFamilia && matchesSubfamilia;
     })
     .sort((a, b) => {
       return sortOrder === 'asc' 
@@ -275,62 +321,44 @@ const OrderCreate = () => {
 
   const handleSubmitOrder = async () => {
     try {
-      setError('');
       setLoading(prev => ({ ...prev, submit: true }));
-
-      if (!user?.codigoCliente || !user?.cifDni) {
-        throw new Error('Datos de usuario incompletos. Por favor, inicie sesión nuevamente.');
-      }
+      setError('');
 
       const itemsToSend = orderItems.map(item => ({
         CodigoArticulo: item.CodigoArticulo,
         DescripcionArticulo: item.DescripcionArticulo,
-        Cantidad: Number(item.Cantidad || item.UnidadesPedidas || 1),
-        PrecioCompra: item.PrecioCompra || item.Precio || 0,
+        Cantidad: Number(item.Cantidad),
+        PrecioCompra: item.PrecioCompra || item.Precio,
         CodigoProveedor: item.CodigoProveedor || null,
         CodigoCliente: user.codigoCliente,
-        CifDni: user.cifDni,
-        Familia: item.Familia || '',
-        Subfamilia: item.Subfamilia || ''
+        CifDni: user.cifDni
       }));
 
-      const orderData = {
+      const response = await api.post('/api/orders', {
         items: itemsToSend,
         deliveryDate: deliveryDate || null,
         comment: comment
-      };
-
-      const response = await api.post('/api/orders', orderData);
-
-      navigate('/revisar-pedido', {
-        state: {
-          orderId: response.data.orderId,
-          seriePedido: response.data.seriePedido,
-          deliveryDate: deliveryDate,
-          comment: comment,
-          items: orderItems,
-          total: orderItems.reduce((sum, item) => {
-            const precio = item.PrecioVenta || item.PrecioCompra || item.Precio || 0;
-            const cantidad = item.Cantidad || item.UnidadesPedidas || 1;
-            return sum + (precio * cantidad);
-          }, 0),
-          success: true
-        }
       });
+
+      if (response.data.success) {
+        navigate('/revision-pedido', {
+          state: {
+            orderId: response.data.orderId,
+            seriePedido: response.data.seriePedido,
+            deliveryDate: deliveryDate,
+            items: orderItems,
+            comment: comment,
+            total: response.data.importeLiquido
+          }
+        });
+      }
     } catch (err) {
       console.error('Error al crear pedido:', err);
-      setError(err.response?.data?.message || err.message || 'Error al crear el pedido');
+      setError(err.response?.data?.message || err.message || 'Error al procesar el pedido');
     } finally {
       setLoading(prev => ({ ...prev, submit: false }));
     }
   };
-
-  // Obtener opciones para filtros
-  const opcionesFamilias = [...new Set(products.map(p => p.Familia).filter(Boolean))].sort();
-  const opcionesSubfamilias = products
-    .filter(p => p.Familia && p.Subfamilia)
-    .map(p => ({ familia: p.Familia, valor: p.Subfamilia }));
-  const subfamiliasUnicas = [...new Map(opcionesSubfamilias.map(item => [item.valor, item])).values()];
 
   const handleFiltroChange = (e) => {
     const { name, value } = e.target;
@@ -348,19 +376,27 @@ const OrderCreate = () => {
     setCurrentPage(1);
   };
 
+  const opcionesFamilias = [...new Set(products.map(p => p.Familia).filter(Boolean))].sort();
+  const opcionesSubfamilias = products
+    .filter(p => p.Familia && p.Subfamilia)
+    .map(p => ({ familia: p.Familia, valor: p.Subfamilia }));
+  const uniqueSubfamilias = [...new Map(opcionesSubfamilias.map(item => [item.valor, item])).values()];
+
   if (reviewMode) {
     return (
-      <div className="oc-review-container">
-        <div className="oc-review-header">
+      <div className="oc-container">
+        <div className="oc-header">
           <button onClick={handleBackToEdit} className="oc-back-button">
-            <FaArrowLeft />
+            <FaArrowLeft className="oc-back-icon" />
             Volver a editar
           </button>
-          <h2>Revisar Pedido</h2>
-          <p>Confirme los detalles antes de enviar el pedido</p>
+          <div className="oc-title-section">
+            <h2>Revisar y Confirmar Pedido</h2>
+            <p>Revise los detalles antes de enviar el pedido</p>
+          </div>
         </div>
-        
-        <ResumenPedido 
+
+        <ResumenPedido
           items={orderItems}
           deliveryDate={deliveryDate}
           comment={comment}
@@ -369,39 +405,32 @@ const OrderCreate = () => {
           onDeliveryDateChange={setDeliveryDate}
           onCommentChange={setComment}
         />
-        
-        <div className="oc-review-actions">
-          <button 
+
+        <div className="oc-actions">
+          <button
             onClick={handleSubmitOrder}
             disabled={loading.submit}
             className="oc-submit-button"
           >
             {loading.submit ? (
               <>
-                <div className="oc-spinner"></div>
+                <div className="oc-button-spinner"></div>
                 Procesando...
               </>
             ) : (
               <>
-                <FaCheck />
+                <FaCheck className="oc-check-icon" />
                 Confirmar Pedido
               </>
             )}
           </button>
-          <button 
+          <button
             onClick={handleBackToEdit}
             className="oc-cancel-button"
           >
             Cancelar
           </button>
         </div>
-
-        {error && (
-          <div className="oc-error-message">
-            <div className="oc-error-icon">⚠️</div>
-            <p>{error}</p>
-          </div>
-        )}
       </div>
     );
   }
@@ -410,95 +439,85 @@ const OrderCreate = () => {
     <div className="oc-container">
       <div className="oc-header">
         <button onClick={() => navigate(-1)} className="oc-back-button">
-          <FaArrowLeft />
+          <FaArrowLeft className="oc-back-icon" />
           Volver
         </button>
         <div className="oc-title-section">
           <h2>Crear Nuevo Pedido</h2>
-          <p>Seleccione los productos para su pedido</p>
+          <p>Seleccione productos del catálogo para agregar a su pedido</p>
+        </div>
+        <div className="oc-header-actions">
+          <button 
+            onClick={() => setMostrarFiltros(!mostrarFiltros)} 
+            className="oc-filter-btn"
+          >
+            <FaFilter className="oc-filter-icon" />
+            Filtros
+          </button>
+          <button onClick={handleReviewOrder} className="oc-review-btn">
+            <FaCheck className="oc-check-icon" />
+            Revisar Pedido
+          </button>
         </div>
       </div>
 
       {error && (
         <div className="oc-error-message">
-          <div className="oc-error-icon">⚠️</div>
           <p>{error}</p>
           <button onClick={() => setError('')} className="oc-error-close">×</button>
         </div>
       )}
 
-      <div className="oc-main-content">
-        <div className="oc-order-panel">
-          <ResumenPedido 
-            items={orderItems}
-            deliveryDate={deliveryDate}
-            comment={comment}
-            onUpdateQuantity={handleUpdateQuantity}
-            onRemoveItem={handleRemoveItem}
-            onDeliveryDateChange={setDeliveryDate}
-            onCommentChange={setComment}
+      {mostrarFiltros && (
+        <FiltrosAvanzados
+          filtros={filtros}
+          onFiltroChange={handleFiltroChange}
+          opcionesFamilias={opcionesFamilias}
+          opcionesSubfamilias={uniqueSubfamilias}
+          onLimpiarFiltros={limpiarFiltros}
+        />
+      )}
+
+      <div className="oc-controls-panel">
+        <div className="oc-search-container">
+          <FaSearch className="oc-search-icon" />
+          <input
+            type="text"
+            placeholder="Buscar productos por nombre, código, proveedor, familia..."
+            value={filtros.search}
+            onChange={(e) => {
+              setFiltros(prev => ({ ...prev, search: e.target.value }));
+              setCurrentPage(1);
+            }}
+            className="oc-search-input"
           />
-          
-          {orderItems.length > 0 && (
+          {filtros.search && (
             <button 
-              onClick={handleReviewOrder}
-              className="oc-review-button"
+              onClick={() => setFiltros(prev => ({ ...prev, search: '' }))}
+              className="oc-clear-search"
             >
-              <FaCheck />
-              Revisar y Confirmar Pedido
+              ×
             </button>
           )}
         </div>
 
-        <div className="oc-catalog-panel">
-          <div className="oc-catalog-controls">
-            <div className="oc-search-container">
-              <FaSearch className="oc-search-icon" />
-              <input
-                type="text"
-                placeholder="Buscar productos por nombre, código o proveedor..."
-                value={filtros.search}
-                onChange={(e) => setFiltros(prev => ({ ...prev, search: e.target.value }))}
-                className="oc-search-input"
-              />
-              {filtros.search && (
-                <button 
-                  onClick={() => setFiltros(prev => ({ ...prev, search: '' }))}
-                  className="oc-clear-search"
-                >
-                  ×
-                </button>
-              )}
-            </div>
+        <div className="oc-filter-container">
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            className="oc-filter-select"
+          >
+            <option value="asc">Ordenar A-Z</option>
+            <option value="desc">Ordenar Z-A</option>
+          </select>
+        </div>
+      </div>
 
-            <div className="oc-controls-right">
-              <button 
-                onClick={() => setMostrarFiltros(!mostrarFiltros)} 
-                className={`oc-filter-toggle ${mostrarFiltros ? 'active' : ''}`}
-              >
-                <FaFilter /> Filtros
-              </button>
-              
-              <select
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-                className="oc-sort-select"
-              >
-                <option value="asc">Ordenar A-Z</option>
-                <option value="desc">Ordenar Z-A</option>
-              </select>
-            </div>
+      <div className="oc-main-content">
+        <div className="oc-product-selection">
+          <div className="oc-products-header">
+            <h3>Seleccionar Productos ({productosFiltrados.length} disponibles)</h3>
           </div>
-
-          {mostrarFiltros && (
-            <FiltrosAvanzados
-              filtros={filtros}
-              onFiltroChange={handleFiltroChange}
-              opcionesFamilias={opcionesFamilias}
-              opcionesSubfamilias={subfamiliasUnicas}
-              onLimpiarFiltros={limpiarFiltros}
-            />
-          )}
 
           <ProductGrid
             products={currentProducts}
@@ -508,6 +527,19 @@ const OrderCreate = () => {
             onPageChange={handlePageChange}
             searchTerm={filtros.search}
             generateProductKey={generateProductKey}
+            loading={loading.products}
+          />
+        </div>
+
+        <div className="oc-order-summary">
+          <ResumenPedido
+            items={orderItems}
+            deliveryDate={deliveryDate}
+            comment={comment}
+            onUpdateQuantity={handleUpdateQuantity}
+            onRemoveItem={handleRemoveItem}
+            onDeliveryDateChange={setDeliveryDate}
+            onCommentChange={setComment}
           />
         </div>
       </div>

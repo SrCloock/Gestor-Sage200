@@ -24,23 +24,48 @@ const ProductCatalog = () => {
   const navigate = useNavigate();
   const productsPerPage = 40;
 
-  // Función mejorada para generar claves únicas
+  // Función MEJORADA para generar claves únicas usando campos reales de la base de datos
   const generateProductKey = (product) => {
-    return `${product.Ejercicio || '0000'}-${product.CodigoArticulo}-${product.CodigoAlmacen || '00'}-${product.Periodo || '00'}-${product.Partida || '000'}-${product.TipoUnidadMedida_ || '00'}-${product.CodigoColor_ || '000'}-${product.CodigoTalla01_ || '000'}`;
+    return `${product.CodigoArticulo}-${product.CodigoProveedor || 'NP'}-${product.CodigoFamilia || 'NF'}-${product.CodigoSubfamilia || 'NS'}`;
   };
+
+  // Cache simple en memoria
+  const [productsCache, setProductsCache] = useState(null);
+  const [lastFetchTime, setLastFetchTime] = useState(0);
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
   useEffect(() => {
     const fetchProducts = async () => {
+      // Verificar cache primero
+      const now = Date.now();
+      if (productsCache && (now - lastFetchTime) < CACHE_DURATION) {
+        setProducts(productsCache);
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         setError('');
         const response = await api.get('/api/products');
         
-        if (response.data.products) {
-          setProducts(response.data.products);
-        } else {
-          setProducts(response.data);
-        }
+        let productsData = response.data.products || response.data;
+
+        // Eliminar duplicados usando la clave única MEJORADA
+        const uniqueProductsMap = new Map();
+        
+        productsData.forEach(product => {
+          const key = generateProductKey(product);
+          if (!uniqueProductsMap.has(key)) {
+            uniqueProductsMap.set(key, product);
+          }
+        });
+
+        const uniqueProducts = Array.from(uniqueProductsMap.values());
+        setProducts(uniqueProducts);
+        setProductsCache(uniqueProducts);
+        setLastFetchTime(Date.now());
+
       } catch (err) {
         console.error('Error loading products:', err);
         setError('Error al cargar el catálogo');
@@ -59,6 +84,8 @@ const ProductCatalog = () => {
   };
 
   const handleRefresh = () => {
+    setProductsCache(null);
+    setLastFetchTime(0);
     window.location.reload();
   };
 
@@ -75,16 +102,25 @@ const ProductCatalog = () => {
     return [...new Map(subfamilias.map(item => [item.valor, item])).values()];
   }, [products]);
 
+  // BUSCADOR MEJORADO - busca en todos los campos relevantes
   const productosFiltrados = useMemo(() => {
     let result = [...products];
 
-    if (filtros.search) {
-      const term = filtros.search.toLowerCase();
-      result = result.filter(product => 
-        product.DescripcionArticulo?.toLowerCase().includes(term) ||
-        product.CodigoArticulo?.toLowerCase().includes(term) ||
-        product.NombreProveedor?.toLowerCase().includes(term)
-      );
+    if (filtros.search.trim()) {
+      const term = filtros.search.toLowerCase().trim();
+      result = result.filter(product => {
+        const descripcion = product.DescripcionArticulo?.toLowerCase() || '';
+        const codigo = product.CodigoArticulo?.toLowerCase() || '';
+        const proveedor = product.NombreProveedor?.toLowerCase() || '';
+        const familia = product.Familia?.toLowerCase() || '';
+        const subfamilia = product.Subfamilia?.toLowerCase() || '';
+
+        return descripcion.includes(term) ||
+               codigo.includes(term) ||
+               proveedor.includes(term) ||
+               familia.includes(term) ||
+               subfamilia.includes(term);
+      });
     }
 
     if (filtros.familia) {
@@ -95,10 +131,11 @@ const ProductCatalog = () => {
       result = result.filter(product => product.Subfamilia === filtros.subfamilia);
     }
 
+    // Ordenar después de filtrar
     result.sort((a, b) => {
       return sortOrder === 'asc' 
-        ? a.DescripcionArticulo.localeCompare(b.DescripcionArticulo)
-        : b.DescripcionArticulo.localeCompare(a.DescripcionArticulo);
+        ? a.DescripcionArticulo?.localeCompare(b.DescripcionArticulo || '') 
+        : b.DescripcionArticulo?.localeCompare(a.DescripcionArticulo || '');
     });
 
     return result;
@@ -167,7 +204,7 @@ const ProductCatalog = () => {
         <div className="pc-search-container">
           <input
             type="text"
-            placeholder="Buscar por descripción, código o proveedor..."
+            placeholder="Buscar por descripción, código, proveedor, familia..."
             value={filtros.search}
             onChange={(e) => setFiltros(prev => ({ ...prev, search: e.target.value }))}
             className="pc-search-input"
