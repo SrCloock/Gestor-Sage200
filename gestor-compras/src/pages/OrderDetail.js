@@ -23,10 +23,17 @@ const OrderDetail = () => {
             seriePedido: 'WebCD'
           }
         });
-        setOrder(response.data.order);
+        
+        console.log('Respuesta del API:', response.data); // Para debug
+        
+        if (response.data && response.data.order) {
+          setOrder(response.data.order);
+        } else {
+          setError('Estructura de datos inesperada');
+        }
       } catch (err) {
+        console.error('Error detallado:', err);
         setError(err.response?.data?.message || 'Error al cargar los detalles del pedido');
-        console.error(err);
       } finally {
         setLoading(false);
       }
@@ -36,6 +43,28 @@ const OrderDetail = () => {
       fetchOrderDetails();
     }
   }, [orderId, user]);
+
+  // Función para determinar si se puede confirmar recepción
+  const canConfirmReception = () => {
+    if (!order) return false;
+    return order.StatusAprobado === -1 && order.Estado !== 2;
+  };
+
+  // Función para obtener el texto del estado
+  const getStatusText = () => {
+    if (!order) return 'Desconocido';
+    
+    if (order.StatusAprobado === 0) return 'Revisando';
+    if (order.StatusAprobado === -1) {
+      switch (order.Estado) {
+        case 0: return 'Preparando';
+        case 1: return 'Parcial';
+        case 2: return 'Servido';
+        default: return 'Preparando';
+      }
+    }
+    return 'Desconocido';
+  };
 
   if (loading) return (
     <div className="od-loading-container">
@@ -48,6 +77,9 @@ const OrderDetail = () => {
     <div className="od-error-container">
       <div className="od-error-icon">⚠️</div>
       <p>{error}</p>
+      <button onClick={() => navigate('/mis-pedidos')} className="od-back-button">
+        Volver al Historial
+      </button>
     </div>
   );
 
@@ -56,20 +88,27 @@ const OrderDetail = () => {
       <div className="od-not-found-icon">❌</div>
       <h3>No se encontró el pedido</h3>
       <p>El pedido solicitado no existe o no tienes permisos para verlo</p>
+      <button onClick={() => navigate('/mis-pedidos')} className="od-back-button">
+        Volver al Historial
+      </button>
     </div>
   );
 
+  // Asegurarse de que productos existe y es un array
+  const productos = order.productos || order.Productos || [];
+  const numeroLineas = productos.length;
+
   return (
     <div className="od-container">
-      <button onClick={() => navigate(-1)} className="od-back-button">
+      <button onClick={() => navigate('/mis-pedidos')} className="od-back-button">
         ← Volver al Historial
       </button>
       
       <div className="od-header">
         <div className="od-title-section">
           <h2>Pedido #{order.NumeroPedido}</h2>
-          <span className={`od-status-badge ${order.Estado === 'Preparando' ? 'od-status-preparing' : 'od-status-served'}`}>
-            {order.Estado}
+          <span className={`od-status-badge od-status-${getStatusText().toLowerCase()}`}>
+            {getStatusText()}
           </span>
         </div>
         <p className="od-order-date">
@@ -95,7 +134,7 @@ const OrderDetail = () => {
           )}
           <div className="od-info-row">
             <span className="od-info-label">Total Artículos:</span>
-            <span className="od-info-value">{order.productos.length}</span>
+            <span className="od-info-value">{numeroLineas}</span>
           </div>
           <div className="od-info-row">
             <span className="od-info-label">Total del Pedido:</span>
@@ -128,7 +167,7 @@ const OrderDetail = () => {
       </div>
       
       <div className="od-actions">
-        {order.Estado === 'Preparando' && (
+        {canConfirmReception() && (
           <button 
             onClick={() => navigate(`/mis-pedidos/${orderId}/recepcion`)}
             className="od-action-button od-primary-button"
@@ -141,36 +180,45 @@ const OrderDetail = () => {
       <div className="od-products-section">
         <div className="od-section-header">
           <h3>Artículos del Pedido</h3>
-          <span className="od-items-count">{order.productos.length} productos</span>
+          <span className="od-items-count">{numeroLineas} productos</span>
         </div>
-        <div className="od-table-container">
-          <table className="od-products-table">
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Descripción</th>
-                <th>Cantidad</th>
-                <th>Precio Unitario</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {order.productos.map((product, index) => (
-                <tr key={index} className="od-product-row">
-                  <td className="od-product-code">{product.CodigoArticulo}</td>
-                  <td className="od-product-description">{product.DescripcionArticulo}</td>
-                  <td className="od-product-quantity">{product.UnidadesPedidas}</td>
-                  <td className="od-product-price">
-                    {product.Precio ? `${product.Precio.toFixed(2)} €` : '-'}
-                  </td>
-                  <td className="od-product-total">
-                    {product.ImporteLiquido ? `${product.ImporteLiquido.toFixed(2)} €` : '-'}
-                  </td>
+        
+        {numeroLineas === 0 ? (
+          <div className="od-empty-products">
+            <div className="od-empty-icon">📦</div>
+            <p>No hay productos en este pedido</p>
+          </div>
+        ) : (
+          <div className="od-table-container">
+            <table className="od-products-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Descripción</th>
+                  <th>Cantidad</th>
+                  <th>Precio Unitario</th>
+                  <th>Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {productos.map((product, index) => (
+                  <tr key={index} className="od-product-row">
+                    <td className="od-product-code">{product.CodigoArticulo}</td>
+                    <td className="od-product-description">{product.DescripcionArticulo}</td>
+                    <td className="od-product-quantity">{product.UnidadesPedidas || product.Cantidad || 0}</td>
+                    <td className="od-product-price">
+                      {product.Precio ? `${product.Precio.toFixed(2)} €` : '-'}
+                    </td>
+                    <td className="od-product-total">
+                      {product.ImporteLiquido ? `${product.ImporteLiquido.toFixed(2)} €` : 
+                       product.Precio && product.UnidadesPedidas ? `${(product.Precio * product.UnidadesPedidas).toFixed(2)} €` : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

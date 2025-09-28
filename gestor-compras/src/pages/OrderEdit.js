@@ -24,8 +24,9 @@ const OrderEdit = () => {
   const [comment, setComment] = useState('');
   const productsPerPage = 20;
 
+  // Función mejorada para generar claves únicas
   const generateProductKey = (product) => {
-    return `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}-${product.Familia || '00'}-${product.Subfamilia || '00'}`;
+    return `${product.Ejercicio || '0000'}-${product.CodigoArticulo}-${product.CodigoAlmacen || '00'}-${product.Periodo || '00'}-${product.Partida || '000'}-${product.TipoUnidadMedida_ || '00'}-${product.CodigoColor_ || '000'}-${product.CodigoTalla01_ || '000'}`;
   };
 
   useEffect(() => {
@@ -68,7 +69,7 @@ const OrderEdit = () => {
         
         let productsData = response.data.products || response.data;
         
-        // Eliminar duplicados
+        // Eliminar duplicados usando la clave única
         const uniqueProducts = [];
         const seenKeys = new Set();
         
@@ -109,6 +110,7 @@ const OrderEdit = () => {
       });
     }
 
+    // Eliminar duplicados nuevamente después del filtrado
     const uniqueProducts = [];
     const seenKeys = new Set();
     

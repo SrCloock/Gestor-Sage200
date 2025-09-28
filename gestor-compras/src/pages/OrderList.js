@@ -32,6 +32,10 @@ const OrderList = () => {
     return order.StatusAprobado === 0;
   }, []);
 
+  const canReceiveOrder = useMemo(() => (order) => {
+    return order.StatusAprobado === -1 && order.Estado !== 2;
+  }, []);
+
   useEffect(() => {
     const fetchOrders = async () => {
       try {
@@ -103,10 +107,6 @@ const OrderList = () => {
     if (order && canEditOrder(order)) {
       navigate(`/editar-pedido/${orderId}`);
     }
-  };
-
-  const handleReception = (orderId) => {
-    navigate(`/mis-pedidos/${orderId}/recepcion`);
   };
 
   if (loading) return (
@@ -195,7 +195,6 @@ const OrderList = () => {
               {filteredOrders.map(order => {
                 const statusText = getStatusText(order);
                 const editable = canEditOrder(order);
-                const canReceive = order.StatusAprobado === -1 && order.Estado !== 2;
                 
                 return (
                   <tr key={order.NumeroPedido} className="ol-table-row">
@@ -228,14 +227,7 @@ const OrderList = () => {
                             Editar
                           </button>
                         )}
-                        {canReceive && (
-                          <button 
-                            onClick={() => handleReception(order.NumeroPedido)}
-                            className="ol-btn ol-btn-success"
-                          >
-                            Recepción
-                          </button>
-                        )}
+                        {/* ELIMINADO: Botón de recepción del listado */}
                       </div>
                     </td>
                   </tr>

@@ -35,7 +35,9 @@ const getProducts = async (req, res) => {
           a.CodigoProveedor, 
           a.PrecioCompra, 
           a.RutaImagen,
-          p.RazonSocial AS NombreProveedor
+          p.RazonSocial AS NombreProveedor,
+          a.CodigoFamilia,
+          a.CodigoSubfamilia
         FROM Articulos a
         LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor
         WHERE a.CodigoEmpresa = @CodigoEmpresa
@@ -84,6 +86,7 @@ const getProducts = async (req, res) => {
     });
   }
 };
+
 const syncImagesWithDB = async () => {
   const files = await fs.promises.readdir(IMAGE_FOLDER);
   const pool = await getPool();

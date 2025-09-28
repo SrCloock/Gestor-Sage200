@@ -79,7 +79,7 @@ const ProductGrid = memo(({
 
           return (
             <div
-              key={productKey}
+              key={productKey} 
               className="pg-product-card"
               onClick={(e) => handleProductClick(product, e)}
               tabIndex={0}

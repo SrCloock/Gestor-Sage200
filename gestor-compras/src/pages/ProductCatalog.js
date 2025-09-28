@@ -24,6 +24,11 @@ const ProductCatalog = () => {
   const navigate = useNavigate();
   const productsPerPage = 40;
 
+  // Función mejorada para generar claves únicas
+  const generateProductKey = (product) => {
+    return `${product.Ejercicio || '0000'}-${product.CodigoArticulo}-${product.CodigoAlmacen || '00'}-${product.Periodo || '00'}-${product.Partida || '000'}-${product.TipoUnidadMedida_ || '00'}-${product.CodigoColor_ || '000'}-${product.CodigoTalla01_ || '000'}`;
+  };
+
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -46,10 +51,6 @@ const ProductCatalog = () => {
 
     fetchProducts();
   }, []);
-
-  const generateProductKey = (product) => {
-    return `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}`;
-  };
 
   const handleAddToOrder = (product) => {
     navigate('/crear-pedido', { 

@@ -125,7 +125,7 @@ const ResumenPedido = ({ items, deliveryDate, comment, onUpdateQuantity, onRemov
         {deliveryDate && (
           <div className="oc-fecha-entrega">
             <span>Fecha necesaria:</span>
-            <span>{new Date(deliveryDate).toLocaleDateString('es-ES')}</span>
+            <span>{new Date(deliveryDate).toLocaleDateString()}</span>
           </div>
         )}
       </div>
@@ -156,8 +156,9 @@ const OrderCreate = () => {
   });
   const productsPerPage = 20;
 
+  // Función mejorada para generar claves únicas
   const generateProductKey = (product) => {
-    return `${product.CodigoArticulo}-${product.CodigoProveedor || '00'}-${user?.codigoCliente || '00'}`;
+    return `${product.Ejercicio || '0000'}-${product.CodigoArticulo}-${product.CodigoAlmacen || '00'}-${product.Periodo || '00'}-${product.Partida || '000'}-${product.TipoUnidadMedida_ || '00'}-${product.CodigoColor_ || '000'}-${product.CodigoTalla01_ || '000'}`;
   };
 
   useEffect(() => {

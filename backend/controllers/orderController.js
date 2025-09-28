@@ -195,7 +195,7 @@ const createOrder = async (req, res) => {
         almacenes[row.sysItem] = row.sysContenidoIni;
       });
 
-      const codigoAlmacen = almacenes['AlmacenDefcepto'] || 'CEN';
+      const codigoAlmacen = almacenes['AlmacenDefecto'] || 'CEN';
       const codigoAlmacenAnterior = almacenes['AlmacenFabrica'] || 'CEN';
 
       const fechaPedido = `${fechaActual.toISOString().split('T')[0]} 00:00:00.000`;
@@ -554,6 +554,9 @@ const getOrderDetails = async (req, res) => {
       });
     }
 
+    console.log('Buscando pedido:', { numeroPedido, codigoCliente, SERIE_PEDIDO });
+
+    // Cabecera del pedido
     const orderResult = await pool.request()
       .input('NumeroPedido', numeroPedido)
       .input('CodigoCliente', codigoCliente)
@@ -578,7 +581,8 @@ const getOrderDetails = async (req, res) => {
           Municipio,
           Provincia,
           Nacion,
-          CodigoContable
+          CodigoContable,
+          ObservacionesPedido
         FROM CabeceraPedidoCliente
         WHERE NumeroPedido = @NumeroPedido
         AND CodigoCliente = @CodigoCliente
@@ -586,12 +590,16 @@ const getOrderDetails = async (req, res) => {
       `);
 
     if (orderResult.recordset.length === 0) {
+      console.log('Pedido no encontrado en la base de datos');
       return res.status(404).json({ 
         success: false, 
         message: 'Pedido no encontrado' 
       });
     }
 
+    console.log('Pedido encontrado:', orderResult.recordset[0].NumeroPedido);
+
+    // Líneas del pedido - CONSULTA MEJORADA
     const linesResult = await pool.request()
       .input('NumeroPedido', numeroPedido)
       .input('SeriePedido', SERIE_PEDIDO)
@@ -607,13 +615,18 @@ const getOrderDetails = async (req, res) => {
           l.ImporteNeto,
           l.ImporteLiquido,
           l.TotalIva,
-          l.CodigoProveedor
+          l.CodigoProveedor,
+          p.RazonSocial as NombreProveedor
         FROM LineasPedidoCliente l
+        LEFT JOIN Proveedores p ON l.CodigoProveedor = p.CodigoProveedor
         WHERE l.NumeroPedido = @NumeroPedido
         AND l.SeriePedido = @SeriePedido
         ORDER BY l.Orden
       `);
 
+    console.log('Líneas encontradas:', linesResult.recordset.length);
+
+    // Eliminar posibles duplicados
     const uniqueProducts = [];
     const seenKeys = new Set();
     
@@ -627,15 +640,31 @@ const getOrderDetails = async (req, res) => {
 
     const orderData = orderResult.recordset[0];
     
-    return res.status(200).json({
+    // Determinar el estado del pedido
+    let estadoTexto = 'Desconocido';
+    if (orderData.StatusAprobado === 0) {
+      estadoTexto = 'Revisando';
+    } else if (orderData.StatusAprobado === -1) {
+      switch (orderData.Estado) {
+        case 0: estadoTexto = 'Preparando'; break;
+        case 1: estadoTexto = 'Parcial'; break;
+        case 2: estadoTexto = 'Servido'; break;
+        default: estadoTexto = 'Preparando';
+      }
+    }
+
+    const responseData = {
       success: true,
       order: {
         ...orderData,
-        Estado: orderData.Estado === 0 ? 'Preparando' : 'Servido',
-        Productos: uniqueProducts
+        Estado: estadoTexto,
+        productos: uniqueProducts  // Asegurar que se llama "productos"
       },
       message: 'Detalle del pedido obtenido correctamente'
-    });
+    };
+
+    console.log('Enviando respuesta con', uniqueProducts.length, 'productos');
+    return res.status(200).json(responseData);
 
   } catch (error) {
     console.error('Error al obtener detalle del pedido:', error);
@@ -822,7 +851,7 @@ const updateOrder = async (req, res) => {
       const importeLiquidoTotal = baseImponibleTotal + totalIVATotal;
       const numeroLineas = parseInt(totalesResult.recordset[0].NumeroLineas) || 0;
 
-      // Actualizar cabecera - CORREGIDO: FechaEntregar -> FechaEntrega
+      // Actualizar cabecera
       await transaction.request()
         .input('CodigoEmpresa', CodigoEmpresa)
         .input('EjercicioPedido', EjercicioPedido)
@@ -832,9 +861,6 @@ const updateOrder = async (req, res) => {
         .input('TotalIVA', totalIVATotal)
         .input('ImporteLiquido', importeLiquidoTotal)
         .input('NumeroLineas', numeroLineas)
-        .input('FechaNecesaria', deliveryDate ? `${deliveryDate} 00:00:00.000` : null)
-        .input('FechaEntrega', deliveryDate ? `${deliveryDate} 00:00:00.000` : null) // Cambiado de FechaEntregar a FechaEntrega
-        .input('FechaTope', deliveryDate ? `${deliveryDate} 00:00:00.000` : null)
         .input('ObservacionesPedido', comment || '')
         .query(`
           UPDATE CabeceraPedidoCliente
@@ -843,10 +869,8 @@ const updateOrder = async (req, res) => {
             TotalIva = @TotalIVA,
             ImporteLiquido = @ImporteLiquido,
             NumeroLineas = @NumeroLineas,
-            FechaNecesaria = @FechaNecesaria,
-            FechaEntrega = @FechaEntrega, -- Cambiado de FechaEntregar a FechaEntrega
-            FechaTope = @FechaTope,
             ObservacionesPedido = @ObservacionesPedido
+            ${deliveryDate ? ', FechaNecesaria = @FechaNecesaria' : ''}
           WHERE 
             CodigoEmpresa = @CodigoEmpresa AND
             EjercicioPedido = @EjercicioPedido AND
@@ -870,14 +894,14 @@ const updateOrder = async (req, res) => {
     console.error('Error al actualizar pedido:', error);
     return res.status(500).json({ 
       success: false, 
-      message: error.message || 'Error al procesar la actualización del pedido' 
+      message: error.message || 'Error al actualizar el pedido' 
     });
   }
 };
 
-module.exports = { 
-  createOrder, 
-  getOrders, 
+module.exports = {
+  createOrder,
+  getOrders,
   getOrderDetails,
-  updateOrder 
+  updateOrder
 };
