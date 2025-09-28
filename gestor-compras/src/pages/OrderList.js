@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api';
 import '../styles/OrderList.css';
@@ -14,6 +14,7 @@ const OrderList = () => {
   
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const getStatusText = useMemo(() => (order) => {
     if (order.StatusAprobado === 0) return 'Revisando';
@@ -37,22 +38,39 @@ const OrderList = () => {
   }, []);
 
   useEffect(() => {
+    // Mostrar mensaje de éxito si viene de una edición
+    if (location.state?.success) {
+      alert(location.state.message);
+      // Limpiar el estado de navegación
+      window.history.replaceState({}, document.title);
+    }
+
     const fetchOrders = async () => {
       try {
         setLoading(true);
         setError('');
+        console.log('Obteniendo pedidos para cliente:', user?.codigoCliente);
+        
         const response = await api.get('/api/orders', {
           params: { codigoCliente: user?.codigoCliente }
         });
         
+        console.log('Respuesta de pedidos:', response.data);
+        
         if (response.data.success) {
-          setOrders(response.data.orders);
+          setOrders(response.data.orders || []);
         } else {
           setError(response.data.message || 'Error al cargar pedidos');
         }
       } catch (err) {
-        setError('Error al cargar los pedidos');
         console.error('Error fetching orders:', err);
+        if (err.response?.status === 401) {
+          setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
+        } else if (err.code === 'NETWORK_ERROR') {
+          setError('Error de conexión con el servidor. Verifique que el servidor esté ejecutándose.');
+        } else {
+          setError('Error al cargar los pedidos: ' + (err.message || 'Error desconocido'));
+        }
       } finally {
         setLoading(false);
       }
@@ -60,8 +78,11 @@ const OrderList = () => {
 
     if (user?.codigoCliente) {
       fetchOrders();
+    } else {
+      setError('No se pudo identificar el cliente');
+      setLoading(false);
     }
-  }, [user]);
+  }, [user, location.state]);
 
   const filteredOrders = useMemo(() => {
     let result = [...orders];
@@ -109,6 +130,10 @@ const OrderList = () => {
     }
   };
 
+  const handleRefresh = () => {
+    window.location.reload();
+  };
+
   if (loading) return (
     <div className="ol-loading-container">
       <div className="ol-spinner"></div>
@@ -120,6 +145,9 @@ const OrderList = () => {
     <div className="ol-error-container">
       <div className="ol-error-icon">⚠️</div>
       <p>{error}</p>
+      <button onClick={handleRefresh} className="ol-retry-button">
+        Reintentar
+      </button>
     </div>
   );
 
@@ -128,6 +156,9 @@ const OrderList = () => {
       <div className="ol-header">
         <h2 className="ol-title">Historial de Pedidos</h2>
         <p className="ol-subtitle">Gestiona y revisa tus pedidos realizados</p>
+        <button onClick={handleRefresh} className="ol-refresh-button">
+          🔄 Actualizar
+        </button>
       </div>
       
       <div className="ol-controls-panel">
@@ -140,6 +171,14 @@ const OrderList = () => {
             className="ol-search-input"
           />
           <span className="ol-search-icon">🔍</span>
+          {searchTerm && (
+            <button 
+              onClick={() => setSearchTerm('')}
+              className="ol-clear-search"
+            >
+              ×
+            </button>
+          )}
         </div>
         
         <div className="ol-filter-container">
@@ -177,6 +216,9 @@ const OrderList = () => {
           <div className="ol-empty-icon">📭</div>
           <h3>No se encontraron pedidos</h3>
           <p>No hay pedidos que coincidan con los filtros aplicados</p>
+          <button onClick={() => {setSearchTerm(''); setStatusFilter('');}} className="ol-clear-filters">
+            Limpiar filtros
+          </button>
         </div>
       ) : (
         <div className="ol-table-container">
@@ -195,6 +237,7 @@ const OrderList = () => {
               {filteredOrders.map(order => {
                 const statusText = getStatusText(order);
                 const editable = canEditOrder(order);
+                const receivable = canReceiveOrder(order);
                 
                 return (
                   <tr key={order.NumeroPedido} className="ol-table-row">
@@ -204,7 +247,7 @@ const OrderList = () => {
                     </td>
                     <td className="ol-items-count">{order.NumeroLineas}</td>
                     <td className="ol-order-amount">
-                      {order.ImporteLiquido ? `${order.ImporteLiquido.toFixed(2)} €` : 'N/A'}
+                      {order.ImporteLiquido ? `${order.ImporteLiquido.toFixed(2)} €` : '0.00 €'}
                     </td>
                     <td>
                       <span className={`ol-status-badge ol-status-${statusText.toLowerCase()}`}>
@@ -227,7 +270,6 @@ const OrderList = () => {
                             Editar
                           </button>
                         )}
-                        {/* ELIMINADO: Botón de recepción del listado */}
                       </div>
                     </td>
                   </tr>

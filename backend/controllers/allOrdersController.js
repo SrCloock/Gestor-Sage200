@@ -10,21 +10,28 @@ const getAllOrders = async (req, res) => {
       estado,
       fechaDesde,
       fechaHasta,
+      numeroPedido,
+      importeMin,
+      importeMax,
       ordenarPor = 'FechaPedido',
       orden = 'DESC'
     } = req.query;
 
+    console.log('Parámetros recibidos en getAllOrders:', req.query);
+
     const pool = await getPool();
     
-    let whereConditions = ["SeriePedido = 'WebCD'"];
+    // Filtros base: EjercicioPedido del año actual y SeriePedido = 'WebCD'
+    const currentYear = new Date().getFullYear();
+    let whereConditions = [`EjercicioPedido = ${currentYear}`, "SeriePedido = 'WebCD'"];
     let inputParams = {};
     
-    if (cliente) {
+    if (cliente && cliente.trim() !== '') {
       whereConditions.push('RazonSocial LIKE @cliente');
       inputParams.cliente = `%${cliente}%`;
     }
     
-    if (estado !== undefined && estado !== '') {
+    if (estado !== undefined && estado !== '' && !isNaN(parseInt(estado))) {
       whereConditions.push('StatusAprobado = @estado');
       inputParams.estado = parseInt(estado);
     }
@@ -37,6 +44,22 @@ const getAllOrders = async (req, res) => {
     if (fechaHasta) {
       whereConditions.push('CONVERT(DATE, FechaPedido) <= @fechaHasta');
       inputParams.fechaHasta = fechaHasta;
+    }
+
+    // Nuevos filtros del frontend
+    if (numeroPedido && numeroPedido.trim() !== '' && !isNaN(parseInt(numeroPedido))) {
+      whereConditions.push('NumeroPedido = @numeroPedido');
+      inputParams.numeroPedido = parseInt(numeroPedido);
+    }
+
+    if (importeMin && !isNaN(parseFloat(importeMin))) {
+      whereConditions.push('BaseImponible >= @importeMin');
+      inputParams.importeMin = parseFloat(importeMin);
+    }
+
+    if (importeMax && !isNaN(parseFloat(importeMax))) {
+      whereConditions.push('BaseImponible <= @importeMax');
+      inputParams.importeMax = parseFloat(importeMax);
     }
     
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
@@ -76,6 +99,9 @@ const getAllOrders = async (req, res) => {
       OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
     `;
     
+    console.log('Consulta ejecutada:', query);
+    console.log('Parámetros:', inputParams);
+    
     let request = pool.request();
     Object.keys(inputParams).forEach(key => {
       request = request.input(key, inputParams[key]);
@@ -93,6 +119,8 @@ const getAllOrders = async (req, res) => {
     const countResult = await countRequest.query(countQuery);
     const total = countResult.recordset[0].total;
     const totalPaginas = Math.ceil(total / limit);
+
+    console.log(`Resultados: ${result.recordset.length} pedidos de ${total} totales`);
 
     res.status(200).json({
       success: true,
@@ -118,11 +146,22 @@ const getAllOrders = async (req, res) => {
 const getOrderDetails = async (req, res) => {
   try {
     const { orderId } = req.params;
+    
+    // Validar que orderId sea un número y no sea "all"
+    if (!orderId || orderId === 'all' || isNaN(parseInt(orderId))) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'ID de pedido inválido' 
+      });
+    }
+
     const pool = await getPool();
+
+    console.log('Buscando detalles del pedido:', orderId);
 
     // Cabecera del pedido
     const orderResult = await pool.request()
-      .input('NumeroPedido', orderId)
+      .input('NumeroPedido', parseInt(orderId))
       .input('SeriePedido', 'WebCD')
       .query(`
         SELECT 
@@ -148,7 +187,7 @@ const getOrderDetails = async (req, res) => {
 
     // Líneas del pedido
     const linesResult = await pool.request()
-      .input('NumeroPedido', orderId)
+      .input('NumeroPedido', parseInt(orderId))
       .input('SeriePedido', 'WebCD')
       .query(`
         SELECT 
@@ -168,6 +207,8 @@ const getOrderDetails = async (req, res) => {
         AND l.SeriePedido = @SeriePedido
         ORDER BY l.Orden
       `);
+
+    console.log(`Encontradas ${linesResult.recordset.length} líneas para el pedido ${orderId}`);
 
     res.status(200).json({
       success: true,

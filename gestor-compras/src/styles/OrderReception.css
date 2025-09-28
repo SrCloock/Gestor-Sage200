@@ -486,3 +486,54 @@
     font-size: 0.95rem;
   }
 }
+
+.orr-warning-text {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  padding: 10px;
+  margin: 10px 0;
+  color: #856404;
+}
+
+.orr-needs-comment {
+  background-color: #f8d7da !important;
+  border-left: 4px solid #dc3545;
+}
+
+.orr-comment-warning {
+  color: #dc3545;
+  font-size: 12px;
+  font-weight: bold;
+  display: block;
+  margin-top: 5px;
+}
+
+.orr-status-complete {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.orr-status-pending {
+  color: #ffc107;
+  font-weight: bold;
+}
+
+.orr-status-partial {
+  color: #fd7e14;
+  font-weight: bold;
+}
+
+.orr-comment-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.orr-comment-input:focus {
+  border-color: #007bff;
+  outline: none;
+}

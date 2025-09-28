@@ -182,6 +182,7 @@ const OrderCreate = () => {
 
       try {
         setLoading(prev => ({ ...prev, products: true }));
+        setError('');
         const response = await api.get('/api/products');
         
         let productsData = response.data.products || response.data;
@@ -203,7 +204,11 @@ const OrderCreate = () => {
 
       } catch (err) {
         console.error('Error al cargar productos:', err);
-        setError('Error al cargar productos');
+        if (err.response?.status === 401) {
+          setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
+        } else {
+          setError('Error al cargar productos: ' + (err.message || 'Error desconocido'));
+        }
       } finally {
         setLoading(prev => ({ ...prev, products: false }));
       }
@@ -249,8 +254,8 @@ const OrderCreate = () => {
     })
     .sort((a, b) => {
       return sortOrder === 'asc' 
-        ? a.DescripcionArticulo.localeCompare(b.DescripcionArticulo)
-        : b.DescripcionArticulo.localeCompare(a.DescripcionArticulo);
+        ? (a.DescripcionArticulo || '').localeCompare(b.DescripcionArticulo || '')
+        : (b.DescripcionArticulo || '').localeCompare(a.DescripcionArticulo || '');
     });
 
   const indexOfLastProduct = currentPage * productsPerPage;
@@ -334,30 +339,49 @@ const OrderCreate = () => {
         CifDni: user.cifDni
       }));
 
+      console.log('Enviando pedido con datos:', {
+        items: itemsToSend,
+        FechaNecesaria: deliveryDate || null,
+        ObservacionesPedido: comment
+      });
+
       const response = await api.post('/api/orders', {
         items: itemsToSend,
-        deliveryDate: deliveryDate || null,
-        comment: comment
+        FechaNecesaria: deliveryDate || null,
+        ObservacionesPedido: comment
       });
 
       if (response.data.success) {
-        navigate('/revision-pedido', {
+        navigate('/revisar-pedido', {
           state: {
             orderId: response.data.orderId,
             seriePedido: response.data.seriePedido,
             deliveryDate: deliveryDate,
             items: orderItems,
             comment: comment,
-            total: response.data.importeLiquido
+            total: response.data.importeLiquido || calcularTotal()
           }
         });
+      } else {
+        setError(response.data.message || 'Error al procesar el pedido');
       }
     } catch (err) {
       console.error('Error al crear pedido:', err);
-      setError(err.response?.data?.message || err.message || 'Error al procesar el pedido');
+      if (err.response?.status === 401) {
+        setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
+      } else {
+        setError(err.response?.data?.message || err.message || 'Error al procesar el pedido');
+      }
     } finally {
       setLoading(prev => ({ ...prev, submit: false }));
     }
+  };
+
+  const calcularTotal = () => {
+    return orderItems.reduce((sum, item) => {
+      const precio = item.PrecioVenta || item.PrecioCompra || item.Precio || 0;
+      return sum + (precio * (item.Cantidad || 1));
+    }, 0);
   };
 
   const handleFiltroChange = (e) => {
@@ -454,10 +478,12 @@ const OrderCreate = () => {
             <FaFilter className="oc-filter-icon" />
             Filtros
           </button>
-          <button onClick={handleReviewOrder} className="oc-review-btn">
-            <FaCheck className="oc-check-icon" />
-            Revisar Pedido
-          </button>
+          {orderItems.length > 0 && (
+            <button onClick={handleReviewOrder} className="oc-review-btn">
+              <FaCheck className="oc-check-icon" />
+              Revisar Pedido ({orderItems.length})
+            </button>
+          )}
         </div>
       </div>
 

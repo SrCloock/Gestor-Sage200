@@ -4,8 +4,10 @@ const router = express.Router();
 const allOrdersController = require('../controllers/allOrdersController');
 const { adminAuth } = require('../middleware/auth');
 
-// Todas las rutas requieren autenticación de administrador
+// Ruta para obtener todos los pedidos con filtros
 router.get('/', adminAuth, allOrdersController.getAllOrders);
+
+// Ruta para obtener detalles de un pedido específico
 router.get('/:orderId', adminAuth, allOrdersController.getOrderDetails);
 
 module.exports = router;

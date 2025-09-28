@@ -1,11 +1,10 @@
 import axios from 'axios';
-import { getToken } from '../utils/auth';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -13,7 +12,7 @@ const api = axios.create({
 
 // Interceptor para añadir token a las peticiones
 api.interceptors.request.use(config => {
-  const token = getToken();
+  const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -22,22 +21,40 @@ api.interceptors.request.use(config => {
   return Promise.reject(error);
 });
 
-// Interceptor para manejar errores globales
+// Interceptor MEJORADO para manejar errores globales
 api.interceptors.response.use(response => {
   return response;
 }, error => {
+  console.error('Error en interceptor:', error.response?.status, error.message);
+  
   if (error.response?.status === 401) {
-    // Manejar logout si el token es inválido
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
+    const currentPath = window.location.pathname;
+    if (!currentPath.includes('/login')) {
+      console.warn('Sesión expirada, redirigiendo a login...');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
+    }
   }
+  
+  if (error.code === 'NETWORK_ERROR' || error.message.includes('Network Error')) {
+    console.error('Error de conexión con el servidor');
+  }
+  
   return Promise.reject(error);
 });
 
 // ========== AUTENTICACIÓN ==========
-export const loginUser = (credentials) => {
-  return api.post('/auth/login', credentials);
+export const loginUser = async (credentials) => {
+  try {
+    const response = await api.post('/auth/login', credentials);
+    return response;
+  } catch (error) {
+    console.error('Error en login:', error);
+    throw error;
+  }
 };
 
 export const getProfile = () => {
@@ -49,8 +66,14 @@ export const adminLogin = (credentials) => {
 };
 
 // ========== PRODUCTOS ==========
-export const getProducts = () => {
-  return api.get('/products');
+export const getProducts = async () => {
+  try {
+    const response = await api.get('/products');
+    return response;
+  } catch (error) {
+    console.error('Error obteniendo productos:', error);
+    throw error;
+  }
 };
 
 export const searchProducts = (filters) => {
@@ -62,12 +85,27 @@ export const getProductById = (id) => {
 };
 
 // ========== PEDIDOS ==========
-export const createOrder = (orderData) => {
-  return api.post('/orders', orderData);
+export const createOrder = async (orderData) => {
+  try {
+    const response = await api.post('/orders', orderData);
+    return response;
+  } catch (error) {
+    console.error('Error creando pedido:', error);
+    if (error.response?.status === 401) {
+      console.warn('Sesión expirada durante creación de pedido');
+    }
+    throw error;
+  }
 };
 
-export const getOrders = (CodigoCliente) => {
-  return api.get(`/orders/${CodigoCliente}`);
+export const getOrders = async (CodigoCliente) => {
+  try {
+    const response = await api.get(`/orders/${CodigoCliente}`);
+    return response;
+  } catch (error) {
+    console.error('Error obteniendo pedidos:', error);
+    throw error;
+  }
 };
 
 export const getOrderDetail = (CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido) => {

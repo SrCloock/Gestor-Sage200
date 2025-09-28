@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import api from '../api';
+import api from '../components/orderService'; // Solo importar api
 import { FaSearch, FaSort, FaSortUp, FaSortDown, FaTimes, FaSync, FaEye } from 'react-icons/fa';
 import '../styles/AllOrders.css';
 
@@ -48,7 +48,11 @@ const AllOrders = () => {
         ...(filters.estado && { estado: filters.estado })
       };
 
-      const response = await api.get('/api/admin/all-orders', { params });
+      console.log('Buscando todos los pedidos con params:', params);
+
+      // Usar api.get directamente en lugar de getAllOrders
+      const response = await api.get('/admin/orders', { params });
+
       
       if (response.data.success) {
         setOrders(response.data.orders || []);
@@ -57,15 +61,20 @@ const AllOrders = () => {
           total: response.data.pagination?.total || 0,
           totalPages: response.data.pagination?.totalPages || 0
         }));
+        console.log('Pedidos cargados:', response.data.orders?.length);
       } else {
         setError(response.data.message || 'Error al cargar los pedidos');
       }
     } catch (err) {
       console.error('Error fetching orders:', err);
       if (err.response?.status === 404) {
-        setError('La ruta /api/admin/all-orders no fue encontrada. Verifique la configuración del servidor.');
+        setError('La ruta /admin/orders/all no fue encontrada. Verifique la configuración del servidor.');
+      } else if (err.code === 'NETWORK_ERROR' || err.message.includes('Network Error')) {
+        setError('Error de conexión con el servidor. Verifique que el servidor esté ejecutándose en http://localhost:5000');
+      } else if (err.response?.status === 401) {
+        setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
       } else {
-        setError('Error de conexión con el servidor. Verifique que el servidor esté ejecutándose.');
+        setError('Error de conexión con el servidor: ' + (err.message || 'Error desconocido'));
       }
     } finally {
       setLoading(false);
@@ -275,7 +284,7 @@ const AllOrders = () => {
                       </td>
                       <td className="order-client">{order.RazonSocial || 'N/A'}</td>
                       <td className="order-amount">
-                        {order.BaseImponible ? `${order.BaseImponible.toFixed(2)} €` : 'N/A'}
+                        {order.BaseImponible ? `${order.BaseImponible.toFixed(2)} €` : '0.00 €'}
                       </td>
                       <td className="order-delivery">
                         {order.FechaNecesaria ? new Date(order.FechaNecesaria).toLocaleDateString('es-ES') : 'N/A'}

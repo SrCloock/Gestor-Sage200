@@ -17,6 +17,8 @@ const OrderDetail = () => {
       try {
         setLoading(true);
         setError('');
+        console.log('Obteniendo detalles del pedido:', orderId, 'para cliente:', user?.codigoCliente);
+        
         const response = await api.get(`/api/orders/${orderId}`, {
           params: {
             codigoCliente: user?.codigoCliente,
@@ -24,16 +26,22 @@ const OrderDetail = () => {
           }
         });
         
-        console.log('Respuesta del API:', response.data); // Para debug
+        console.log('Respuesta del API:', response.data);
         
         if (response.data && response.data.order) {
           setOrder(response.data.order);
         } else {
-          setError('Estructura de datos inesperada');
+          setError('No se encontraron datos del pedido');
         }
       } catch (err) {
         console.error('Error detallado:', err);
-        setError(err.response?.data?.message || 'Error al cargar los detalles del pedido');
+        if (err.response?.status === 401) {
+          setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
+        } else if (err.response?.status === 404) {
+          setError('El pedido solicitado no existe.');
+        } else {
+          setError(err.response?.data?.message || 'Error al cargar los detalles del pedido');
+        }
       } finally {
         setLoading(false);
       }
@@ -41,6 +49,9 @@ const OrderDetail = () => {
   
     if (user?.codigoCliente) {
       fetchOrderDetails();
+    } else {
+      setError('No se pudo identificar el cliente');
+      setLoading(false);
     }
   }, [orderId, user]);
 
@@ -66,6 +77,10 @@ const OrderDetail = () => {
     return 'Desconocido';
   };
 
+  const handleRefresh = () => {
+    window.location.reload();
+  };
+
   if (loading) return (
     <div className="od-loading-container">
       <div className="od-spinner"></div>
@@ -77,9 +92,14 @@ const OrderDetail = () => {
     <div className="od-error-container">
       <div className="od-error-icon">⚠️</div>
       <p>{error}</p>
-      <button onClick={() => navigate('/mis-pedidos')} className="od-back-button">
-        Volver al Historial
-      </button>
+      <div className="od-error-actions">
+        <button onClick={handleRefresh} className="od-retry-button">
+          Reintentar
+        </button>
+        <button onClick={() => navigate('/mis-pedidos')} className="od-back-button">
+          Volver al Historial
+        </button>
+      </div>
     </div>
   );
 
@@ -139,7 +159,7 @@ const OrderDetail = () => {
           <div className="od-info-row">
             <span className="od-info-label">Total del Pedido:</span>
             <span className="od-info-value">
-              {order.ImporteLiquido ? `${order.ImporteLiquido.toFixed(2)} €` : 'N/A'}
+              {order.ImporteLiquido ? `${order.ImporteLiquido.toFixed(2)} €` : '0.00 €'}
             </span>
           </div>
         </div>
@@ -201,20 +221,25 @@ const OrderDetail = () => {
                 </tr>
               </thead>
               <tbody>
-                {productos.map((product, index) => (
-                  <tr key={index} className="od-product-row">
-                    <td className="od-product-code">{product.CodigoArticulo}</td>
-                    <td className="od-product-description">{product.DescripcionArticulo}</td>
-                    <td className="od-product-quantity">{product.UnidadesPedidas || product.Cantidad || 0}</td>
-                    <td className="od-product-price">
-                      {product.Precio ? `${product.Precio.toFixed(2)} €` : '-'}
-                    </td>
-                    <td className="od-product-total">
-                      {product.ImporteLiquido ? `${product.ImporteLiquido.toFixed(2)} €` : 
-                       product.Precio && product.UnidadesPedidas ? `${(product.Precio * product.UnidadesPedidas).toFixed(2)} €` : '-'}
-                    </td>
-                  </tr>
-                ))}
+                {productos.map((product, index) => {
+                  const cantidad = product.UnidadesPedidas || product.Cantidad || 0;
+                  const precio = product.Precio || 0;
+                  const total = product.ImporteLiquido || (precio * cantidad);
+                  
+                  return (
+                    <tr key={index} className="od-product-row">
+                      <td className="od-product-code">{product.CodigoArticulo}</td>
+                      <td className="od-product-description">{product.DescripcionArticulo}</td>
+                      <td className="od-product-quantity">{cantidad}</td>
+                      <td className="od-product-price">
+                        {precio ? `${precio.toFixed(2)} €` : '0.00 €'}
+                      </td>
+                      <td className="od-product-total">
+                        {total ? `${total.toFixed(2)} €` : '0.00 €'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

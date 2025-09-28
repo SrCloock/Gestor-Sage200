@@ -26,13 +26,16 @@ const OrderEdit = () => {
 
   // Función mejorada para generar claves únicas
   const generateProductKey = (product) => {
-    return `${product.Ejercicio || '0000'}-${product.CodigoArticulo}-${product.CodigoAlmacen || '00'}-${product.Periodo || '00'}-${product.Partida || '000'}-${product.TipoUnidadMedida_ || '00'}-${product.CodigoColor_ || '000'}-${product.CodigoTalla01_ || '000'}`;
+    return `${product.CodigoArticulo}-${product.CodigoProveedor || 'NP'}-${product.CodigoFamilia || 'NF'}-${product.CodigoSubfamilia || 'NS'}`;
   };
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
       try {
         setLoading(prev => ({ ...prev, order: true }));
+        setError('');
+        console.log('Cargando detalles del pedido:', orderId);
+        
         const response = await api.get(`/api/orders/${orderId}`, {
           params: {
             codigoCliente: user?.codigoCliente,
@@ -41,22 +44,30 @@ const OrderEdit = () => {
         });
         
         const order = response.data.order;
-        setOriginalItems(order.productos.map(item => ({
-          ...item,
-          Cantidad: item.UnidadesPedidas
-        })));
+        console.log('Pedido cargado:', order);
         
-        setOrderItems(order.productos.map(item => ({
-          ...item,
-          Cantidad: item.UnidadesPedidas
-        })));
-        
-        setDeliveryDate(order.FechaNecesaria?.split('T')[0] || '');
-        setComment(order.ObservacionesPedido || '');
+        if (order && order.productos) {
+          const itemsWithQuantity = order.productos.map(item => ({
+            ...item,
+            Cantidad: item.UnidadesPedidas || 1
+          }));
+          
+          setOriginalItems(itemsWithQuantity);
+          setOrderItems(itemsWithQuantity);
+          
+          setDeliveryDate(order.FechaNecesaria?.split('T')[0] || '');
+          setComment(order.ObservacionesPedido || '');
+        } else {
+          setError('No se encontraron productos en el pedido');
+        }
         
       } catch (err) {
-        setError('Error al cargar los detalles del pedido');
-        console.error(err);
+        console.error('Error cargando detalles del pedido:', err);
+        if (err.response?.status === 401) {
+          setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
+        } else {
+          setError('Error al cargar los detalles del pedido: ' + (err.message || 'Error desconocido'));
+        }
       } finally {
         setLoading(prev => ({ ...prev, order: false }));
       }
@@ -84,8 +95,8 @@ const OrderEdit = () => {
         setProducts(uniqueProducts);
         setFilteredProducts(uniqueProducts);
       } catch (err) {
-        setError('Error al cargar productos');
-        console.error(err);
+        console.error('Error cargando productos:', err);
+        setError('Error al cargar productos: ' + (err.message || 'Error desconocido'));
       } finally {
         setLoading(prev => ({ ...prev, products: false }));
       }
@@ -94,6 +105,9 @@ const OrderEdit = () => {
     if (user?.codigoCliente) {
       fetchOrderDetails();
       fetchProducts();
+    } else {
+      setError('No se pudo identificar el cliente');
+      setLoading({ order: false, products: false, submit: false });
     }
   }, [orderId, user]);
 
@@ -124,8 +138,8 @@ const OrderEdit = () => {
 
     uniqueProducts.sort((a, b) =>
       sortOrder === 'asc'
-        ? a.DescripcionArticulo.localeCompare(b.DescripcionArticulo)
-        : b.DescripcionArticulo.localeCompare(a.DescripcionArticulo)
+        ? (a.DescripcionArticulo || '').localeCompare(b.DescripcionArticulo || '')
+        : (b.DescripcionArticulo || '').localeCompare(a.DescripcionArticulo || '')
     );
 
     setFilteredProducts(uniqueProducts);
@@ -197,16 +211,22 @@ const OrderEdit = () => {
         CodigoArticulo: item.CodigoArticulo,
         DescripcionArticulo: item.DescripcionArticulo,
         Cantidad: Number(item.Cantidad),
-        PrecioCompra: item.Precio,
+        PrecioCompra: item.PrecioCompra || item.Precio,
         CodigoProveedor: item.CodigoProveedor || null,
         CodigoCliente: user.codigoCliente,
         CifDni: user.cifDni
       }));
 
+      console.log('Enviando datos de actualización:', {
+        items: itemsToSend,
+        FechaNecesaria: deliveryDate || null,
+        ObservacionesPedido: comment
+      });
+
       const response = await api.put(`/api/orders/${orderId}`, {
         items: itemsToSend,
-        deliveryDate: deliveryDate || null,
-        comment: comment
+        FechaNecesaria: deliveryDate || null,
+        ObservacionesPedido: comment
       });
 
       if (response.data.success) {
@@ -216,13 +236,23 @@ const OrderEdit = () => {
             message: 'Pedido actualizado correctamente'
           }
         });
+      } else {
+        setError(response.data.message || 'Error al actualizar el pedido');
       }
     } catch (err) {
       console.error('Error al actualizar pedido:', err);
-      setError(err.response?.data?.message || err.message || 'Error al actualizar el pedido');
+      if (err.response?.status === 401) {
+        setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
+      } else {
+        setError(err.response?.data?.message || err.message || 'Error al actualizar el pedido');
+      }
     } finally {
       setLoading(prev => ({ ...prev, submit: false }));
     }
+  };
+
+  const handleRefresh = () => {
+    window.location.reload();
   };
 
   if (loading.order || loading.products) {
@@ -234,11 +264,19 @@ const OrderEdit = () => {
     );
   }
 
-  if (error) {
+  if (error && !loading.order && !loading.products) {
     return (
       <div className="oe-error-container">
         <div className="oe-error-icon">⚠️</div>
         <p>{error}</p>
+        <div className="oe-error-actions">
+          <button onClick={handleRefresh} className="oe-retry-button">
+            Reintentar
+          </button>
+          <button onClick={() => navigate('/mis-pedidos')} className="oe-back-button">
+            Volver al Historial
+          </button>
+        </div>
       </div>
     );
   }
@@ -246,9 +284,9 @@ const OrderEdit = () => {
   return (
     <div className="oe-container">
       <div className="oe-header">
-        <button onClick={() => navigate(-1)} className="oe-back-button">
+        <button onClick={() => navigate('/mis-pedidos')} className="oe-back-button">
           <FaArrowLeft className="oe-back-icon" />
-          Volver
+          Volver al Historial
         </button>
         <div className="oe-title-section">
           <h2>Editar Pedido #{orderId}</h2>
@@ -299,6 +337,14 @@ const OrderEdit = () => {
             }}
             className="oe-search-input"
           />
+          {searchTerm && (
+            <button 
+              onClick={() => setSearchTerm('')}
+              className="oe-clear-search"
+            >
+              ×
+            </button>
+          )}
         </div>
 
         <div className="oe-filter-container">
@@ -342,6 +388,7 @@ const OrderEdit = () => {
           {orderItems.length === 0 ? (
             <div className="oe-empty-cart">
               <p>No hay productos en el pedido</p>
+              <p>Agregue productos desde el catálogo</p>
             </div>
           ) : (
             <div className="oe-order-items">
@@ -349,17 +396,27 @@ const OrderEdit = () => {
                 <div key={generateProductKey(item)} className="oe-order-item">
                   <div className="oe-item-details">
                     <h4>{item.DescripcionArticulo}</h4>
-                    <p>Código: {item.CodigoArticulo}</p>
-                    {item.NombreProveedor && <p>Proveedor: {item.NombreProveedor}</p>}
+                    <div className="oe-item-meta">
+                      <p><strong>Código:</strong> {item.CodigoArticulo}</p>
+                      {item.NombreProveedor && <p><strong>Proveedor:</strong> {item.NombreProveedor}</p>}
+                      {item.Familia && <p><strong>Familia:</strong> {item.Familia}</p>}
+                      <p><strong>Precio:</strong> {(item.PrecioCompra || item.Precio || 0).toFixed(2)} €</p>
+                    </div>
                   </div>
                   <div className="oe-item-controls">
-                    <input
-                      type="number"
-                      min="1"
-                      value={item.Cantidad}
-                      onChange={(e) => handleUpdateQuantity(item, e.target.value)}
-                      className="oe-quantity-input"
-                    />
+                    <div className="oe-quantity-section">
+                      <label>Cantidad:</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.Cantidad}
+                        onChange={(e) => handleUpdateQuantity(item, e.target.value)}
+                        className="oe-quantity-input"
+                      />
+                    </div>
+                    <div className="oe-subtotal">
+                      <strong>Subtotal:</strong> {((item.PrecioCompra || item.Precio || 0) * item.Cantidad).toFixed(2)} €
+                    </div>
                     <button
                       className="oe-remove-button"
                       onClick={() => handleRemoveItem(item)}
@@ -372,13 +429,32 @@ const OrderEdit = () => {
             </div>
           )}
 
+          <div className="oe-total-section">
+            <div className="oe-total-line">
+              <span>Total del pedido:</span>
+              <span className="oe-total-amount">
+                {orderItems.reduce((total, item) => {
+                  const precio = item.PrecioCompra || item.Precio || 0;
+                  return total + (precio * item.Cantidad);
+                }, 0).toFixed(2)} €
+              </span>
+            </div>
+          </div>
+
           <div className="oe-actions">
             <button
               onClick={handleSubmitChanges}
               disabled={loading.submit || orderItems.length === 0}
               className="oe-submit-button"
             >
-              {loading.submit ? 'Guardando cambios...' : 'Guardar Cambios'}
+              {loading.submit ? (
+                <>
+                  <div className="oe-button-spinner"></div>
+                  Guardando cambios...
+                </>
+              ) : (
+                'Guardar Cambios'
+              )}
             </button>
             <button
               onClick={() => navigate('/mis-pedidos')}
@@ -402,6 +478,7 @@ const OrderEdit = () => {
             onPageChange={handlePageChange}
             searchTerm={searchTerm}
             generateProductKey={generateProductKey}
+            loading={loading.products}
           />
         </div>
       </div>

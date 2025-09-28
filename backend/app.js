@@ -7,6 +7,7 @@ const productRoutes = require('./routes/productRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const receptionRoutes = require('./routes/receptionRoutes');
+const allOrdersRoutes = require('./routes/allOrders'); // AGREGAR ESTA LÍNEA
 
 const { connect } = require('./db/Sage200db');
 const { syncImagesWithDB } = require('./controllers/productController');
@@ -63,6 +64,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/reception', receptionRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/orders', allOrdersRoutes); // AGREGAR ESTA LÍNEA - MONTAR RUTAS DE ALL ORDERS
 
 // Middleware de errores
 app.use((err, req, res, next) => {
