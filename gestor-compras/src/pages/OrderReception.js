@@ -20,7 +20,8 @@ const OrderReception = () => {
     const fetchOrderReception = async () => {
       try {
         setLoading(true);
-        const response = await api.get(`/api/reception/${orderId}`);
+        // ✅ Corregido: se elimina el "/api"
+        const response = await api.get(`/reception/${orderId}`);
         
         if (response.data.success) {
           setOrder(response.data.order);
@@ -51,7 +52,6 @@ const OrderReception = () => {
     
     newItems[index].UnidadesRecibidas = nuevasUnidades;
     
-    // Si la cantidad recibida es diferente a la pedida, sugerir agregar comentario
     if (nuevasUnidades !== unidadesPedidas && !newItems[index].ComentarioRecepcion) {
       newItems[index].ComentarioRecepcion = `Cantidad modificada: recibidas ${nuevasUnidades} de ${unidadesPedidas} pedidas`;
     }
@@ -71,7 +71,6 @@ const OrderReception = () => {
       setError('');
       setSuccess('');
       
-      // Validar que si hay diferencias en cantidades, haya comentarios
       const itemsWithDifferences = receptionItems.filter(item => 
         item.UnidadesRecibidas !== item.UnidadesPedidas && !item.ComentarioRecepcion.trim()
       );
@@ -83,7 +82,8 @@ const OrderReception = () => {
         return;
       }
 
-      const response = await api.post(`/api/reception/${orderId}/confirm`, {
+      // ✅ Corregido: se elimina el "/api"
+      const response = await api.post(`/reception/${orderId}/confirm`, {
         items: receptionItems
       });
       
