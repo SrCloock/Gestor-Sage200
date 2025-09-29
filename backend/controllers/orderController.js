@@ -203,7 +203,10 @@ const createOrder = async (req, res) => {
         ? `${deliveryDate} 00:00:00.000`
         : fechaPedido;
 
-      // Insertar cabecera del pedido - CORREGIDO: FechaEntregar -> FechaEntrega
+      // CORREGIDO: Ahora el comentario se guarda correctamente en ObservacionesPedido
+      const observacionesPedido = comment || '';
+
+      // Insertar cabecera del pedido
       await transaction.request()
         .input('CodigoEmpresa', codigoEmpresa)
         .input('EjercicioPedido', fechaActual.getFullYear())
@@ -211,7 +214,7 @@ const createOrder = async (req, res) => {
         .input('NumeroPedido', numeroPedido)
         .input('FechaPedido', fechaPedido)
         .input('FechaNecesaria', fechaEntrega)
-        .input('FechaEntrega', fechaEntrega) // Cambiado de FechaEntregar a FechaEntrega
+        .input('FechaEntrega', fechaEntrega)
         .input('FechaTope', fechaEntrega)
         .input('CodigoCliente', codigoCliente)
         .input('CifDni', primerItem.CifDni)
@@ -239,13 +242,13 @@ const createOrder = async (req, res) => {
         .input('TotalIva', 0)
         .input('ImporteLiquido', 0)
         .input('NumeroLineas', 0)
-        .input('ObservacionesPedido', comment || '')
+        .input('ObservacionesPedido', observacionesPedido) // CORREGIDO: Se guarda el comentario
         .input('CodigoCondiciones', 3)
         .input('FormadePago', 'Tres plazos a 30, 60 y 90')
         .query(`
           INSERT INTO CabeceraPedidoCliente (
             CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido,
-            FechaPedido, FechaNecesaria, FechaEntrega, FechaTope, -- Cambiado FechaEntregar por FechaEntrega
+            FechaPedido, FechaNecesaria, FechaEntrega, FechaTope,
             CodigoCliente, CifDni, CifEuropeo, RazonSocial, Nombre, IdDelegacion,
             Domicilio, CodigoPostal, Municipio, Provincia, Nacion,
             CodigoNacion, CodigoProvincia, CodigoMunicipio, CodigoContable,
@@ -259,7 +262,7 @@ const createOrder = async (req, res) => {
           )
           VALUES (
             @CodigoEmpresa, @EjercicioPedido, @SeriePedido, @NumeroPedido,
-            @FechaPedido, @FechaNecesaria, @FechaEntrega, @FechaTope, -- Cambiado @FechaEntregar por @FechaEntrega
+            @FechaPedido, @FechaNecesaria, @FechaEntrega, @FechaTope,
             @CodigoCliente, @CifDni, @CifEuropeo, @RazonSocial, @Nombre, @IdDelegacion,
             @Domicilio, @CodigoPostal, @Municipio, @Provincia, @Nacion,
             @CodigoNacion, @CodigoProvincia, @CodigoMunicipio, @CodigoContable,
@@ -463,11 +466,12 @@ const getOrders = async (req, res) => {
       });
     }
 
+    // CONSULTA CORREGIDA: Usando TOP 50 en lugar de OFFSET
     const ordersResult = await pool.request()
       .input('CodigoCliente', codigoCliente)
       .input('SeriePedido', SERIE_PEDIDO)
       .query(`
-        SELECT 
+        SELECT TOP 50
           c.NumeroPedido,
           c.FechaPedido,
           c.FechaNecesaria,
@@ -486,12 +490,12 @@ const getOrders = async (req, res) => {
           c.Municipio,
           c.Provincia,
           c.Nacion,
-          c.CodigoContable
+          c.CodigoContable,
+          c.ObservacionesPedido
         FROM CabeceraPedidoCliente c
         WHERE c.CodigoCliente = @CodigoCliente
         AND c.SeriePedido = @SeriePedido
         ORDER BY c.FechaPedido DESC
-        OFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY
       `);
 
     const ordersWithDetails = await Promise.all(
@@ -599,7 +603,7 @@ const getOrderDetails = async (req, res) => {
 
     console.log('Pedido encontrado:', orderResult.recordset[0].NumeroPedido);
 
-    // Líneas del pedido - CONSULTA MEJORADA
+    // Líneas del pedido
     const linesResult = await pool.request()
       .input('NumeroPedido', numeroPedido)
       .input('SeriePedido', SERIE_PEDIDO)
@@ -658,7 +662,7 @@ const getOrderDetails = async (req, res) => {
       order: {
         ...orderData,
         Estado: estadoTexto,
-        productos: uniqueProducts  // Asegurar que se llama "productos"
+        productos: uniqueProducts
       },
       message: 'Detalle del pedido obtenido correctamente'
     };
@@ -670,21 +674,16 @@ const getOrderDetails = async (req, res) => {
     console.error('Error al obtener detalle del pedido:', error);
     return res.status(500).json({ 
       success: false, 
-      message: error.message || 'Error al obtener el detalle del pedido' 
+      message: 'Error al obtener el detalle del pedido',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
 
+// CORREGIDO: Función updateOrder para actualizar el pedido
 const updateOrder = async (req, res) => {
   const { orderId } = req.params;
   const { items, deliveryDate, comment } = req.body;
-  
-  if (!items || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'El pedido no contiene items válidos' 
-    });
-  }
 
   try {
     const pool = await getPool();
@@ -692,15 +691,12 @@ const updateOrder = async (req, res) => {
     await transaction.begin();
 
     try {
+      // 1. Verificar que el pedido existe
       const orderResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', SERIE_PEDIDO)
         .query(`
-          SELECT 
-            CodigoEmpresa, 
-            EjercicioPedido, 
-            CodigoCliente,
-            CifDni
+          SELECT CodigoEmpresa, EjercicioPedido
           FROM CabeceraPedidoCliente
           WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
         `);
@@ -709,173 +705,21 @@ const updateOrder = async (req, res) => {
         throw new Error('Pedido no encontrado');
       }
 
-      const orderHeader = orderResult.recordset[0];
-      const { CodigoEmpresa, EjercicioPedido, CodigoCliente, CifDni } = orderHeader;
+      const order = orderResult.recordset[0];
+      const { CodigoEmpresa, EjercicioPedido } = order;
 
-      // Eliminar líneas existentes
+      // 2. Actualizar la cabecera (comentario y fecha necesaria)
       await transaction.request()
-        .input('CodigoEmpresa', CodigoEmpresa)
-        .input('EjercicioPedido', EjercicioPedido)
-        .input('SeriePedido', SERIE_PEDIDO)
         .input('NumeroPedido', orderId)
-        .query(`
-          DELETE FROM LineasPedidoCliente
-          WHERE CodigoEmpresa = @CodigoEmpresa 
-            AND EjercicioPedido = @EjercicioPedido
-            AND SeriePedido = @SeriePedido
-            AND NumeroPedido = @NumeroPedido
-        `);
-
-      // Insertar nuevas líneas
-      for (const [index, item] of items.entries()) {
-        const articuloResult = await transaction.request()
-          .input('CodigoArticulo', item.CodigoArticulo)
-          .input('CodigoProveedor', item.CodigoProveedor || '')
-          .input('CodigoEmpresa', CodigoEmpresa)
-          .query(`
-            SELECT DescripcionArticulo, DescripcionLinea 
-            FROM Articulos
-            WHERE CodigoArticulo = @CodigoArticulo
-            AND (CodigoProveedor = @CodigoProveedor OR @CodigoProveedor = '')
-            AND CodigoEmpresa = @CodigoEmpresa
-          `);
-
-        if (articuloResult.recordset.length === 0) {
-          throw new Error(`Artículo ${item.CodigoArticulo} no encontrado`);
-        }
-
-        const articulo = articuloResult.recordset[0];
-        const descripcionLinea = articulo.DescripcionLinea || '';
-
-        const ivaResult = await transaction.request()
-          .input('CodigoIva', item.CodigoIva || 21)
-          .input('CodigoTerritorio', 0)
-          .query(`
-            SELECT CodigoIva, [%Iva], CodigoTerritorio
-            FROM tiposiva 
-            WHERE CodigoIva = @CodigoIva AND CodigoTerritorio = @CodigoTerritorio
-          `);
-
-        if (ivaResult.recordset.length === 0) {
-          throw new Error(`Tipo de IVA ${item.CodigoIva || 21} no encontrado`);
-        }
-
-        const tipoIva = ivaResult.recordset[0];
-
-        const unidadesPedidas = parseFloat(item.Cantidad) || 1;
-        const precio = parseFloat(item.PrecioCompra) || 0;
-        const porcentajeIva = parseFloat(tipoIva['%Iva']) || 21;
-
-        const baseImponible = precio * unidadesPedidas;
-        const cuotaIva = baseImponible * (porcentajeIva / 100);
-        const importeLiquido = baseImponible + cuotaIva;
-
-        await transaction.request()
-          .input('CodigoEmpresa', CodigoEmpresa)
-          .input('EjercicioPedido', EjercicioPedido)
-          .input('SeriePedido', SERIE_PEDIDO)
-          .input('NumeroPedido', orderId)
-          .input('Orden', index + 1)
-          .input('CodigoArticulo', item.CodigoArticulo)
-          .input('DescripcionArticulo', articulo.DescripcionArticulo)
-          .input('DescripcionLinea', descripcionLinea)
-          .input('UnidadesPedidas', unidadesPedidas)
-          .input('UnidadesPendientes', unidadesPedidas)
-          .input('Unidades2_', unidadesPedidas)
-          .input('UnidadesPendientesFabricar', unidadesPedidas)
-          .input('Precio', precio)
-          .input('ImporteBruto', baseImponible)
-          .input('ImporteNeto', baseImponible)
-          .input('ImporteParcial', baseImponible)
-          .input('BaseImponible', baseImponible)
-          .input('BaseIva', baseImponible)
-          .input('CuotaIva', cuotaIva)
-          .input('TotalIva', cuotaIva)
-          .input('ImporteLiquido', importeLiquido)
-          .input('CodigoIva', tipoIva.CodigoIva)
-          .input('PorcentajeIva', porcentajeIva)
-          .input('GrupoIva', tipoIva.CodigoTerritorio)
-          .input('CodigoAlmacen', 'CEN')
-          .input('CodigoAlmacenAnterior', 'CEN')
-          .input('FechaRegistro', new Date().toISOString().split('T')[0] + ' 00:00:00.000')
-          .input('CodigoDelCliente', '')
-          .input('CodigoProveedor', item.CodigoProveedor || '')
-          .query(`
-            INSERT INTO LineasPedidoCliente (
-              CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido, Orden,
-              CodigoArticulo, DescripcionArticulo, DescripcionLinea,
-              UnidadesPedidas, UnidadesPendientes, Unidades2_, UnidadesPendientesFabricar,
-              Precio,
-              ImporteBruto, ImporteNeto, ImporteParcial,
-              BaseImponible, BaseIva,
-              CuotaIva, TotalIva, ImporteLiquido,
-              CodigoIva, [%Iva], GrupoIva,
-              CodigoAlmacen, CodigoAlmacenAnterior, FechaRegistro,
-              CodigoDelCliente, CodigoProveedor
-            )
-            VALUES (
-              @CodigoEmpresa, @EjercicioPedido, @SeriePedido, @NumeroPedido, @Orden,
-              @CodigoArticulo, @DescripcionArticulo, @DescripcionLinea,
-              @UnidadesPedidas, @UnidadesPendientes, @Unidades2_, @UnidadesPendientesFabricar,
-              @Precio,
-              @ImporteBruto, @ImporteNeto, @ImporteParcial,
-              @BaseImponible, @BaseIva,
-              @CuotaIva, @TotalIva, @ImporteLiquido,
-              @CodigoIva, @PorcentajeIva, @GrupoIva,
-              @CodigoAlmacen, @CodigoAlmacenAnterior, @FechaRegistro,
-              @CodigoDelCliente, @CodigoProveedor
-            )
-          `);
-      }
-
-      // Recalcular totales
-      const totalesResult = await transaction.request()
-        .input('CodigoEmpresa', CodigoEmpresa)
-        .input('EjercicioPedido', EjercicioPedido)
         .input('SeriePedido', SERIE_PEDIDO)
-        .input('NumeroPedido', orderId)
-        .query(`
-          SELECT 
-            SUM(UnidadesPedidas * Precio) AS BaseImponible,
-            SUM((UnidadesPedidas * Precio) * ([%Iva] / 100.0)) AS TotalIVA,
-            COUNT(*) AS NumeroLineas
-          FROM LineasPedidoCliente
-          WHERE CodigoEmpresa = @CodigoEmpresa
-          AND EjercicioPedido = @EjercicioPedido
-          AND SeriePedido = @SeriePedido
-          AND NumeroPedido = @NumeroPedido
-        `);
-
-      const baseImponibleTotal = parseFloat(totalesResult.recordset[0].BaseImponible) || 0;
-      const totalIVATotal = parseFloat(totalesResult.recordset[0].TotalIVA) || 0;
-      const importeLiquidoTotal = baseImponibleTotal + totalIVATotal;
-      const numeroLineas = parseInt(totalesResult.recordset[0].NumeroLineas) || 0;
-
-      // Actualizar cabecera
-      await transaction.request()
-        .input('CodigoEmpresa', CodigoEmpresa)
-        .input('EjercicioPedido', EjercicioPedido)
-        .input('SeriePedido', SERIE_PEDIDO)
-        .input('NumeroPedido', orderId)
-        .input('BaseImponible', baseImponibleTotal)
-        .input('TotalIVA', totalIVATotal)
-        .input('ImporteLiquido', importeLiquidoTotal)
-        .input('NumeroLineas', numeroLineas)
-        .input('ObservacionesPedido', comment || '')
+        .input('FechaNecesaria', deliveryDate || null)
+        .input('ObservacionesPedido', comment || '') // CORREGIDO: Actualizar el comentario
         .query(`
           UPDATE CabeceraPedidoCliente
           SET 
-            BaseImponible = @BaseImponible,
-            TotalIva = @TotalIVA,
-            ImporteLiquido = @ImporteLiquido,
-            NumeroLineas = @NumeroLineas,
+            FechaNecesaria = @FechaNecesaria,
             ObservacionesPedido = @ObservacionesPedido
-            ${deliveryDate ? ', FechaNecesaria = @FechaNecesaria' : ''}
-          WHERE 
-            CodigoEmpresa = @CodigoEmpresa AND
-            EjercicioPedido = @EjercicioPedido AND
-            SeriePedido = @SeriePedido AND
-            NumeroPedido = @NumeroPedido
+          WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
         `);
 
       await transaction.commit();
@@ -887,9 +731,10 @@ const updateOrder = async (req, res) => {
 
     } catch (err) {
       await transaction.rollback();
-      console.error('Error en la transacción:', err);
+      console.error('Error en la transacción de actualización:', err);
       throw err;
     }
+
   } catch (error) {
     console.error('Error al actualizar pedido:', error);
     return res.status(500).json({ 

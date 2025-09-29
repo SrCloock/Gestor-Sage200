@@ -64,7 +64,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/reception', receptionRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/admin/orders', allOrdersRoutes); // AGREGAR ESTA LÍNEA - MONTAR RUTAS DE ALL ORDERS
+app.use('/api/admin/all-orders', allOrdersRoutes);
 
 // Middleware de errores
 app.use((err, req, res, next) => {

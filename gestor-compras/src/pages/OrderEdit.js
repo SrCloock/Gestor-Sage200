@@ -56,6 +56,7 @@ const OrderEdit = () => {
           setOrderItems(itemsWithQuantity);
           
           setDeliveryDate(order.FechaNecesaria?.split('T')[0] || '');
+          // CORREGIDO: Cargar el comentario correctamente desde ObservacionesPedido
           setComment(order.ObservacionesPedido || '');
         } else {
           setError('No se encontraron productos en el pedido');
@@ -219,14 +220,14 @@ const OrderEdit = () => {
 
       console.log('Enviando datos de actualización:', {
         items: itemsToSend,
-        FechaNecesaria: deliveryDate || null,
-        ObservacionesPedido: comment
+        deliveryDate: deliveryDate || null,
+        comment: comment // CORREGIDO: Enviar el comentario
       });
 
       const response = await api.put(`/api/orders/${orderId}`, {
         items: itemsToSend,
-        FechaNecesaria: deliveryDate || null,
-        ObservacionesPedido: comment
+        deliveryDate: deliveryDate || null,
+        comment: comment // CORREGIDO: Esto mantendrá el comentario
       });
 
       if (response.data.success) {

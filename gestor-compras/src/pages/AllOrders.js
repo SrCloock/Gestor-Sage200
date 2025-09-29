@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import api from '../components/orderService'; // Solo importar api
+import api from '../components/orderService';
 import { FaSearch, FaSort, FaSortUp, FaSortDown, FaTimes, FaSync, FaEye } from 'react-icons/fa';
 import '../styles/AllOrders.css';
 
@@ -50,9 +50,8 @@ const AllOrders = () => {
 
       console.log('Buscando todos los pedidos con params:', params);
 
-      // Usar api.get directamente en lugar de getAllOrders
-      const response = await api.get('/admin/orders', { params });
-
+      // URL corregida
+      const response = await api.get('/admin/all-orders', { params });
       
       if (response.data.success) {
         setOrders(response.data.orders || []);
@@ -68,13 +67,11 @@ const AllOrders = () => {
     } catch (err) {
       console.error('Error fetching orders:', err);
       if (err.response?.status === 404) {
-        setError('La ruta /admin/orders/all no fue encontrada. Verifique la configuración del servidor.');
+        setError('La ruta /admin/all-orders no fue encontrada. Verifique la configuración del servidor.');
       } else if (err.code === 'NETWORK_ERROR' || err.message.includes('Network Error')) {
-        setError('Error de conexión con el servidor. Verifique que el servidor esté ejecutándose en http://localhost:5000');
-      } else if (err.response?.status === 401) {
-        setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
+        setError('Error de conexión con el servidor. Verifique que el servidor esté ejecutándose.');
       } else {
-        setError('Error de conexión con el servidor: ' + (err.message || 'Error desconocido'));
+        setError(err.response?.data?.message || err.message || 'Error al cargar los pedidos');
       }
     } finally {
       setLoading(false);
@@ -83,8 +80,10 @@ const AllOrders = () => {
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
-    setPagination(prev => ({ ...prev, page: 1 }));
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const handleSort = (field) => {
@@ -102,49 +101,37 @@ const AllOrders = () => {
       importeMax: '',
       estado: ''
     });
-    setPagination(prev => ({ ...prev, page: 1 }));
   };
 
-  const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= pagination.totalPages) {
-      setPagination(prev => ({ ...prev, page: newPage }));
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('es-ES');
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('es-ES', {
+      style: 'currency',
+      currency: 'EUR'
+    }).format(amount || 0);
+  };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 0: return 'Pendiente';
+      case -1: return 'Aprobado';
+      default: return 'Desconocido';
     }
   };
 
-  const getStatusText = (order) => {
-    if (order.StatusAprobado === 0) return 'Pendiente';
-    if (order.StatusAprobado === -1) {
-      switch (order.Estado) {
-        case 0: return 'Preparando';
-        case 1: return 'Parcial';
-        case 2: return 'Servido';
-        default: return 'Preparando';
-      }
-    }
-    return 'Desconocido';
-  };
-
-  const getStatusClass = (status) => {
-    const statusText = getStatusText({ StatusAprobado: status.StatusAprobado, Estado: status.Estado });
-    switch (statusText) {
-      case 'Pendiente': return 'status-pending';
-      case 'Preparando': return 'status-preparing';
-      case 'Parcial': return 'status-partial';
-      case 'Servido': return 'status-completed';
-      default: return 'status-unknown';
-    }
-  };
-
-  const getSortIcon = (field) => {
+  const renderSortIcon = (field) => {
     if (sorting.field !== field) return <FaSort />;
     return sorting.direction === 'ASC' ? <FaSortUp /> : <FaSortDown />;
   };
 
   if (!user || !user.isAdmin) {
     return (
-      <div className="all-orders-container">
-        <div className="access-denied">
-          <FaTimes className="denied-icon" />
+      <div className="ao-container">
+        <div className="ao-access-denied">
+          <FaTimes className="ao-denied-icon" />
           <h2>Acceso restringido</h2>
           <p>Se requieren permisos de administrador para acceder a esta sección.</p>
         </div>
@@ -153,227 +140,180 @@ const AllOrders = () => {
   }
 
   return (
-    <div className="all-orders-container">
-      <div className="header">
-        <div className="title-section">
+    <div className="ao-container">
+      <div className="ao-header">
+        <div className="ao-title-section">
           <h1>Todos los Pedidos</h1>
-          <p>Gestión completa de pedidos de todos los clientes</p>
+          <p>Vista completa de todos los pedidos del sistema</p>
         </div>
-        <button onClick={fetchAllOrders} className="refresh-btn">
-          <FaSync /> Actualizar
-        </button>
-      </div>
-      
-      <div className="filters-section">
-        <div className="filters-grid">
-          <div className="filter-group">
-            <label>Nº Pedido:</label>
-            <input 
-              type="text" 
-              name="numeroPedido" 
-              placeholder="Buscar por número..." 
-              value={filters.numeroPedido}
-              onChange={handleFilterChange}
-            />
-          </div>
-          
-          <div className="filter-group">
-            <label>Cliente:</label>
-            <input 
-              type="text" 
-              name="cliente" 
-              placeholder="Buscar cliente..." 
-              value={filters.cliente}
-              onChange={handleFilterChange}
-            />
-          </div>
-          
-          <div className="filter-group">
-            <label>Importe Mín:</label>
-            <input 
-              type="number" 
-              name="importeMin" 
-              placeholder="Mínimo" 
-              value={filters.importeMin}
-              onChange={handleFilterChange}
-            />
-          </div>
-          
-          <div className="filter-group">
-            <label>Importe Máx:</label>
-            <input 
-              type="number" 
-              name="importeMax" 
-              placeholder="Máximo" 
-              value={filters.importeMax}
-              onChange={handleFilterChange}
-            />
-          </div>
-          
-          <div className="filter-group">
-            <label>Estado:</label>
-            <select name="estado" value={filters.estado} onChange={handleFilterChange}>
-              <option value="">Todos los estados</option>
-              <option value="0">Pendiente</option>
-              <option value="-1">Aprobado</option>
-              <option value="1">Parcial</option>
-              <option value="2">Servido</option>
-            </select>
-          </div>
-        </div>
-        
-        <div className="filter-actions">
-          <button onClick={fetchAllOrders} className="search-btn">
-            <FaSearch /> Buscar
-          </button>
-          <button onClick={clearFilters} className="clear-btn">
-            Limpiar Filtros
+        <div className="ao-header-actions">
+          <button onClick={fetchAllOrders} className="ao-refresh-btn">
+            <FaSync className="ao-refresh-icon" />
+            Actualizar
           </button>
         </div>
       </div>
 
-      {error && (
-        <div className="error-message">
-          <div className="error-icon">⚠️</div>
-          <p>{error}</p>
-          <button onClick={fetchAllOrders} className="retry-btn">Reintentar</button>
+      {/* Filtros */}
+      <div className="ao-filters">
+        <div className="ao-filter-group">
+          <label>Nº Pedido:</label>
+          <input
+            type="number"
+            name="numeroPedido"
+            value={filters.numeroPedido}
+            onChange={handleFilterChange}
+            placeholder="Buscar por número"
+          />
+        </div>
+
+        <div className="ao-filter-group">
+          <label>Cliente:</label>
+          <input
+            type="text"
+            name="cliente"
+            value={filters.cliente}
+            onChange={handleFilterChange}
+            placeholder="Buscar cliente"
+          />
+        </div>
+
+        <div className="ao-filter-group">
+          <label>Importe Mín:</label>
+          <input
+            type="number"
+            name="importeMin"
+            value={filters.importeMin}
+            onChange={handleFilterChange}
+            placeholder="0.00"
+            step="0.01"
+          />
+        </div>
+
+        <div className="ao-filter-group">
+          <label>Importe Máx:</label>
+          <input
+            type="number"
+            name="importeMax"
+            value={filters.importeMax}
+            onChange={handleFilterChange}
+            placeholder="1000.00"
+            step="0.01"
+          />
+        </div>
+
+        <div className="ao-filter-group">
+          <label>Estado:</label>
+          <select
+            name="estado"
+            value={filters.estado}
+            onChange={handleFilterChange}
+          >
+            <option value="">Todos</option>
+            <option value="0">Pendiente</option>
+            <option value="-1">Aprobado</option>
+          </select>
+        </div>
+
+        <button onClick={clearFilters} className="ao-clear-filters">
+          <FaTimes /> Limpiar
+        </button>
+      </div>
+
+      {loading && (
+        <div className="ao-loading">
+          <div className="ao-spinner"></div>
+          <p>Cargando pedidos...</p>
         </div>
       )}
 
-      {loading ? (
-        <div className="loading-container">
-          <div className="spinner"></div>
-          <p>Cargando pedidos...</p>
+      {error && (
+        <div className="ao-error">
+          <p>{error}</p>
+          <button onClick={fetchAllOrders}>Reintentar</button>
         </div>
-      ) : (
+      )}
+
+      {!loading && !error && (
         <>
-          <div className="table-container">
-            <table className="orders-table">
+          <div className="ao-stats">
+            <p>Mostrando {orders.length} de {pagination.total} pedidos</p>
+          </div>
+
+          <div className="ao-table-container">
+            <table className="ao-table">
               <thead>
                 <tr>
-                  <th onClick={() => handleSort('NumeroPedido')} className="sortable">
-                    Nº Pedido {getSortIcon('NumeroPedido')}
+                  <th onClick={() => handleSort('NumeroPedido')}>
+                    Nº Pedido {renderSortIcon('NumeroPedido')}
                   </th>
-                  <th onClick={() => handleSort('FechaPedido')} className="sortable">
-                    Fecha {getSortIcon('FechaPedido')}
+                  <th onClick={() => handleSort('FechaPedido')}>
+                    Fecha {renderSortIcon('FechaPedido')}
                   </th>
-                  <th>Cliente</th>
-                  <th onClick={() => handleSort('BaseImponible')} className="sortable">
-                    Importe {getSortIcon('BaseImponible')}
+                  <th onClick={() => handleSort('RazonSocial')}>
+                    Cliente {renderSortIcon('RazonSocial')}
                   </th>
-                  <th>Fecha Necesaria</th>
-                  <th onClick={() => handleSort('StatusAprobado')} className="sortable">
-                    Estado {getSortIcon('StatusAprobado')}
+                  <th>CIF/DNI</th>
+                  <th>Líneas</th>
+                  <th onClick={() => handleSort('BaseImponible')}>
+                    Importe {renderSortIcon('BaseImponible')}
                   </th>
+                  <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {orders.length === 0 ? (
-                  <tr>
-                    <td colSpan="7" className="no-data">
-                      No se encontraron pedidos
+                {orders.map(order => (
+                  <tr key={order.NumeroPedido}>
+                    <td>{order.NumeroPedido}</td>
+                    <td>{formatDate(order.FechaPedido)}</td>
+                    <td>{order.RazonSocial}</td>
+                    <td>{order.CifDni}</td>
+                    <td>{order.NumeroLineas}</td>
+                    <td>{formatCurrency(order.BaseImponible)}</td>
+                    <td>
+                      <span className={`ao-status ao-status-${getStatusText(order.StatusAprobado).toLowerCase()}`}>
+                        {getStatusText(order.StatusAprobado)}
+                      </span>
+                    </td>
+                    <td>
+                      <button 
+                        className="ao-view-btn"
+                        onClick={() => console.log('Ver detalle:', order.NumeroPedido)}
+                      >
+                        <FaEye /> Ver
+                      </button>
                     </td>
                   </tr>
-                ) : (
-                  orders.map(order => (
-                    <tr key={order.NumeroPedido}>
-                      <td className="order-id">#{order.NumeroPedido}</td>
-                      <td className="order-date">
-                        {order.FechaPedido ? new Date(order.FechaPedido).toLocaleDateString('es-ES') : 'N/A'}
-                      </td>
-                      <td className="order-client">{order.RazonSocial || 'N/A'}</td>
-                      <td className="order-amount">
-                        {order.BaseImponible ? `${order.BaseImponible.toFixed(2)} €` : '0.00 €'}
-                      </td>
-                      <td className="order-delivery">
-                        {order.FechaNecesaria ? new Date(order.FechaNecesaria).toLocaleDateString('es-ES') : 'N/A'}
-                      </td>
-                      <td>
-                        <span className={`status-badge ${getStatusClass(order)}`}>
-                          {getStatusText(order)}
-                        </span>
-                      </td>
-                      <td className="order-actions">
-                        <button className="view-btn">
-                          <FaEye /> Ver
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
+
+            {orders.length === 0 && (
+              <div className="ao-empty">
+                <p>No se encontraron pedidos</p>
+              </div>
+            )}
           </div>
 
+          {/* Paginación */}
           {pagination.totalPages > 1 && (
-            <div className="pagination">
-              <div className="pagination-info">
-                Mostrando {((pagination.page - 1) * pagination.limit) + 1} - {Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total} pedidos
-              </div>
+            <div className="ao-pagination">
+              <button
+                disabled={pagination.page === 1}
+                onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+              >
+                Anterior
+              </button>
               
-              <div className="pagination-controls">
-                <button 
-                  onClick={() => handlePageChange(1)} 
-                  disabled={pagination.page === 1}
-                >
-                  «
-                </button>
-                <button 
-                  onClick={() => handlePageChange(pagination.page - 1)} 
-                  disabled={pagination.page === 1}
-                >
-                  ‹
-                </button>
-                
-                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                  const pageNum = Math.max(1, Math.min(
-                    pagination.totalPages - 4,
-                    pagination.page - 2
-                  )) + i;
-                  
-                  if (pageNum > pagination.totalPages) return null;
-                  
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => handlePageChange(pageNum)}
-                      className={pagination.page === pageNum ? 'active' : ''}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-                
-                <button 
-                  onClick={() => handlePageChange(pagination.page + 1)} 
-                  disabled={pagination.page === pagination.totalPages}
-                >
-                  ›
-                </button>
-                <button 
-                  onClick={() => handlePageChange(pagination.totalPages)} 
-                  disabled={pagination.page === pagination.totalPages}
-                >
-                  »
-                </button>
-              </div>
+              <span>Página {pagination.page} de {pagination.totalPages}</span>
               
-              <div className="page-size">
-                <select
-                  value={pagination.limit}
-                  onChange={(e) => setPagination(prev => ({ 
-                    ...prev, 
-                    limit: parseInt(e.target.value),
-                    page: 1
-                  }))}
-                >
-                  <option value="10">10 por página</option>
-                  <option value="20">20 por página</option>
-                  <option value="50">50 por página</option>
-                  <option value="100">100 por página</option>
-                </select>
-              </div>
+              <button
+                disabled={pagination.page === pagination.totalPages}
+                onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+              >
+                Siguiente
+              </button>
             </div>
           )}
         </>

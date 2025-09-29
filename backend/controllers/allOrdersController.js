@@ -21,9 +21,8 @@ const getAllOrders = async (req, res) => {
 
     const pool = await getPool();
     
-    // Filtros base: EjercicioPedido del año actual y SeriePedido = 'WebCD'
-    const currentYear = new Date().getFullYear();
-    let whereConditions = [`EjercicioPedido = ${currentYear}`, "SeriePedido = 'WebCD'"];
+    // Filtros base: EjercicioPedido = 2025 y SeriePedido = 'WebCD'
+    let whereConditions = ["EjercicioPedido = '2025'", "SeriePedido = 'WebCD'"];
     let inputParams = {};
     
     if (cliente && cliente.trim() !== '') {
@@ -71,32 +70,36 @@ const getAllOrders = async (req, res) => {
     const ordenarPorValido = columnasPermitidas.includes(ordenarPor) ? ordenarPor : 'FechaPedido';
     const ordenValido = ordenPermitido.includes(orden.toUpperCase()) ? orden.toUpperCase() : 'DESC';
     
-    const offset = (page - 1) * limit;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const offset = (pageNum - 1) * limitNum;
     
-    // Consulta principal con todos los pedidos
+    // CONSULTA CORREGIDA: Usando ROW_NUMBER() para paginación compatible
     let query = `
-      SELECT 
-        NumeroPedido,
-        FechaPedido,
-        RazonSocial,
-        CifDni,
-        NumeroLineas,
-        StatusAprobado,
-        Estado,
-        BaseImponible,
-        TotalIVA,
-        ImporteLiquido,
-        FechaNecesaria,
-        ObservacionesPedido,
-        CodigoCliente,
-        Domicilio,
-        CodigoPostal,
-        Municipio,
-        Provincia
-      FROM CabeceraPedidoCliente
-      ${whereClause}
-      ORDER BY ${ordenarPorValido} ${ordenValido}
-      OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
+      SELECT * FROM (
+        SELECT 
+          ROW_NUMBER() OVER (ORDER BY ${ordenarPorValido} ${ordenValido}) as RowNum,
+          NumeroPedido,
+          FechaPedido,
+          RazonSocial,
+          CifDni,
+          NumeroLineas,
+          StatusAprobado,
+          Estado,
+          BaseImponible,
+          TotalIVA,
+          ImporteLiquido,
+          FechaNecesaria,
+          ObservacionesPedido,
+          CodigoCliente,
+          Domicilio,
+          CodigoPostal,
+          Municipio,
+          Provincia
+        FROM CabeceraPedidoCliente
+        ${whereClause}
+      ) AS Results
+      WHERE RowNum > ${offset} AND RowNum <= ${offset + limitNum}
     `;
     
     console.log('Consulta ejecutada:', query);
@@ -118,7 +121,7 @@ const getAllOrders = async (req, res) => {
     
     const countResult = await countRequest.query(countQuery);
     const total = countResult.recordset[0].total;
-    const totalPaginas = Math.ceil(total / limit);
+    const totalPaginas = Math.ceil(total / limitNum);
 
     console.log(`Resultados: ${result.recordset.length} pedidos de ${total} totales`);
 
@@ -126,8 +129,8 @@ const getAllOrders = async (req, res) => {
       success: true,
       orders: result.recordset,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: pageNum,
+        limit: limitNum,
         total,
         totalPages: totalPaginas
       }

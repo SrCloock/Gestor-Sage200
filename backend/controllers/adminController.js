@@ -54,24 +54,26 @@ const getPendingOrders = async (req, res) => {
     // Calcular offset para paginación
     const offset = (page - 1) * limit;
     
-    // Consulta para los datos
+    // CONSULTA CORREGIDA: Usando ROW_NUMBER() para paginación compatible
     let query = `
-      SELECT 
-        NumeroPedido,
-        FechaPedido,
-        RazonSocial,
-        CifDni,
-        NumeroLineas,
-        StatusAprobado,
-        SeriePedido,
-        BaseImponible,
-        FechaNecesaria,
-        ObservacionesPedido,
-        CodigoCliente
-      FROM CabeceraPedidoCliente
-      ${whereClause}
-      ORDER BY ${ordenarPorValido} ${ordenValido}
-      OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
+      SELECT * FROM (
+        SELECT 
+          ROW_NUMBER() OVER (ORDER BY ${ordenarPorValido} ${ordenValido}) as RowNum,
+          NumeroPedido,
+          FechaPedido,
+          RazonSocial,
+          CifDni,
+          NumeroLineas,
+          StatusAprobado,
+          SeriePedido,
+          BaseImponible,
+          FechaNecesaria,
+          ObservacionesPedido,
+          CodigoCliente
+        FROM CabeceraPedidoCliente
+        ${whereClause}
+      ) AS Results
+      WHERE RowNum > ${offset} AND RowNum <= ${offset + parseInt(limit)}
     `;
     
     let request = pool.request();
