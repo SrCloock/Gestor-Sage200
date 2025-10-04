@@ -368,7 +368,66 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
       const orderHeader = orderResult.recordset[0];
       const { CodigoEmpresa, EjercicioPedido, CodigoCliente, CifDni, RazonSocial, Domicilio, CodigoPostal, Municipio, Provincia, IdDelegacion, CodigoContable, NumeroPedido } = orderHeader;
 
-      // 2. Actualizar cantidades en LineasPedidoCliente
+      // NUEVO: Si no hay items, eliminar el pedido completo
+      if (!items || items.length === 0) {
+        console.log(`Eliminando pedido ${orderId} completo por falta de productos`);
+        
+        // Eliminar líneas del pedido
+        await transaction.request()
+          .input('NumeroPedido', orderId)
+          .input('SeriePedido', 'WebCD')
+          .query(`
+            DELETE FROM LineasPedidoCliente
+            WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
+          `);
+
+        // Eliminar cabecera del pedido
+        await transaction.request()
+          .input('NumeroPedido', orderId)
+          .input('SeriePedido', 'WebCD')
+          .query(`
+            DELETE FROM CabeceraPedidoCliente
+            WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
+          `);
+
+        await transaction.commit();
+
+        return res.status(200).json({
+          success: true,
+          message: 'Pedido eliminado correctamente porque no contenía productos'
+        });
+      }
+
+      // 2. Obtener órdenes actuales para identificar líneas eliminadas
+      const currentLinesResult = await transaction.request()
+        .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD')
+        .query(`
+          SELECT Orden 
+          FROM LineasPedidoCliente
+          WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
+        `);
+
+      const currentOrders = currentLinesResult.recordset.map(row => row.Orden);
+      const updatedOrders = items.map(item => item.Orden);
+
+      // 3. Eliminar líneas que ya no están en el array de items
+      const ordersToDelete = currentOrders.filter(order => !updatedOrders.includes(order));
+      
+      for (const orderToDelete of ordersToDelete) {
+        await transaction.request()
+          .input('NumeroPedido', orderId)
+          .input('SeriePedido', 'WebCD')
+          .input('Orden', orderToDelete)
+          .query(`
+            DELETE FROM LineasPedidoCliente
+            WHERE NumeroPedido = @NumeroPedido 
+            AND SeriePedido = @SeriePedido 
+            AND Orden = @Orden
+          `);
+      }
+
+      // 4. Actualizar cantidades en LineasPedidoCliente para las líneas existentes
       for (const item of items) {
         await transaction.request()
           .input('NumeroPedido', orderId)
@@ -391,7 +450,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           `);
       }
 
-      // 3. Recalcular totales del pedido
+      // 5. Recalcular totales del pedido
       const totalesResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
@@ -409,7 +468,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
       const totalIVATotal = parseFloat(totalesResult.recordset[0].TotalIVA) || 0;
       const importeLiquidoTotal = baseImponibleTotal + totalIVATotal;
 
-      // 4. Actualizar cabecera con nuevos totales y estado
+      // 6. Actualizar cabecera con nuevos totales y estado
       await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
@@ -430,11 +489,11 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           AND SeriePedido = @SeriePedido
         `);
 
-      // 5. Generar albarán para el cliente (SOLO albarán de cliente)
+      // 7. Generar albarán para el cliente (SOLO albarán de cliente)
       const numeroAlbaranCliente = await generarAlbaranCliente(transaction, orderHeader, items);
       console.log(`Albarán de cliente generado: ${numeroAlbaranCliente}`);
 
-      // 6. Crear pedidos a proveedores (agrupados por proveedor) - SIN GENERAR ALBARÁN DE PROVEEDOR
+      // 8. Crear pedidos a proveedores (agrupados por proveedor) - SIN GENERAR ALBARÁN DE PROVEEDOR
       const pedidosPorProveedor = {};
       
       // Agrupar items por proveedor

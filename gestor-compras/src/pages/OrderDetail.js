@@ -215,28 +215,39 @@ const OrderDetail = () => {
                 <tr>
                   <th>Código</th>
                   <th>Descripción</th>
-                  <th>Cantidad</th>
+                  <th>Cantidad Pedida</th>
+                  <th>Cantidad Recibida</th>
                   <th>Precio Unitario</th>
                   <th>Total</th>
+                  {order.Estado !== 0 && <th>Comentario Recepción</th>}
                 </tr>
               </thead>
               <tbody>
                 {productos.map((product, index) => {
-                  const cantidad = product.UnidadesPedidas || product.Cantidad || 0;
+                  const cantidadPedida = product.UnidadesPedidas || product.Cantidad || 0;
+                  const cantidadRecibida = product.UnidadesRecibidas || 0;
                   const precio = product.Precio || 0;
-                  const total = product.ImporteLiquido || (precio * cantidad);
+                  const total = product.ImporteLiquido || (precio * cantidadPedida);
                   
                   return (
                     <tr key={index} className="od-product-row">
                       <td className="od-product-code">{product.CodigoArticulo}</td>
                       <td className="od-product-description">{product.DescripcionArticulo}</td>
-                      <td className="od-product-quantity">{cantidad}</td>
+                      <td className="od-product-quantity">{cantidadPedida}</td>
+                      <td className={`od-product-quantity ${cantidadRecibida !== cantidadPedida ? 'od-quantity-modified' : ''}`}>
+                        {cantidadRecibida}
+                      </td>
                       <td className="od-product-price">
                         {precio ? `${precio.toFixed(2)} €` : '0.00 €'}
                       </td>
                       <td className="od-product-total">
                         {total ? `${total.toFixed(2)} €` : '0.00 €'}
                       </td>
+                      {order.Estado !== 0 && (
+                        <td className="od-product-comment">
+                          {product.ComentarioRecepcion || '-'}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}

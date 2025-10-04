@@ -341,14 +341,15 @@ const OrderCreate = () => {
 
       console.log('Enviando pedido con datos:', {
         items: itemsToSend,
-        FechaNecesaria: deliveryDate || null,
-        ObservacionesPedido: comment
+        deliveryDate: deliveryDate || null,
+        comment: comment
       });
 
+      // CORREGIDO: Enviar comment en lugar de ObservacionesPedido
       const response = await api.post('/api/orders', {
         items: itemsToSend,
-        FechaNecesaria: deliveryDate || null,
-        ObservacionesPedido: comment
+        deliveryDate: deliveryDate || null,
+        comment: comment  // CORREGIDO: Se envía como 'comment'
       });
 
       if (response.data.success) {
@@ -358,7 +359,7 @@ const OrderCreate = () => {
             seriePedido: response.data.seriePedido,
             deliveryDate: deliveryDate,
             items: orderItems,
-            comment: comment,
+            comment: comment,  // CORREGIDO: Pasar el comentario a la pantalla de revisión
             total: response.data.importeLiquido || calcularTotal()
           }
         });

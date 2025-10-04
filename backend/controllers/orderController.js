@@ -205,6 +205,7 @@ const createOrder = async (req, res) => {
 
       // CORREGIDO: Ahora el comentario se guarda correctamente en ObservacionesPedido
       const observacionesPedido = comment || '';
+      console.log('Guardando comentario en ObservacionesPedido:', observacionesPedido);
 
       // Insertar cabecera del pedido
       await transaction.request()
@@ -437,6 +438,7 @@ const createOrder = async (req, res) => {
         importeLiquido: importeLiquidoTotal,
         numeroLineas: numeroLineas,
         deliveryDate: deliveryDate || null,
+        comment: comment, // CORREGIDO: Incluir el comentario en la respuesta
         message: 'Pedido creado correctamente'
       });
 
@@ -524,7 +526,8 @@ const getOrders = async (req, res) => {
         return {
           ...order,
           Estado: order.Estado === 0 ? 'Preparando' : 'Servido',
-          Productos: detailsResult.recordset
+          Productos: detailsResult.recordset,
+          comment: order.ObservacionesPedido // CORREGIDO: Incluir comentario en la respuesta
         };
       })
     );
@@ -662,7 +665,8 @@ const getOrderDetails = async (req, res) => {
       order: {
         ...orderData,
         Estado: estadoTexto,
-        productos: uniqueProducts
+        productos: uniqueProducts,
+        comment: orderData.ObservacionesPedido // CORREGIDO: Incluir comentario
       },
       message: 'Detalle del pedido obtenido correctamente'
     };
@@ -712,14 +716,19 @@ const updateOrder = async (req, res) => {
       await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', SERIE_PEDIDO)
-        .input('FechaNecesaria', deliveryDate || null)
+        .input('CodigoEmpresa', CodigoEmpresa)
+        .input('EjercicioPedido', EjercicioPedido)
+        .input('FechaNecesaria', deliveryDate ? `${deliveryDate} 00:00:00.000` : null)
         .input('ObservacionesPedido', comment || '') // CORREGIDO: Actualizar el comentario
         .query(`
           UPDATE CabeceraPedidoCliente
           SET 
             FechaNecesaria = @FechaNecesaria,
             ObservacionesPedido = @ObservacionesPedido
-          WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
+          WHERE NumeroPedido = @NumeroPedido 
+            AND SeriePedido = @SeriePedido
+            AND CodigoEmpresa = @CodigoEmpresa
+            AND EjercicioPedido = @EjercicioPedido
         `);
 
       await transaction.commit();

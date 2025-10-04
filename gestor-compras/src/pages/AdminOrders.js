@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import { FaSync, FaEye, FaCheckCircle, FaTimes, FaFilter, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
+import { FaSync, FaEye, FaCheckCircle, FaTimes, FaFilter, FaSort, FaSortUp, FaSortDown, FaTrash } from 'react-icons/fa';
 import '../styles/AdminOrders.css';
 
 const AdminOrders = () => {
@@ -119,7 +119,17 @@ const AdminOrders = () => {
 
   const handleQuantityChange = (index, newQuantity) => {
     const updatedProducts = [...editedOrder.Productos];
-    updatedProducts[index].UnidadesPedidas = parseInt(newQuantity) || 1;
+    updatedProducts[index].UnidadesPedidas = Math.max(0, parseInt(newQuantity) || 0);
+    setEditedOrder({
+      ...editedOrder,
+      Productos: updatedProducts
+    });
+  };
+
+  // FUNCIÓN: Eliminar producto del pedido
+  const handleRemoveProduct = (index) => {
+    const updatedProducts = [...editedOrder.Productos];
+    updatedProducts.splice(index, 1);
     setEditedOrder({
       ...editedOrder,
       Productos: updatedProducts
@@ -131,6 +141,12 @@ const AdminOrders = () => {
       setLoading(true);
       setError('');
       
+      // Validar que hay al menos un producto con cantidad > 0
+      const validProducts = editedOrder.Productos.filter(product => product.UnidadesPedidas > 0);
+      
+      // Si no hay productos válidos, enviar array vacío para eliminar el pedido
+      const productsToSend = validProducts.length > 0 ? validProducts : [];
+
       const response = await fetch(`http://localhost:5000/api/admin/orders/${selectedOrder.NumeroPedido}/approve`, {
         method: 'PUT',
         credentials: 'include',
@@ -138,14 +154,14 @@ const AdminOrders = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          items: editedOrder.Productos
+          items: productsToSend
         })
       });
 
       const data = await response.json();
       
       if (data.success) {
-        setSuccessMessage('Pedido aprobado y convertido a pedidos de proveedor correctamente');
+        setSuccessMessage(data.message);
         fetchPendingOrders();
         setTimeout(() => {
           setSelectedOrder(null);
@@ -153,11 +169,11 @@ const AdminOrders = () => {
           setSuccessMessage('');
         }, 3000);
       } else {
-        setError(data.message || 'Error al aprobar el pedido');
+        setError(data.message || 'Error al procesar el pedido');
       }
     } catch (error) {
       console.error('Error approving order:', error);
-      setError('Error al aprobar el pedido');
+      setError('Error al procesar el pedido');
     } finally {
       setLoading(false);
     }
@@ -173,7 +189,6 @@ const AdminOrders = () => {
 
   const aplicarFiltros = () => {
     setPaginacion(prev => ({ ...prev, pagina: 1 }));
-    // No es necesario llamar a fetchPendingOrders porque el useEffect se disparará con el cambio de estado
   };
 
   const limpiarFiltros = () => {
@@ -577,36 +592,54 @@ const AdminOrders = () => {
             
             <h3 className="ao-products-title">Productos</h3>
             <div className="ao-products-container">
-              <table className="ao-products-table">
-                <thead>
-                  <tr>
-                    <th>Código</th>
-                    <th>Descripción</th>
-                    <th>Cantidad</th>
-                    <th>Precio</th>
-                    <th>Proveedor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {editedOrder.Productos && editedOrder.Productos.map((product, index) => (
-                    <tr key={generateProductKey(product, index)} className="ao-product-row">
-                      <td className="ao-product-code">{product.CodigoArticulo}</td>
-                      <td className="ao-product-desc">{product.DescripcionArticulo}</td>
-                      <td className="ao-product-quantity">
-                        <input
-                          type="number"
-                          value={product.UnidadesPedidas}
-                          onChange={(e) => handleQuantityChange(index, e.target.value)}
-                          min="1"
-                          className="ao-quantity-input"
-                        />
-                      </td>
-                      <td className="ao-product-price">{formatCurrency(product.Precio)}</td>
-                      <td className="ao-product-supplier">{product.NombreProveedor || 'No especificado'}</td>
+              {editedOrder.Productos && editedOrder.Productos.length === 0 ? (
+                <div className="ao-empty-products">
+                  <div className="ao-empty-products-icon">📦</div>
+                  <p>No hay productos en este pedido</p>
+                  <p>Al aprobar, el pedido será eliminado automáticamente</p>
+                </div>
+              ) : (
+                <table className="ao-products-table">
+                  <thead>
+                    <tr>
+                      <th>Código</th>
+                      <th>Descripción</th>
+                      <th>Cantidad</th>
+                      <th>Precio</th>
+                      <th>Proveedor</th>
+                      <th>Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {editedOrder.Productos && editedOrder.Productos.map((product, index) => (
+                      <tr key={generateProductKey(product, index)} className="ao-product-row">
+                        <td className="ao-product-code">{product.CodigoArticulo}</td>
+                        <td className="ao-product-desc">{product.DescripcionArticulo}</td>
+                        <td className="ao-product-quantity">
+                          <input
+                            type="number"
+                            value={product.UnidadesPedidas}
+                            onChange={(e) => handleQuantityChange(index, e.target.value)}
+                            min="0"
+                            className="ao-quantity-input"
+                          />
+                        </td>
+                        <td className="ao-product-price">{formatCurrency(product.Precio)}</td>
+                        <td className="ao-product-supplier">{product.NombreProveedor || 'No especificado'}</td>
+                        <td className="ao-product-actions">
+                          <button
+                            onClick={() => handleRemoveProduct(index)}
+                            className="ao-remove-btn"
+                            title="Eliminar producto"
+                          >
+                            <FaTrash />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
             
             <div className="ao-modal-actions">
@@ -621,7 +654,9 @@ const AdminOrders = () => {
                     Procesando...
                   </>
                 ) : (
-                  'Aprobar Pedido y Generar Pedidos a Proveedores'
+                  editedOrder.Productos && editedOrder.Productos.length > 0 
+                    ? 'Aprobar Pedido y Generar Pedidos a Proveedores'
+                    : 'Eliminar Pedido (Sin productos)'
                 )}
               </button>
               <button 
