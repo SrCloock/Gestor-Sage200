@@ -118,18 +118,6 @@ const Navbar = () => {
               <span className="nv-dropdown-role">{user?.isAdmin ? 'Administrador' : 'Usuario'}</span>
             </div>
             <div className="nv-dropdown-divider"></div>
-            <div className="nv-dropdown-links">
-              <Link to="/mi-perfil" className="nv-dropdown-link" onClick={() => setDropdownOpen(false)}>
-                <FaUser className="nv-dropdown-link-icon" />
-                <span>Mi Perfil</span>
-              </Link>
-              {user?.isAdmin && (
-                <Link to="/admin/configuracion" className="nv-dropdown-link" onClick={() => setDropdownOpen(false)}>
-                  <FaCrown className="nv-dropdown-link-icon" />
-                  <span>Configuración</span>
-                </Link>
-              )}
-            </div>
             <div className="nv-dropdown-divider"></div>
             <button className="nv-logout-button" onClick={handleLogout}>
               <FaPowerOff className="nv-logout-icon" />

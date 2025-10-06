@@ -20,6 +20,7 @@ const getOrderReception = async (req, res) => {
           l.DescripcionArticulo,
           l.UnidadesPedidas,
           l.UnidadesRecibidas,
+          l.UnidadesPendientes,
           l.ComentarioRecepcion,
           l.FechaRecepcion
         FROM CabeceraPedidoCliente c
@@ -61,6 +62,7 @@ const getOrderReception = async (req, res) => {
         DescripcionArticulo: item.DescripcionArticulo,
         UnidadesPedidas: item.UnidadesPedidas,
         UnidadesRecibidas: item.UnidadesRecibidas,
+        UnidadesPendientes: item.UnidadesPendientes,
         ComentarioRecepcion: item.ComentarioRecepcion,
         FechaRecepcion: item.FechaRecepcion
       }))
@@ -121,19 +123,23 @@ const confirmReception = async (req, res) => {
 
       const orderInfo = orderResult.recordset[0];
 
-      // 3. Actualizar líneas del pedido con cantidades recibidas
+      // 3. Actualizar líneas del pedido con cantidades recibidas y calcular pendientes
       for (const item of items) {
+        const unidadesPendientes = item.UnidadesPedidas - item.UnidadesRecibidas;
+        
         await transaction.request()
           .input('NumeroPedido', orderId)
           .input('SeriePedido', 'WebCD')
           .input('Orden', item.Orden)
           .input('UnidadesRecibidas', item.UnidadesRecibidas)
+          .input('UnidadesPendientes', unidadesPendientes)
           .input('ComentarioRecepcion', item.ComentarioRecepcion || '')
           .input('FechaRecepcion', new Date())
           .query(`
             UPDATE LineasPedidoCliente 
             SET 
               UnidadesRecibidas = @UnidadesRecibidas,
+              UnidadesPendientes = @UnidadesPendientes,
               ComentarioRecepcion = @ComentarioRecepcion,
               FechaRecepcion = @FechaRecepcion
             WHERE NumeroPedido = @NumeroPedido 
@@ -158,7 +164,7 @@ const confirmReception = async (req, res) => {
         
         console.log(`Encontrado albarán ${numeroAlbaran} para el pedido ${orderId}`);
         
-        // 5. Actualizar las líneas del albarán de cliente con TODOS los campos necesarios
+        // 5. Actualizar las líneas del albarán de cliente con las unidades recibidas
         for (const item of items) {
           await transaction.request()
             .input('NumeroAlbaran', numeroAlbaran)
@@ -216,13 +222,24 @@ const confirmReception = async (req, res) => {
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
         .query(`
-          SELECT SUM(UnidadesPedidas - UnidadesRecibidas) as Pendiente
+          SELECT 
+            SUM(UnidadesPedidas - UnidadesRecibidas) as PendienteTotal,
+            COUNT(CASE WHEN UnidadesPedidas > UnidadesRecibidas THEN 1 END) as LineasPendientes
           FROM LineasPedidoCliente
           WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
         `);
 
-      const pendiente = pendingResult.recordset[0].Pendiente || 0;
-      const nuevoEstado = pendiente > 0 ? 1 : 2;
+      const pendienteTotal = pendingResult.recordset[0].PendienteTotal || 0;
+      const lineasPendientes = pendingResult.recordset[0].LineasPendientes || 0;
+      
+      let nuevoEstado;
+      if (pendienteTotal === 0) {
+        nuevoEstado = 2; // Servido (completo)
+      } else if (lineasPendientes > 0) {
+        nuevoEstado = 1; // Parcial
+      } else {
+        nuevoEstado = 0; // Preparando
+      }
 
       // 9. Actualizar estado del pedido
       await transaction.request()
@@ -242,7 +259,7 @@ const confirmReception = async (req, res) => {
         success: true,
         message: 'Recepción confirmada correctamente. Albarán actualizado con las cantidades recibidas y comentarios.',
         estado: nuevoEstado,
-        estadoTexto: nuevoEstado === 1 ? 'Parcial' : 'Servido'
+        estadoTexto: nuevoEstado === 2 ? 'Servido' : nuevoEstado === 1 ? 'Parcial' : 'Preparando'
       });
 
     } catch (err) {

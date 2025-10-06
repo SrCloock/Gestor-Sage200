@@ -29,7 +29,7 @@
 
 .lg-shape {
   position: absolute;
-  border-radius: 50%;
+  border-radius: var(--radio-full);
   background: rgba(255, 255, 255, 0.1);
   animation: float 6s ease-in-out infinite;
 }
@@ -140,7 +140,8 @@
   align-items: center;
   gap: var(--espacio-3);
   padding: var(--espacio-3) var(--espacio-4);
-  background: rgba(220, 53, 69, 0.1);
+  background: var(--error);
+  background-color: rgba(220, 53, 69, 0.1);
   border: 1px solid rgba(220, 53, 69, 0.2);
   border-radius: var(--radio-base);
   margin-bottom: var(--espacio-4);
@@ -153,7 +154,7 @@
   height: 20px;
   background: var(--error);
   color: var(--blanco);
-  border-radius: 50%;
+  border-radius: var(--radio-full);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -196,6 +197,7 @@
   background: var(--gris-01);
   transition: var(--transicion-rapida);
   min-height: 48px;
+  font-family: var(--fuente-principal);
 }
 
 .lg-input:focus {
@@ -208,6 +210,7 @@
 .lg-input:disabled {
   background: var(--gris-02);
   opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .lg-password-toggle {
@@ -222,6 +225,9 @@
   padding: var(--espacio-1);
   border-radius: var(--radio-base);
   transition: var(--transicion-rapida);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .lg-password-toggle:hover {
@@ -250,6 +256,7 @@
   cursor: pointer;
   font-size: var(--texto-sm);
   color: var(--gris-05);
+  font-family: var(--fuente-principal);
 }
 
 .lg-checkbox {
@@ -288,6 +295,8 @@
   cursor: pointer;
   text-decoration: underline;
   transition: var(--transicion-rapida);
+  font-family: var(--fuente-principal);
+  padding: 0;
 }
 
 .lg-forgot-password:hover {
@@ -310,11 +319,13 @@
   align-items: center;
   justify-content: center;
   gap: var(--espacio-2);
+  font-family: var(--fuente-principal);
 }
 
 .lg-button:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: var(--sombra-md);
+  background: linear-gradient(135deg, #0069d9 0%, #6ba8e6 100%);
 }
 
 .lg-button:disabled {
@@ -328,7 +339,7 @@
   height: 20px;
   border: 2px solid transparent;
   border-top: 2px solid currentColor;
-  border-radius: 50%;
+  border-radius: var(--radio-full);
   animation: spin 1s linear infinite;
 }
 
@@ -348,11 +359,22 @@
   color: var(--azul-01);
   text-decoration: none;
   transition: var(--transicion-rapida);
+  font-family: var(--fuente-principal);
 }
 
 .lg-footer-link:hover {
   color: var(--azul-02);
   text-decoration: underline;
+}
+
+/* Animación flotante para las formas de fondo */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
 }
 
 /* Responsive */
@@ -377,5 +399,15 @@
   .lg-remember-forgot {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .lg-form {
+    padding: var(--espacio-6);
+  }
+  
+  .lg-branding {
+    margin-bottom: var(--espacio-6);
   }
 }

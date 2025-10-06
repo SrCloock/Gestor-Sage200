@@ -60,22 +60,68 @@ const AllOrders = () => {
           total: response.data.pagination?.total || 0,
           totalPages: response.data.pagination?.totalPages || 0
         }));
-        console.log('Pedidos cargados:', response.data.orders?.length);
       } else {
-        setError(response.data.message || 'Error al cargar los pedidos');
+        setError(response.data.message || 'Error al cargar pedidos');
       }
-    } catch (err) {
-      console.error('Error fetching orders:', err);
-      if (err.response?.status === 404) {
-        setError('La ruta /admin/all-orders no fue encontrada. Verifique la configuración del servidor.');
-      } else if (err.code === 'NETWORK_ERROR' || err.message.includes('Network Error')) {
-        setError('Error de conexión con el servidor. Verifique que el servidor esté ejecutándose.');
-      } else {
-        setError(err.response?.data?.message || err.message || 'Error al cargar los pedidos');
-      }
+    } catch (error) {
+      console.error('Error fetching all orders:', error);
+      setError('Error al cargar los pedidos');
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('es-ES', {
+      style: 'currency',
+      currency: 'EUR'
+    }).format(amount || 0);
+  };
+
+  const getStatusText = (order) => {
+    if (order.StatusAprobado === 0) return 'Pendiente';
+    if (order.StatusAprobado === -1) {
+      switch (order.Estado) {
+        case 0: return 'Preparando';
+        case 1: return 'Parcial';
+        case 2: return 'Servido';
+        default: return 'Preparando';
+      }
+    }
+    return 'Desconocido';
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES');
+  };
+
+  // CORREGIDO: Mostrar ImporteLiquido (con IVA) en lugar de BaseImponible
+  const renderTableRows = () => {
+    return orders.map(order => (
+      <tr key={order.NumeroPedido} className="ao-order-row">
+        <td className="ao-order-id">{order.NumeroPedido}</td>
+        <td className="ao-order-date">{formatDate(order.FechaPedido)}</td>
+        <td className="ao-order-client">{order.RazonSocial}</td>
+        <td className="ao-order-cif">{order.CifDni}</td>
+        <td className="ao-order-lines">{order.NumeroLineas}</td>
+        <td className="ao-order-amount">
+          {/* CORREGIDO: Mostrar ImporteLiquido en lugar de BaseImponible */}
+          {formatCurrency(order.ImporteLiquido)}
+        </td>
+        <td className="ao-order-status">
+          <span className={`ao-status-badge ao-status-${getStatusText(order).toLowerCase()}`}>
+            {getStatusText(order)}
+          </span>
+        </td>
+      </tr>
+    ));
+  };
+
+  const handleViewDetails = (orderId) => {
+    // Navegar a los detalles del pedido
+    window.open(`/admin/orders/${orderId}`, '_blank');
   };
 
   const handleFilterChange = (e) => {
@@ -83,13 +129,6 @@ const AllOrders = () => {
     setFilters(prev => ({
       ...prev,
       [name]: value
-    }));
-  };
-
-  const handleSort = (field) => {
-    setSorting(prev => ({
-      field,
-      direction: prev.field === field && prev.direction === 'ASC' ? 'DESC' : 'ASC'
     }));
   };
 
@@ -101,30 +140,6 @@ const AllOrders = () => {
       importeMax: '',
       estado: ''
     });
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('es-ES');
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('es-ES', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(amount || 0);
-  };
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case 0: return 'Pendiente';
-      case -1: return 'Aprobado';
-      default: return 'Desconocido';
-    }
-  };
-
-  const renderSortIcon = (field) => {
-    if (sorting.field !== field) return <FaSort />;
-    return sorting.direction === 'ASC' ? <FaSortUp /> : <FaSortDown />;
   };
 
   if (!user || !user.isAdmin) {
@@ -144,7 +159,7 @@ const AllOrders = () => {
       <div className="ao-header">
         <div className="ao-title-section">
           <h1>Todos los Pedidos</h1>
-          <p>Vista completa de todos los pedidos del sistema</p>
+          <p>Gestión completa de pedidos de todos los clientes</p>
         </div>
         <div className="ao-header-actions">
           <button onClick={fetchAllOrders} className="ao-refresh-btn">
@@ -154,166 +169,144 @@ const AllOrders = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="ao-error-message">
+          <div className="ao-error-icon">⚠️</div>
+          <p>{error}</p>
+        </div>
+      )}
+
       {/* Filtros */}
-      <div className="ao-filters">
-        <div className="ao-filter-group">
-          <label>Nº Pedido:</label>
-          <input
-            type="number"
-            name="numeroPedido"
-            value={filters.numeroPedido}
-            onChange={handleFilterChange}
-            placeholder="Buscar por número"
-          />
+      <div className="ao-filters-panel">
+        <div className="ao-filters-grid">
+          <div className="ao-filter-group">
+            <label>Nº Pedido:</label>
+            <input
+              type="text"
+              name="numeroPedido"
+              value={filters.numeroPedido}
+              onChange={handleFilterChange}
+              placeholder="Buscar por número"
+            />
+          </div>
+
+          <div className="ao-filter-group">
+            <label>Cliente:</label>
+            <input
+              type="text"
+              name="cliente"
+              value={filters.cliente}
+              onChange={handleFilterChange}
+              placeholder="Buscar por cliente"
+            />
+          </div>
+
+          <div className="ao-filter-group">
+            <label>Importe Mín:</label>
+            <input
+              type="number"
+              name="importeMin"
+              value={filters.importeMin}
+              onChange={handleFilterChange}
+              placeholder="Importe mínimo"
+              step="0.01"
+            />
+          </div>
+
+          <div className="ao-filter-group">
+            <label>Importe Máx:</label>
+            <input
+              type="number"
+              name="importeMax"
+              value={filters.importeMax}
+              onChange={handleFilterChange}
+              placeholder="Importe máximo"
+              step="0.01"
+            />
+          </div>
+
+          <div className="ao-filter-group">
+            <label>Estado:</label>
+            <select
+              name="estado"
+              value={filters.estado}
+              onChange={handleFilterChange}
+            >
+              <option value="">Todos</option>
+              <option value="0">Pendiente</option>
+              <option value="-1">Aprobado</option>
+            </select>
+          </div>
         </div>
 
-        <div className="ao-filter-group">
-          <label>Cliente:</label>
-          <input
-            type="text"
-            name="cliente"
-            value={filters.cliente}
-            onChange={handleFilterChange}
-            placeholder="Buscar cliente"
-          />
+        <div className="ao-filters-actions">
+          <button onClick={fetchAllOrders} className="ao-apply-btn">
+            Aplicar Filtros
+          </button>
+          <button onClick={clearFilters} className="ao-clear-btn">
+            Limpiar
+          </button>
         </div>
-
-        <div className="ao-filter-group">
-          <label>Importe Mín:</label>
-          <input
-            type="number"
-            name="importeMin"
-            value={filters.importeMin}
-            onChange={handleFilterChange}
-            placeholder="0.00"
-            step="0.01"
-          />
-        </div>
-
-        <div className="ao-filter-group">
-          <label>Importe Máx:</label>
-          <input
-            type="number"
-            name="importeMax"
-            value={filters.importeMax}
-            onChange={handleFilterChange}
-            placeholder="1000.00"
-            step="0.01"
-          />
-        </div>
-
-        <div className="ao-filter-group">
-          <label>Estado:</label>
-          <select
-            name="estado"
-            value={filters.estado}
-            onChange={handleFilterChange}
-          >
-            <option value="">Todos</option>
-            <option value="0">Pendiente</option>
-            <option value="-1">Aprobado</option>
-          </select>
-        </div>
-
-        <button onClick={clearFilters} className="ao-clear-filters">
-          <FaTimes /> Limpiar
-        </button>
       </div>
 
-      {loading && (
+      {loading ? (
         <div className="ao-loading">
           <div className="ao-spinner"></div>
           <p>Cargando pedidos...</p>
         </div>
-      )}
-
-      {error && (
-        <div className="ao-error">
-          <p>{error}</p>
-          <button onClick={fetchAllOrders}>Reintentar</button>
-        </div>
-      )}
-
-      {!loading && !error && (
+      ) : (
         <>
-          <div className="ao-stats">
-            <p>Mostrando {orders.length} de {pagination.total} pedidos</p>
-          </div>
-
           <div className="ao-table-container">
-            <table className="ao-table">
-              <thead>
-                <tr>
-                  <th onClick={() => handleSort('NumeroPedido')}>
-                    Nº Pedido {renderSortIcon('NumeroPedido')}
-                  </th>
-                  <th onClick={() => handleSort('FechaPedido')}>
-                    Fecha {renderSortIcon('FechaPedido')}
-                  </th>
-                  <th onClick={() => handleSort('RazonSocial')}>
-                    Cliente {renderSortIcon('RazonSocial')}
-                  </th>
-                  <th>CIF/DNI</th>
-                  <th>Líneas</th>
-                  <th onClick={() => handleSort('BaseImponible')}>
-                    Importe {renderSortIcon('BaseImponible')}
-                  </th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map(order => (
-                  <tr key={order.NumeroPedido}>
-                    <td>{order.NumeroPedido}</td>
-                    <td>{formatDate(order.FechaPedido)}</td>
-                    <td>{order.RazonSocial}</td>
-                    <td>{order.CifDni}</td>
-                    <td>{order.NumeroLineas}</td>
-                    <td>{formatCurrency(order.BaseImponible)}</td>
-                    <td>
-                      <span className={`ao-status ao-status-${getStatusText(order.StatusAprobado).toLowerCase()}`}>
-                        {getStatusText(order.StatusAprobado)}
-                      </span>
-                    </td>
-                    <td>
-                      <button 
-                        className="ao-view-btn"
-                        onClick={() => console.log('Ver detalle:', order.NumeroPedido)}
-                      >
-                        <FaEye /> Ver
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {orders.length === 0 && (
-              <div className="ao-empty">
-                <p>No se encontraron pedidos</p>
+            {orders.length === 0 ? (
+              <div className="ao-empty-state">
+                <div className="ao-empty-icon">📭</div>
+                <h3>No hay pedidos</h3>
+                <p>No se encontraron pedidos con los filtros aplicados.</p>
               </div>
+            ) : (
+              <table className="ao-orders-table">
+                <thead>
+                  <tr>
+                    <th>Nº Pedido</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>CIF/DNI</th>
+                    <th>Líneas</th>
+                    <th>Importe</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {renderTableRows()}
+                </tbody>
+              </table>
             )}
           </div>
 
-          {/* Paginación */}
-          {pagination.totalPages > 1 && (
+          {orders.length > 0 && (
             <div className="ao-pagination">
-              <button
-                disabled={pagination.page === 1}
-                onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-              >
-                Anterior
-              </button>
+              <div className="ao-pagination-info">
+                Mostrando {((pagination.page - 1) * pagination.limit) + 1} - {Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total} pedidos
+              </div>
               
-              <span>Página {pagination.page} de {pagination.totalPages}</span>
-              
-              <button
-                disabled={pagination.page === pagination.totalPages}
-                onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-              >
-                Siguiente
-              </button>
+              <div className="ao-pagination-controls">
+                <button 
+                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                  disabled={pagination.page === 1}
+                >
+                  ‹ Anterior
+                </button>
+                
+                <span className="ao-current-page">Página {pagination.page} de {pagination.totalPages}</span>
+                
+                <button 
+                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                  disabled={pagination.page === pagination.totalPages}
+                >
+                  Siguiente ›
+                </button>
+              </div>
             </div>
           )}
         </>

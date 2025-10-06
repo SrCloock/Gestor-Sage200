@@ -52,19 +52,21 @@ const getAllOrders = async (req, res) => {
     }
 
     if (importeMin && !isNaN(parseFloat(importeMin))) {
-      whereConditions.push('BaseImponible >= @importeMin');
+      // CORREGIDO: Filtrar por ImporteLiquido (con IVA) en lugar de BaseImponible
+      whereConditions.push('ImporteLiquido >= @importeMin');
       inputParams.importeMin = parseFloat(importeMin);
     }
 
     if (importeMax && !isNaN(parseFloat(importeMax))) {
-      whereConditions.push('BaseImponible <= @importeMax');
+      // CORREGIDO: Filtrar por ImporteLiquido (con IVA) en lugar de BaseImponible
+      whereConditions.push('ImporteLiquido <= @importeMax');
       inputParams.importeMax = parseFloat(importeMax);
     }
     
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
     
     // Validar parámetros de ordenación
-    const columnasPermitidas = ['NumeroPedido', 'FechaPedido', 'RazonSocial', 'BaseImponible', 'FechaNecesaria', 'StatusAprobado'];
+    const columnasPermitidas = ['NumeroPedido', 'FechaPedido', 'RazonSocial', 'BaseImponible', 'ImporteLiquido', 'FechaNecesaria', 'StatusAprobado'];
     const ordenPermitido = ['ASC', 'DESC'];
     
     const ordenarPorValido = columnasPermitidas.includes(ordenarPor) ? ordenarPor : 'FechaPedido';
@@ -88,7 +90,7 @@ const getAllOrders = async (req, res) => {
           Estado,
           BaseImponible,
           TotalIVA,
-          ImporteLiquido,
+          ImporteLiquido,  -- Este es el importe CON IVA que debe ver el admin
           FechaNecesaria,
           ObservacionesPedido,
           CodigoCliente,
@@ -199,6 +201,7 @@ const getOrderDetails = async (req, res) => {
           l.DescripcionArticulo,
           l.UnidadesPedidas,
           l.UnidadesRecibidas,
+          l.UnidadesPendientes,
           l.Precio,
           l.CodigoProveedor,
           l.ComentarioRecepcion,

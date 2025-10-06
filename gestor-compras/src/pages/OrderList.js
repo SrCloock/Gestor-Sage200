@@ -2,6 +2,8 @@ import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api';
+import { FaSync } from "react-icons/fa";
+
 import '../styles/OrderList.css';
 
 const OrderList = () => {
@@ -38,10 +40,8 @@ const OrderList = () => {
   }, []);
 
   useEffect(() => {
-    // Mostrar mensaje de éxito si viene de una edición
     if (location.state?.success) {
       alert(location.state.message);
-      // Limpiar el estado de navegación
       window.history.replaceState({}, document.title);
     }
 
@@ -153,14 +153,20 @@ const OrderList = () => {
 
   return (
     <div className="ol-container">
+      
+      {/* Encabezado */}
       <div className="ol-header">
-        <h2 className="ol-title">Historial de Pedidos</h2>
-        <p className="ol-subtitle">Gestiona y revisa tus pedidos realizados</p>
+        <div className="ol-title-section">
+          <h2 className="ol-title">Historial de Pedidos</h2>
+          <p className="ol-subtitle">Gestiona y revisa tus pedidos realizados</p>
+        </div>
         <button onClick={handleRefresh} className="ol-refresh-button">
-          🔄 Actualizar
+          <FaSync className="ol-refresh-icon" />
+          Actualizar
         </button>
       </div>
-      
+
+      {/* Panel de filtros y búsqueda */}
       <div className="ol-controls-panel">
         <div className="ol-search-container">
           <input
@@ -211,12 +217,16 @@ const OrderList = () => {
         </div>
       </div>
       
+      {/* Tabla o estado vacío */}
       {filteredOrders.length === 0 ? (
         <div className="ol-empty-state">
           <div className="ol-empty-icon">📭</div>
           <h3>No se encontraron pedidos</h3>
           <p>No hay pedidos que coincidan con los filtros aplicados</p>
-          <button onClick={() => {setSearchTerm(''); setStatusFilter('');}} className="ol-clear-filters">
+          <button 
+            onClick={() => { setSearchTerm(''); setStatusFilter(''); }} 
+            className="ol-clear-filters"
+          >
             Limpiar filtros
           </button>
         </div>
