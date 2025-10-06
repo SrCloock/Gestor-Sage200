@@ -20,14 +20,13 @@ const OrderReception = () => {
     const fetchOrderReception = async () => {
       try {
         setLoading(true);
-        // ✅ Corregido: se elimina el "/api"
         const response = await api.get(`/reception/${orderId}`);
         
         if (response.data.success) {
           setOrder(response.data.order);
           const items = response.data.order.Productos.map(product => ({
             ...product,
-            UnidadesRecibidas: product.UnidadesRecibidas || product.UnidadesPedidas,
+            UnidadesRecibidas: product.UnidadesRecibidas || 0,
             ComentarioRecepcion: product.ComentarioRecepcion || ''
           }));
           setReceptionItems(items);
@@ -52,6 +51,7 @@ const OrderReception = () => {
     
     newItems[index].UnidadesRecibidas = nuevasUnidades;
     
+    // Si la cantidad cambia y no hay comentario, sugerir uno
     if (nuevasUnidades !== unidadesPedidas && !newItems[index].ComentarioRecepcion) {
       newItems[index].ComentarioRecepcion = `Cantidad modificada: recibidas ${nuevasUnidades} de ${unidadesPedidas} pedidas`;
     }
@@ -70,7 +70,7 @@ const OrderReception = () => {
       setSubmitting(true);
       setError('');
       setSuccess('');
-      
+
       const itemsWithDifferences = receptionItems.filter(item => 
         item.UnidadesRecibidas !== item.UnidadesPedidas && !item.ComentarioRecepcion.trim()
       );
@@ -82,21 +82,29 @@ const OrderReception = () => {
         return;
       }
 
-      // ✅ Corregido: se elimina el "/api"
       const response = await api.post(`/reception/${orderId}/confirm`, {
         items: receptionItems
       });
       
       if (response.data.success) {
         setSuccess('Recepción confirmada correctamente');
-        setOrder({
-          ...order,
-          Estado: 2
-        });
         
+        // Forzar actualización del estado local
+        setOrder(prev => ({
+          ...prev,
+          Estado: response.data.estado || 2
+        }));
+        
+        // Esperar y navegar con flag de actualización
         setTimeout(() => {
-          navigate(`/mis-pedidos/${orderId}`);
-        }, 2000);
+          navigate(`/mis-pedidos/${orderId}`, { 
+            state: { 
+              refreshed: true,
+              receptionConfirmed: true,
+              message: 'Recepción confirmada correctamente'
+            } 
+          });
+        }, 1500);
       } else {
         setError(response.data.message || 'Error al confirmar la recepción');
       }
@@ -112,13 +120,29 @@ const OrderReception = () => {
     }
   };
 
-  const getReceptionStatusText = (status) => {
+  // CORREGIDO: Función para mostrar el estado igual que en AllOrders
+  const getStatusText = (status) => {
     switch (status) {
-      case 0: return 'Pendiente de recepción';
+      case 0: return 'Preparando';
+      case 1: return 'Parcial';
       case 2: return 'Servido';
       default: return 'Estado desconocido';
     }
   };
+
+  // Calcular el estado actual basado en las unidades
+  const calculateCurrentStatus = () => {
+    if (!receptionItems.length) return 0;
+    
+    const totalPedido = receptionItems.reduce((sum, item) => sum + (item.UnidadesPedidas || 0), 0);
+    const totalRecibido = receptionItems.reduce((sum, item) => sum + (item.UnidadesRecibidas || 0), 0);
+    
+    if (totalRecibido === 0) return 0; // Preparando
+    if (totalRecibido === totalPedido) return 2; // Servido
+    return 1; // Parcial
+  };
+
+  const currentStatus = calculateCurrentStatus();
 
   if (loading) {
     return (
@@ -147,8 +171,8 @@ const OrderReception = () => {
         <div className="orr-title-section">
           <h2>Confirmar Recepción del Pedido #{order?.NumeroPedido}</h2>
           <div className="orr-status">
-            Estado: <span className={`orr-status-badge orr-status-${order?.Estado}`}>
-              {getReceptionStatusText(order?.Estado)}
+            Estado actual: <span className={`orr-status-badge orr-status-${currentStatus}`}>
+              {getStatusText(currentStatus)}
             </span>
           </div>
         </div>
@@ -161,6 +185,14 @@ const OrderReception = () => {
         <div className="orr-error-message">
           <div className="orr-error-icon">⚠️</div>
           <p>{error}</p>
+        </div>
+      )}
+
+      {success && (
+        <div className="orr-success-message">
+          <div className="orr-success-icon">✅</div>
+          <p>{success}</p>
+          <p>Redirigiendo al detalle del pedido...</p>
         </div>
       )}
 
@@ -208,6 +240,7 @@ const OrderReception = () => {
               <th>Código</th>
               <th>Pedido</th>
               <th>Recibido</th>
+              <th>Pendiente</th>
               <th>Comentarios</th>
               <th>Estado</th>
             </tr>
@@ -216,6 +249,7 @@ const OrderReception = () => {
             {receptionItems.map((item, index) => {
               const hasDifference = item.UnidadesRecibidas !== item.UnidadesPedidas;
               const needsComment = hasDifference && !item.ComentarioRecepcion.trim();
+              const pendiente = (item.UnidadesPedidas || 0) - (item.UnidadesRecibidas || 0);
               
               return (
                 <tr key={index} className={`${hasDifference ? 'orr-partial-reception' : ''} ${needsComment ? 'orr-needs-comment' : ''}`}>
@@ -233,6 +267,7 @@ const OrderReception = () => {
                       className="orr-quantity-input"
                     />
                   </td>
+                  <td className="orr-item-pending">{pendiente}</td>
                   <td className="orr-item-comments">
                     <textarea
                       placeholder={hasDifference ? "Explique la diferencia en cantidades..." : "Comentarios sobre la recepción"}
@@ -261,13 +296,6 @@ const OrderReception = () => {
           </tbody>
         </table>
       </div>
-
-      {success && (
-        <div className="orr-success-message">
-          <div className="orr-success-icon">✅</div>
-          <p>{success}</p>
-        </div>
-      )}
 
       <div className="orr-actions">
         <button 
