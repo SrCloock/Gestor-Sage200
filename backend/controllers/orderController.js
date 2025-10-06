@@ -917,5 +917,5 @@ module.exports = {
   createOrder,
   getOrders,
   getOrderDetails,
-  updateOrder  // ← Nueva función
+  updateOrder
 };
