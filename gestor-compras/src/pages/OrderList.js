@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api';
 import { FaSync } from "react-icons/fa";
-
 import '../styles/OrderList.css';
 
 const OrderList = () => {
@@ -18,6 +17,7 @@ const OrderList = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // FUNCIÓN CORREGIDA: Lógica para determinar el texto del Status
   const getStatusText = useMemo(() => (order) => {
     if (order.StatusAprobado === 0) return 'Revisando';
     if (order.StatusAprobado === -1) {
@@ -239,7 +239,7 @@ const OrderList = () => {
                 <th>Fecha Pedido</th>
                 <th>Artículos</th>
                 <th>Importe</th>
-                <th>Estado</th>
+                <th>Status</th>
                 <th>Acciones</th>
               </tr>
             </thead>

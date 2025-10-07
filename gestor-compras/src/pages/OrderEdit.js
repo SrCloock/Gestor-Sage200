@@ -46,6 +46,13 @@ const OrderEdit = () => {
         const order = response.data.order;
         console.log('Pedido cargado:', order);
         
+        // VERIFICAR SI SE PUEDE EDITAR (solo en estado "Revisando")
+        if (order.StatusAprobado !== 0) {
+          setError('Este pedido no se puede editar porque ya ha sido aprobado. Solo se pueden editar pedidos en estado "Revisando".');
+          setLoading(prev => ({ ...prev, order: false }));
+          return;
+        }
+        
         if (order && order.productos) {
           const itemsWithQuantity = order.productos.map(item => ({
             ...item,

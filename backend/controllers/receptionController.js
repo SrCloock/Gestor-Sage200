@@ -14,6 +14,7 @@ const getOrderReception = async (req, res) => {
           c.RazonSocial,
           c.FechaPedido,
           c.Estado,
+          c.StatusAprobado,
           c.FechaNecesaria,
           l.Orden,
           l.CodigoArticulo,
@@ -56,6 +57,7 @@ const getOrderReception = async (req, res) => {
       FechaPedido: result.recordset[0].FechaPedido,
       FechaNecesaria: result.recordset[0].FechaNecesaria,
       Estado: result.recordset[0].Estado,
+      StatusAprobado: result.recordset[0].StatusAprobado,
       Productos: uniqueProducts.map(item => ({
         Orden: item.Orden,
         CodigoArticulo: item.CodigoArticulo,
@@ -112,7 +114,9 @@ const confirmReception = async (req, res) => {
             Domicilio,
             CodigoPostal,
             Municipio,
-            Provincia
+            Provincia,
+            Estado,
+            StatusAprobado
           FROM CabeceraPedidoCliente
           WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
         `);
@@ -125,14 +129,17 @@ const confirmReception = async (req, res) => {
 
       // 3. Actualizar líneas del pedido con cantidades recibidas y calcular pendientes
       for (const item of items) {
-        const unidadesPendientes = item.UnidadesPedidas - item.UnidadesRecibidas;
+        const unidadesRecibidas = parseInt(item.UnidadesRecibidas) || 0;
+        const unidadesPedidas = parseInt(item.UnidadesPedidas) || 0;
+        const unidadesPendientes = unidadesPedidas - unidadesRecibidas;
         
         await transaction.request()
           .input('NumeroPedido', orderId)
           .input('SeriePedido', 'WebCD')
           .input('Orden', item.Orden)
-          .input('UnidadesRecibidas', item.UnidadesRecibidas)
+          .input('UnidadesRecibidas', unidadesRecibidas)
           .input('UnidadesPendientes', unidadesPendientes)
+          .input('UnidadesServidas', unidadesRecibidas) // Actualizar unidades servidas
           .input('ComentarioRecepcion', item.ComentarioRecepcion || '')
           .input('FechaRecepcion', new Date())
           .query(`
@@ -140,6 +147,7 @@ const confirmReception = async (req, res) => {
             SET 
               UnidadesRecibidas = @UnidadesRecibidas,
               UnidadesPendientes = @UnidadesPendientes,
+              UnidadesServidas = @UnidadesServidas,
               ComentarioRecepcion = @ComentarioRecepcion,
               FechaRecepcion = @FechaRecepcion
             WHERE NumeroPedido = @NumeroPedido 
@@ -166,11 +174,13 @@ const confirmReception = async (req, res) => {
         
         // 5. Actualizar las líneas del albarán de cliente con las unidades recibidas
         for (const item of items) {
+          const unidadesRecibidas = parseInt(item.UnidadesRecibidas) || 0;
+          
           await transaction.request()
             .input('NumeroAlbaran', numeroAlbaran)
             .input('Orden', item.Orden)
-            .input('Unidades', item.UnidadesRecibidas)
-            .input('UnidadesServidas', item.UnidadesRecibidas)
+            .input('Unidades', unidadesRecibidas)
+            .input('UnidadesServidas', unidadesRecibidas)
             .input('ComentarioRecepcion', item.ComentarioRecepcion || '')
             .query(`
               UPDATE LineasAlbaranCliente 
@@ -217,31 +227,37 @@ const confirmReception = async (req, res) => {
         console.warn(`No se encontró albarán para el pedido ${orderId}`);
       }
 
-      // 8. Determinar nuevo estado del pedido
-      const pendingResult = await transaction.request()
+      // 8. Calcular el NUEVO ESTADO del pedido basado en las unidades recibidas
+      const estadoResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
         .query(`
           SELECT 
-            SUM(UnidadesPedidas - UnidadesRecibidas) as PendienteTotal,
-            COUNT(CASE WHEN UnidadesPedidas > UnidadesRecibidas THEN 1 END) as LineasPendientes
+            SUM(UnidadesPedidas) as TotalPedido,
+            SUM(UnidadesRecibidas) as TotalRecibido,
+            SUM(UnidadesPendientes) as TotalPendiente
           FROM LineasPedidoCliente
           WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
         `);
 
-      const pendienteTotal = pendingResult.recordset[0].PendienteTotal || 0;
-      const lineasPendientes = pendingResult.recordset[0].LineasPendientes || 0;
-      
+      const totalPedido = estadoResult.recordset[0].TotalPedido || 0;
+      const totalRecibido = estadoResult.recordset[0].TotalRecibido || 0;
+      const totalPendiente = estadoResult.recordset[0].TotalPendiente || 0;
+
       let nuevoEstado;
-      if (pendienteTotal === 0) {
-        nuevoEstado = 2; // Servido (completo)
-      } else if (lineasPendientes > 0) {
-        nuevoEstado = 1; // Parcial
+      
+      // LÓGICA CORREGIDA para determinar el estado
+      if (totalRecibido === 0) {
+        nuevoEstado = 0; // No se ha recibido nada -> Preparando
+      } else if (totalPendiente === 0) {
+        nuevoEstado = 2; // No hay unidades pendientes -> Servido
       } else {
-        nuevoEstado = 0; // Preparando
+        nuevoEstado = 1; // Hay unidades pendientes pero se recibió algo -> Parcial
       }
 
-      // 9. Actualizar estado del pedido
+      console.log(`Estado calculado: Pedido=${totalPedido}, Recibido=${totalRecibido}, Pendiente=${totalPendiente} -> Estado=${nuevoEstado}`);
+
+      // 9. Actualizar estado del pedido en la cabecera
       await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
@@ -259,7 +275,12 @@ const confirmReception = async (req, res) => {
         success: true,
         message: 'Recepción confirmada correctamente. Albarán actualizado con las cantidades recibidas y comentarios.',
         estado: nuevoEstado,
-        estadoTexto: nuevoEstado === 2 ? 'Servido' : nuevoEstado === 1 ? 'Parcial' : 'Preparando'
+        estadoTexto: nuevoEstado === 2 ? 'Servido' : nuevoEstado === 1 ? 'Parcial' : 'Preparando',
+        totales: {
+          pedido: totalPedido,
+          recibido: totalRecibido,
+          pendiente: totalPendiente
+        }
       });
 
     } catch (err) {

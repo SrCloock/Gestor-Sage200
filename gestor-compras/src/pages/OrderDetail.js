@@ -61,7 +61,7 @@ const OrderDetail = () => {
     return order.StatusAprobado === -1 && order.Estado !== 2;
   };
 
-  // Función para obtener el texto del estado
+  // FUNCIÓN CORREGIDA: Lógica para determinar el texto del Status
   const getStatusText = () => {
     if (!order) return 'Desconocido';
     

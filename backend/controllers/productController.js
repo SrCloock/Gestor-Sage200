@@ -33,7 +33,7 @@ const getProducts = async (req, res) => {
           a.CodigoArticulo, 
           a.DescripcionArticulo, 
           a.CodigoProveedor, 
-          a.PrecioCompra, 
+          a.PrecioVenta, 
           a.RutaImagen,
           p.RazonSocial AS NombreProveedor,
           a.CodigoFamilia,
@@ -73,6 +73,8 @@ const getProducts = async (req, res) => {
 
       updatedProducts.push({
         ...product,
+        Precio: product.PrecioVenta,
+        PrecioVenta: product.PrecioVenta,
         RutaImagen: `${serverUrl}/images/${finalImage}`
       });
     }

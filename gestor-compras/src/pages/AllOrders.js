@@ -78,8 +78,9 @@ const AllOrders = () => {
     }).format(amount || 0);
   };
 
+  // FUNCIÓN CORREGIDA: Lógica para determinar el texto del Status
   const getStatusText = (order) => {
-    if (order.StatusAprobado === 0) return 'Pendiente';
+    if (order.StatusAprobado === 0) return 'Revisando';
     if (order.StatusAprobado === -1) {
       switch (order.Estado) {
         case 0: return 'Preparando';
@@ -97,7 +98,6 @@ const AllOrders = () => {
     return date.toLocaleDateString('es-ES');
   };
 
-  // CORREGIDO: Mostrar ImporteLiquido (con IVA) en lugar de BaseImponible
   const renderTableRows = () => {
     return orders.map(order => (
       <tr key={order.NumeroPedido} className="ao-order-row">
@@ -107,13 +107,21 @@ const AllOrders = () => {
         <td className="ao-order-cif">{order.CifDni}</td>
         <td className="ao-order-lines">{order.NumeroLineas}</td>
         <td className="ao-order-amount">
-          {/* CORREGIDO: Mostrar ImporteLiquido en lugar de BaseImponible */}
           {formatCurrency(order.ImporteLiquido)}
         </td>
         <td className="ao-order-status">
           <span className={`ao-status-badge ao-status-${getStatusText(order).toLowerCase()}`}>
             {getStatusText(order)}
           </span>
+        </td>
+        <td className="ao-order-actions">
+          <button 
+            onClick={() => handleViewDetails(order.NumeroPedido)}
+            className="ao-view-btn"
+          >
+            <FaEye />
+            Ver detalles
+          </button>
         </td>
       </tr>
     ));
@@ -226,14 +234,14 @@ const AllOrders = () => {
           </div>
 
           <div className="ao-filter-group">
-            <label>Estado:</label>
+            <label>Status:</label>
             <select
               name="estado"
               value={filters.estado}
               onChange={handleFilterChange}
             >
               <option value="">Todos</option>
-              <option value="0">Pendiente</option>
+              <option value="0">Revisando</option>
               <option value="-1">Aprobado</option>
             </select>
           </div>
@@ -273,7 +281,7 @@ const AllOrders = () => {
                     <th>CIF/DNI</th>
                     <th>Líneas</th>
                     <th>Importe</th>
-                    <th>Estado</th>
+                    <th>Status</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>

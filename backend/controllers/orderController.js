@@ -279,12 +279,17 @@ const createOrder = async (req, res) => {
 
       // Insertar líneas del pedido
       for (const [index, item] of items.entries()) {
+        // CORREGIDO: Obtener PrecioVenta y CodigoIva del artículo
         const articuloResult = await transaction.request()
           .input('CodigoArticulo', item.CodigoArticulo)
           .input('CodigoProveedor', item.CodigoProveedor || '')
           .input('CodigoEmpresa', codigoEmpresa)
           .query(`
-            SELECT DescripcionArticulo, DescripcionLinea 
+            SELECT 
+              DescripcionArticulo, 
+              DescripcionLinea,
+              PrecioVenta,  -- CAMBIADO: PrecioCompra por PrecioVenta
+              CodigoIva     -- IMPORTANTE: Obtener el código de IVA del artículo
             FROM Articulos
             WHERE CodigoArticulo = @CodigoArticulo
             AND (CodigoProveedor = @CodigoProveedor OR @CodigoProveedor = '')
@@ -298,9 +303,9 @@ const createOrder = async (req, res) => {
         const articulo = articuloResult.recordset[0];
         const descripcionLinea = articulo.DescripcionLinea || '';
 
-        // Obtener información de IVA
+        // CORREGIDO: Obtener información de IVA del ARTÍCULO, no del item
         const ivaResult = await transaction.request()
-          .input('CodigoIva', item.CodigoIva || 21)
+          .input('CodigoIva', articulo.CodigoIva)  // CAMBIADO: Usar el código de IVA del artículo
           .input('CodigoTerritorio', 0)
           .query(`
             SELECT CodigoIva, [%Iva], CodigoTerritorio
@@ -309,15 +314,17 @@ const createOrder = async (req, res) => {
           `);
 
         if (ivaResult.recordset.length === 0) {
-          throw new Error(`Tipo de IVA ${item.CodigoIva || 21} no encontrado`);
+          throw new Error(`Tipo de IVA ${articulo.CodigoIva} no encontrado para el artículo ${item.CodigoArticulo}`);
         }
 
         const tipoIva = ivaResult.recordset[0];
 
         const unidadesPedidas = parseFloat(item.Cantidad) || 1;
-        const precio = parseFloat(item.PrecioCompra) || 0;
+        // CAMBIADO: Usar PrecioVenta del artículo en lugar de PrecioCompra del item
+        const precio = parseFloat(articulo.PrecioVenta) || 0;
         const porcentajeIva = parseFloat(tipoIva['%Iva']) || 21;
 
+        // Cálculos CORREGIDOS
         const baseImponible = precio * unidadesPedidas;
         const cuotaIva = baseImponible * (porcentajeIva / 100);
         const importeLiquido = baseImponible + cuotaIva;
@@ -335,15 +342,15 @@ const createOrder = async (req, res) => {
           .input('UnidadesPendientes', unidadesPedidas)
           .input('Unidades2_', unidadesPedidas)
           .input('UnidadesPendientesFabricar', unidadesPedidas)
-          .input('Precio', precio)
-          .input('ImporteBruto', baseImponible)
-          .input('ImporteNeto', baseImponible)
+          .input('Precio', precio)  // Este precio ahora es PrecioVenta (con IVA incluido)
+          .input('ImporteBruto', importeLiquido)  // Total con IVA
+          .input('ImporteNeto', baseImponible)    // Base imponible (sin IVA)
           .input('ImporteParcial', baseImponible)
           .input('BaseImponible', baseImponible)
           .input('BaseIva', baseImponible)
           .input('CuotaIva', cuotaIva)
           .input('TotalIva', cuotaIva)
-          .input('ImporteLiquido', importeLiquido)
+          .input('ImporteLiquido', importeLiquido)  // Total con IVA
           .input('CodigoIva', tipoIva.CodigoIva)
           .input('PorcentajeIva', porcentajeIva)
           .input('GrupoIva', tipoIva.CodigoTerritorio)
@@ -380,7 +387,7 @@ const createOrder = async (req, res) => {
           `);
       }
 
-      // Recalcular totales del pedido
+      // CORREGIDO: Recalcular totales del pedido
       const totalesResult = await transaction.request()
         .input('CodigoEmpresa', codigoEmpresa)
         .input('EjercicioPedido', fechaActual.getFullYear())
@@ -388,9 +395,10 @@ const createOrder = async (req, res) => {
         .input('NumeroPedido', numeroPedido)
         .query(`
           SELECT 
-            SUM(UnidadesPedidas * Precio) AS BaseImponible,
-            SUM((UnidadesPedidas * Precio) * ([%Iva] / 100.0)) AS TotalIVA,
-            COUNT(*) AS NumeroLineas
+            SUM(BaseImponible) AS BaseImponible,
+            SUM(TotalIva) AS TotalIVA,
+            COUNT(*) AS NumeroLineas,
+            SUM(ImporteLiquido) AS ImporteLiquidoTotal
           FROM LineasPedidoCliente
           WHERE CodigoEmpresa = @CodigoEmpresa
           AND EjercicioPedido = @EjercicioPedido
@@ -400,7 +408,7 @@ const createOrder = async (req, res) => {
 
       const baseImponibleTotal = parseFloat(totalesResult.recordset[0].BaseImponible) || 0;
       const totalIVATotal = parseFloat(totalesResult.recordset[0].TotalIVA) || 0;
-      const importeLiquidoTotal = baseImponibleTotal + totalIVATotal;
+      const importeLiquidoTotal = parseFloat(totalesResult.recordset[0].ImporteLiquidoTotal) || 0;
       const numeroLineas = parseInt(totalesResult.recordset[0].NumeroLineas) || 0;
 
       // Actualizar cabecera con totales
@@ -468,7 +476,7 @@ const getOrders = async (req, res) => {
       });
     }
 
-    // CONSULTA CORREGIDA: Usando TOP 50 en lugar de OFFSET
+    // CONSULTA CORREGIDA: Incluir Estado y StatusAprobado para calcular el Status
     const ordersResult = await pool.request()
       .input('CodigoCliente', codigoCliente)
       .input('SeriePedido', SERIE_PEDIDO)
@@ -481,7 +489,7 @@ const getOrders = async (req, res) => {
           c.CifDni,
           c.NumeroLineas,
           c.StatusAprobado,
-          c.Estado,
+          c.Estado,  -- IMPORTANTE: Incluir Estado
           c.SeriePedido,
           c.BaseImponible,
           c.TotalIVA,
@@ -512,6 +520,8 @@ const getOrders = async (req, res) => {
               l.DescripcionArticulo,
               l.DescripcionLinea,
               l.UnidadesPedidas,
+              l.UnidadesRecibidas,  -- IMPORTANTE: Incluir UnidadesRecibidas
+              l.UnidadesPendientes, -- IMPORTANTE: Incluir UnidadesPendientes
               l.Precio,
               l.ImporteBruto,
               l.ImporteNeto,
@@ -525,9 +535,9 @@ const getOrders = async (req, res) => {
 
         return {
           ...order,
-          Estado: order.Estado === 0 ? 'Preparando' : 'Servido',
+          // NO sobrescribir Estado aquí, dejar que el frontend calcule el Status
           Productos: detailsResult.recordset,
-          comment: order.ObservacionesPedido // CORREGIDO: Incluir comentario en la respuesta
+          comment: order.ObservacionesPedido
         };
       })
     );
@@ -552,7 +562,7 @@ const getOrderDetails = async (req, res) => {
   try {
     const pool = await getPool();
     const { numeroPedido } = req.params;
-    const { codigoCliente } = req.query;
+    const { codigoCliente, seriePedido = 'WebCD' } = req.query;
 
     if (!codigoCliente) {
       return res.status(400).json({ 
@@ -561,13 +571,13 @@ const getOrderDetails = async (req, res) => {
       });
     }
 
-    console.log('Buscando pedido:', { numeroPedido, codigoCliente, SERIE_PEDIDO });
+    console.log('Buscando pedido:', { numeroPedido, codigoCliente, seriePedido });
 
-    // Cabecera del pedido
+    // Cabecera del pedido - CONSULTA CORREGIDA
     const orderResult = await pool.request()
       .input('NumeroPedido', numeroPedido)
       .input('CodigoCliente', codigoCliente)
-      .input('SeriePedido', SERIE_PEDIDO)
+      .input('SeriePedido', seriePedido)
       .query(`
         SELECT 
           NumeroPedido, 
@@ -575,20 +585,16 @@ const getOrderDetails = async (req, res) => {
           RazonSocial,
           CifDni,
           StatusAprobado,
-          Estado,
+          Estado,  -- IMPORTANTE: Incluir Estado
           SeriePedido,
           BaseImponible,
           TotalIVA,
           ImporteLiquido,
-          NumeroLineas,
           FechaNecesaria,
-          FechaEntrega,
           Domicilio,
           CodigoPostal,
           Municipio,
           Provincia,
-          Nacion,
-          CodigoContable,
           ObservacionesPedido
         FROM CabeceraPedidoCliente
         WHERE NumeroPedido = @NumeroPedido
@@ -597,103 +603,74 @@ const getOrderDetails = async (req, res) => {
       `);
 
     if (orderResult.recordset.length === 0) {
-      console.log('Pedido no encontrado en la base de datos');
       return res.status(404).json({ 
         success: false, 
         message: 'Pedido no encontrado' 
       });
     }
 
-    console.log('Pedido encontrado:', orderResult.recordset[0].NumeroPedido);
+    const order = orderResult.recordset[0];
 
-    // Líneas del pedido
+    // Líneas del pedido - CONSULTA CORREGIDA
     const linesResult = await pool.request()
       .input('NumeroPedido', numeroPedido)
-      .input('SeriePedido', SERIE_PEDIDO)
+      .input('SeriePedido', seriePedido)
       .query(`
         SELECT 
           l.Orden,
-          l.CodigoArticulo, 
+          l.CodigoArticulo,
           l.DescripcionArticulo,
-          l.DescripcionLinea,
           l.UnidadesPedidas,
-          l.UnidadesRecibidas,
-          l.UnidadesPendientes,
+          l.UnidadesRecibidas,  -- IMPORTANTE: Incluir UnidadesRecibidas
+          l.UnidadesPendientes, -- IMPORTANTE: Incluir UnidadesPendientes
           l.Precio,
           l.ImporteBruto,
           l.ImporteNeto,
           l.ImporteLiquido,
           l.TotalIva,
-          l.CodigoProveedor,
-          p.RazonSocial as NombreProveedor
+          l.ComentarioRecepcion,
+          l.FechaRecepcion
         FROM LineasPedidoCliente l
-        LEFT JOIN Proveedores p ON l.CodigoProveedor = p.CodigoProveedor
         WHERE l.NumeroPedido = @NumeroPedido
         AND l.SeriePedido = @SeriePedido
         ORDER BY l.Orden
       `);
 
-    console.log('Líneas encontradas:', linesResult.recordset.length);
+    console.log(`Encontradas ${linesResult.recordset.length} líneas para el pedido ${numeroPedido}`);
 
-    // Eliminar posibles duplicados
+    // Eliminar duplicados
     const uniqueProducts = [];
     const seenKeys = new Set();
     
     linesResult.recordset.forEach(item => {
-      const key = `${item.Orden}-${item.CodigoArticulo}-${item.CodigoProveedor || 'no-prov'}`;
+      const key = `${item.Orden}-${item.CodigoArticulo}`;
       if (!seenKeys.has(key)) {
         seenKeys.add(key);
         uniqueProducts.push(item);
       }
     });
 
-    const orderData = orderResult.recordset[0];
-    
-    // Determinar el estado del pedido
-    let estadoTexto = 'Desconocido';
-    if (orderData.StatusAprobado === 0) {
-      estadoTexto = 'Revisando';
-    } else if (orderData.StatusAprobado === -1) {
-      switch (orderData.Estado) {
-        case 0: estadoTexto = 'Preparando'; break;
-        case 1: estadoTexto = 'Parcial'; break;
-        case 2: estadoTexto = 'Servido'; break;
-        default: estadoTexto = 'Preparando';
-      }
-    }
-
-    const responseData = {
+    return res.status(200).json({
       success: true,
       order: {
-        ...orderData,
-        Estado: estadoTexto,
-        productos: uniqueProducts,
-        comment: orderData.ObservacionesPedido // Incluir comentario en la respuesta
+        ...order,
+        productos: uniqueProducts
       }
-    };
-
-    return res.status(200).json(responseData);
+    });
 
   } catch (error) {
-    console.error('Error al obtener detalles del pedido:', error);
+    console.error('Error al obtener detalle del pedido:', error);
     return res.status(500).json({ 
       success: false, 
-      message: error.message || 'Error al obtener los detalles del pedido' 
+      message: 'Error al obtener el detalle del pedido',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
 
-// NUEVA FUNCIÓN: Actualizar pedido existente
 const updateOrder = async (req, res) => {
   const { orderId } = req.params;
   const { items, deliveryDate, comment } = req.body;
-
-  if (!items || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'El pedido debe contener al menos un item' 
-    });
-  }
 
   try {
     const pool = await getPool();
@@ -701,14 +678,12 @@ const updateOrder = async (req, res) => {
     await transaction.begin();
 
     try {
-      // 1. Verificar que el pedido existe y está pendiente
+      // 1. Obtener información del pedido actual
       const orderResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', SERIE_PEDIDO)
         .query(`
-          SELECT 
-            CodigoEmpresa, EjercicioPedido, CodigoCliente,
-            StatusAprobado, Estado
+          SELECT CodigoEmpresa, EjercicioPedido, CodigoCliente
           FROM CabeceraPedidoCliente
           WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
         `);
@@ -717,12 +692,7 @@ const updateOrder = async (req, res) => {
         throw new Error('Pedido no encontrado');
       }
 
-      const order = orderResult.recordset[0];
-      
-      // Solo permitir edición si está pendiente de aprobación
-      if (order.StatusAprobado !== 0) {
-        throw new Error('No se puede editar un pedido que ya ha sido aprobado');
-      }
+      const { CodigoEmpresa, EjercicioPedido, CodigoCliente } = orderResult.recordset[0];
 
       // 2. Eliminar todas las líneas existentes del pedido
       await transaction.request()
@@ -735,15 +705,18 @@ const updateOrder = async (req, res) => {
 
       // 3. Insertar las nuevas líneas del pedido
       for (const [index, item] of items.entries()) {
+        // CORREGIDO: Obtener PrecioVenta y CodigoIva del artículo
         const articuloResult = await transaction.request()
           .input('CodigoArticulo', item.CodigoArticulo)
-          .input('CodigoProveedor', item.CodigoProveedor || '')
-          .input('CodigoEmpresa', order.CodigoEmpresa)
+          .input('CodigoEmpresa', CodigoEmpresa)
           .query(`
-            SELECT DescripcionArticulo, DescripcionLinea 
+            SELECT 
+              DescripcionArticulo, 
+              DescripcionLinea,
+              PrecioVenta,  -- CAMBIADO: PrecioCompra por PrecioVenta
+              CodigoIva     -- IMPORTANTE: Obtener el código de IVA del artículo
             FROM Articulos
             WHERE CodigoArticulo = @CodigoArticulo
-            AND (CodigoProveedor = @CodigoProveedor OR @CodigoProveedor = '')
             AND CodigoEmpresa = @CodigoEmpresa
           `);
 
@@ -754,9 +727,9 @@ const updateOrder = async (req, res) => {
         const articulo = articuloResult.recordset[0];
         const descripcionLinea = articulo.DescripcionLinea || '';
 
-        // Obtener información de IVA
+        // CORREGIDO: Obtener información de IVA del ARTÍCULO
         const ivaResult = await transaction.request()
-          .input('CodigoIva', item.CodigoIva || 21)
+          .input('CodigoIva', articulo.CodigoIva)  // CAMBIADO: Usar el código de IVA del artículo
           .input('CodigoTerritorio', 0)
           .query(`
             SELECT CodigoIva, [%Iva], CodigoTerritorio
@@ -764,14 +737,11 @@ const updateOrder = async (req, res) => {
             WHERE CodigoIva = @CodigoIva AND CodigoTerritorio = @CodigoTerritorio
           `);
 
-        if (ivaResult.recordset.length === 0) {
-          throw new Error(`Tipo de IVA ${item.CodigoIva || 21} no encontrado`);
-        }
-
-        const tipoIva = ivaResult.recordset[0];
+        const tipoIva = ivaResult.recordset[0] || { CodigoIva: 21, '%Iva': 21, CodigoTerritorio: 0 };
 
         const unidadesPedidas = parseFloat(item.Cantidad) || 1;
-        const precio = parseFloat(item.PrecioCompra) || 0;
+        // CAMBIADO: Usar PrecioVenta del artículo
+        const precio = parseFloat(articulo.PrecioVenta) || 0;
         const porcentajeIva = parseFloat(tipoIva['%Iva']) || 21;
 
         const baseImponible = precio * unidadesPedidas;
@@ -779,8 +749,8 @@ const updateOrder = async (req, res) => {
         const importeLiquido = baseImponible + cuotaIva;
 
         await transaction.request()
-          .input('CodigoEmpresa', order.CodigoEmpresa)
-          .input('EjercicioPedido', order.EjercicioPedido)
+          .input('CodigoEmpresa', CodigoEmpresa)
+          .input('EjercicioPedido', EjercicioPedido)
           .input('SeriePedido', SERIE_PEDIDO)
           .input('NumeroPedido', orderId)
           .input('Orden', index + 1)
@@ -788,24 +758,24 @@ const updateOrder = async (req, res) => {
           .input('DescripcionArticulo', articulo.DescripcionArticulo)
           .input('DescripcionLinea', descripcionLinea)
           .input('UnidadesPedidas', unidadesPedidas)
-          .input('UnidadesPendientes', unidadesPedidas)  // Inicialmente igual a pedidas
+          .input('UnidadesPendientes', unidadesPedidas)
           .input('Unidades2_', unidadesPedidas)
           .input('UnidadesPendientesFabricar', unidadesPedidas)
-          .input('Precio', precio)
-          .input('ImporteBruto', baseImponible)
-          .input('ImporteNeto', baseImponible)
+          .input('Precio', precio)  // Este precio ahora es PrecioVenta (con IVA incluido)
+          .input('ImporteBruto', importeLiquido)  // Total con IVA
+          .input('ImporteNeto', baseImponible)    // Base imponible (sin IVA)
           .input('ImporteParcial', baseImponible)
           .input('BaseImponible', baseImponible)
           .input('BaseIva', baseImponible)
           .input('CuotaIva', cuotaIva)
           .input('TotalIva', cuotaIva)
-          .input('ImporteLiquido', importeLiquido)
+          .input('ImporteLiquido', importeLiquido)  // Total con IVA
           .input('CodigoIva', tipoIva.CodigoIva)
           .input('PorcentajeIva', porcentajeIva)
           .input('GrupoIva', tipoIva.CodigoTerritorio)
-          .input('CodigoAlmacen', 'CEN')  // Valor por defecto
+          .input('CodigoAlmacen', 'CEN')
           .input('CodigoAlmacenAnterior', 'CEN')
-          .input('FechaRegistro', new Date().toISOString().split('T')[0] + ' 00:00:00.000')
+          .input('FechaRegistro', new Date())
           .input('CodigoDelCliente', '')
           .input('CodigoProveedor', item.CodigoProveedor || '')
           .query(`
@@ -836,55 +806,75 @@ const updateOrder = async (req, res) => {
           `);
       }
 
-      // 4. Recalcular totales del pedido
+      // 4. Actualizar fecha de entrega y comentario si se proporcionan
+      if (deliveryDate || comment) {
+        let updateQuery = 'UPDATE CabeceraPedidoCliente SET ';
+        const updateParams = {};
+        
+        if (deliveryDate) {
+          updateQuery += 'FechaNecesaria = @FechaNecesaria, FechaEntrega = @FechaEntrega, ';
+          updateParams.FechaNecesaria = `${deliveryDate} 00:00:00.000`;
+          updateParams.FechaEntrega = `${deliveryDate} 00:00:00.000`;
+        }
+        
+        if (comment) {
+          updateQuery += 'ObservacionesPedido = @ObservacionesPedido, ';
+          updateParams.ObservacionesPedido = comment;
+        }
+        
+        // Eliminar la última coma y espacio
+        updateQuery = updateQuery.slice(0, -2);
+        updateQuery += ' WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido';
+        
+        updateParams.NumeroPedido = orderId;
+        updateParams.SeriePedido = SERIE_PEDIDO;
+        
+        const updateRequest = transaction.request();
+        Object.keys(updateParams).forEach(key => {
+          updateRequest.input(key, updateParams[key]);
+        });
+        
+        await updateRequest.query(updateQuery);
+      }
+
+      // 5. CORREGIDO: Recalcular totales del pedido
       const totalesResult = await transaction.request()
-        .input('CodigoEmpresa', order.CodigoEmpresa)
-        .input('EjercicioPedido', order.EjercicioPedido)
-        .input('SeriePedido', SERIE_PEDIDO)
         .input('NumeroPedido', orderId)
+        .input('SeriePedido', SERIE_PEDIDO)
         .query(`
           SELECT 
-            SUM(UnidadesPedidas * Precio) AS BaseImponible,
-            SUM((UnidadesPedidas * Precio) * ([%Iva] / 100.0)) AS TotalIVA,
-            COUNT(*) AS NumeroLineas
+            SUM(BaseImponible) AS BaseImponible,
+            SUM(TotalIva) AS TotalIVA,
+            COUNT(*) AS NumeroLineas,
+            SUM(ImporteLiquido) AS ImporteLiquidoTotal
           FROM LineasPedidoCliente
-          WHERE CodigoEmpresa = @CodigoEmpresa
-          AND EjercicioPedido = @EjercicioPedido
+          WHERE NumeroPedido = @NumeroPedido
           AND SeriePedido = @SeriePedido
-          AND NumeroPedido = @NumeroPedido
         `);
 
       const baseImponibleTotal = parseFloat(totalesResult.recordset[0].BaseImponible) || 0;
       const totalIVATotal = parseFloat(totalesResult.recordset[0].TotalIVA) || 0;
-      const importeLiquidoTotal = baseImponibleTotal + totalIVATotal;
+      const importeLiquidoTotal = parseFloat(totalesResult.recordset[0].ImporteLiquidoTotal) || 0;
       const numeroLineas = parseInt(totalesResult.recordset[0].NumeroLineas) || 0;
 
-      // 5. Actualizar cabecera con nuevos totales
+      // 6. Actualizar cabecera con nuevos totales
       await transaction.request()
-        .input('CodigoEmpresa', order.CodigoEmpresa)
-        .input('EjercicioPedido', order.EjercicioPedido)
-        .input('SeriePedido', SERIE_PEDIDO)
         .input('NumeroPedido', orderId)
+        .input('SeriePedido', SERIE_PEDIDO)
         .input('BaseImponible', baseImponibleTotal)
         .input('TotalIVA', totalIVATotal)
         .input('ImporteLiquido', importeLiquidoTotal)
         .input('NumeroLineas', numeroLineas)
-        .input('FechaNecesaria', deliveryDate ? `${deliveryDate} 00:00:00.000` : null)
-        .input('ObservacionesPedido', comment || '')
         .query(`
           UPDATE CabeceraPedidoCliente
           SET 
             BaseImponible = @BaseImponible,
             TotalIva = @TotalIVA,
             ImporteLiquido = @ImporteLiquido,
-            NumeroLineas = @NumeroLineas,
-            FechaNecesaria = @FechaNecesaria,
-            ObservacionesPedido = @ObservacionesPedido
+            NumeroLineas = @NumeroLineas
           WHERE 
-            CodigoEmpresa = @CodigoEmpresa AND
-            EjercicioPedido = @EjercicioPedido AND
-            SeriePedido = @SeriePedido AND
-            NumeroPedido = @NumeroPedido
+            NumeroPedido = @NumeroPedido AND
+            SeriePedido = @SeriePedido
         `);
 
       await transaction.commit();
