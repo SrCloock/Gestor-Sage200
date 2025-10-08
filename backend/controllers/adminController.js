@@ -166,6 +166,7 @@ const getOrderForReview = async (req, res) => {
       });
     }
 
+    // CORREGIDO: Consulta actualizada para usar PrecioVentaconIVA1 de Articulos
     const linesResult = await pool.request()
       .input('NumeroPedido', orderId)
       .input('SeriePedido', 'WebCD')
@@ -175,14 +176,15 @@ const getOrderForReview = async (req, res) => {
           l.CodigoArticulo,
           l.DescripcionArticulo,
           l.UnidadesPedidas,
-          l.Precio,
+          l.Precio,  -- Este es el precio con IVA que se guardó en LineasPedidoCliente
           l.CodigoProveedor,
           l.CodigoIva,
-          t.[%Iva] as PorcentajeIva,
+          l.[%Iva] as PorcentajeIva,
+          a.PrecioVentaconIVA1,  -- NUEVO: Precio correcto con IVA desde Articulos
           COALESCE(p.RazonSocial, 'No especificado') as NombreProveedor
         FROM LineasPedidoCliente l
+        LEFT JOIN Articulos a ON l.CodigoArticulo = a.CodigoArticulo  -- NUEVO: JOIN con Articulos
         LEFT JOIN Proveedores p ON l.CodigoProveedor = p.CodigoProveedor
-        LEFT JOIN tiposiva t ON l.CodigoIva = t.CodigoIva AND t.CodigoTerritorio = 0
         WHERE l.NumeroPedido = @NumeroPedido
         AND l.SeriePedido = @SeriePedido
         ORDER BY l.Orden
@@ -196,7 +198,14 @@ const getOrderForReview = async (req, res) => {
       const key = `${item.Orden}-${item.CodigoArticulo}-${item.CodigoProveedor || 'no-prov'}`;
       if (!seenKeys.has(key)) {
         seenKeys.add(key);
-        uniqueProducts.push(item);
+        
+        // CORREGIDO: Usar PrecioVentaconIVA1 si está disponible, sino usar el Precio de la línea
+        const precioFinal = item.PrecioVentaconIVA1 || item.Precio;
+        
+        uniqueProducts.push({
+          ...item,
+          Precio: precioFinal  // Aseguramos que el precio mostrado sea el correcto
+        });
       }
     });
 
@@ -217,7 +226,7 @@ const getOrderForReview = async (req, res) => {
   }
 };
 
-// Función para generar albarán de cliente - MODIFICADA para incluir todos los campos necesarios
+// CORREGIDO: Función para generar albarán de cliente con cálculo correcto de precios
 const generarAlbaranCliente = async (transaction, orderHeader, items) => {
   const { CodigoEmpresa, EjercicioPedido, CodigoCliente, RazonSocial, Domicilio, Municipio, Provincia, NumeroPedido } = orderHeader;
 
@@ -237,31 +246,33 @@ const generarAlbaranCliente = async (transaction, orderHeader, items) => {
   const numeroAlbaran = albaranResult.recordset[0].SiguienteNumero;
   const fechaActual = new Date();
 
-  // Calcular totales
+  // CORREGIDO: Calcular totales usando PrecioVentaconIVA1
   let baseImponibleTotal = 0;
   let totalIVATotal = 0;
 
   items.forEach(item => {
-    const precio = item.Precio || 0;
+    // Usar PrecioVentaconIVA1 si está disponible, sino usar Precio
+    const precioConIva = item.PrecioVentaconIVA1 || item.Precio || 0;
     const unidades = item.UnidadesPedidas || 0;
     const porcentajeIva = item.PorcentajeIva || 21;
 
-    const importeLinea = unidades * precio;
-    const ivaLinea = importeLinea * porcentajeIva / 100;
+    // CORREGIDO: Cálculo correcto - el precio ya incluye IVA, calcular base imponible
+    const baseImponible = (precioConIva * unidades) / (1 + (porcentajeIva / 100));
+    const ivaLinea = baseImponible * (porcentajeIva / 100);
 
-    baseImponibleTotal += importeLinea;
+    baseImponibleTotal += baseImponible;
     totalIVATotal += ivaLinea;
   });
 
   const importeLiquidoTotal = baseImponibleTotal + totalIVATotal;
 
-  // Insertar cabecera del albarán - AHORA INCLUYE NumeroPedido
+  // Insertar cabecera del albarán
   await transaction.request()
     .input('CodigoEmpresa', CodigoEmpresa)
     .input('EjercicioAlbaran', EjercicioPedido)
     .input('SerieAlbaran', 'WebCD')
     .input('NumeroAlbaran', numeroAlbaran)
-    .input('NumeroPedido', NumeroPedido) // ← NUEVO CAMPO
+    .input('NumeroPedido', NumeroPedido)
     .input('CodigoCliente', CodigoCliente)
     .input('RazonSocial', RazonSocial)
     .input('Domicilio', Domicilio || '')
@@ -287,15 +298,17 @@ const generarAlbaranCliente = async (transaction, orderHeader, items) => {
       )
     `);
 
-  // Insertar líneas del albarán - AHORA INCLUYE UnidadesServidas y ComentarioRecepcion
+  // Insertar líneas del albarán
   for (const [index, item] of items.entries()) {
-    const precio = item.Precio || 0;
+    // CORREGIDO: Usar PrecioVentaconIVA1 si está disponible
+    const precioConIva = item.PrecioVentaconIVA1 || item.Precio || 0;
     const unidades = item.UnidadesPedidas || 0;
     const porcentajeIva = item.PorcentajeIva || 21;
 
-    const importeLinea = unidades * precio;
-    const ivaLinea = importeLinea * porcentajeIva / 100;
-    const importeLiquido = importeLinea + ivaLinea;
+    // CORREGIDO: Cálculo correcto - el precio ya incluye IVA
+    const baseImponible = (precioConIva * unidades) / (1 + (porcentajeIva / 100));
+    const ivaLinea = baseImponible * (porcentajeIva / 100);
+    const importeLiquido = baseImponible + ivaLinea;
 
     await transaction.request()
       .input('CodigoEmpresa', CodigoEmpresa)
@@ -306,13 +319,13 @@ const generarAlbaranCliente = async (transaction, orderHeader, items) => {
       .input('CodigoArticulo', item.CodigoArticulo)
       .input('DescripcionArticulo', item.DescripcionArticulo)
       .input('Unidades', unidades)
-      .input('UnidadesServidas', 0) // Inicialmente 0, se actualizará en recepción
-      .input('Precio', precio)
-      .input('BaseImponible', importeLinea)
+      .input('UnidadesServidas', 0)
+      .input('Precio', precioConIva)  // Precio con IVA
+      .input('BaseImponible', baseImponible)
       .input('PorcentajeIva', porcentajeIva)
       .input('CuotaIva', ivaLinea)
       .input('ImporteLiquido', importeLiquido)
-      .input('ComentarioRecepcion', '') // Inicialmente vacío
+      .input('ComentarioRecepcion', '')
       .query(`
         INSERT INTO LineasAlbaranCliente (
           CodigoEmpresa, EjercicioAlbaran, SerieAlbaran, NumeroAlbaran, Orden,
@@ -329,6 +342,7 @@ const generarAlbaranCliente = async (transaction, orderHeader, items) => {
   return numeroAlbaran;
 };
 
+// CORREGIDO: Función principal de actualización y aprobación
 const updateOrderQuantitiesAndApprove = async (req, res) => {
   const { orderId } = req.params;
   const { items } = req.body;
@@ -368,11 +382,10 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
       const orderHeader = orderResult.recordset[0];
       const { CodigoEmpresa, EjercicioPedido, CodigoCliente, CifDni, RazonSocial, Domicilio, CodigoPostal, Municipio, Provincia, IdDelegacion, CodigoContable, NumeroPedido } = orderHeader;
 
-      // NUEVO: Si no hay items, eliminar el pedido completo
+      // Si no hay items, eliminar el pedido completo
       if (!items || items.length === 0) {
         console.log(`Eliminando pedido ${orderId} completo por falta de productos`);
         
-        // Eliminar líneas del pedido
         await transaction.request()
           .input('NumeroPedido', orderId)
           .input('SeriePedido', 'WebCD')
@@ -381,7 +394,6 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
             WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
           `);
 
-        // Eliminar cabecera del pedido
         await transaction.request()
           .input('NumeroPedido', orderId)
           .input('SeriePedido', 'WebCD')
@@ -450,18 +462,17 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           `);
       }
 
-      // 5. Recalcular totales del pedido
+      // 5. CORREGIDO: Recalcular totales del pedido usando BaseImponible y TotalIva directamente
       const totalesResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
         .query(`
           SELECT 
-            SUM(UnidadesPedidas * Precio) AS BaseImponible,
-            SUM((UnidadesPedidas * Precio) * (t.[%Iva] / 100.0)) AS TotalIVA
-          FROM LineasPedidoCliente l
-          LEFT JOIN tiposiva t ON l.CodigoIva = t.CodigoIva AND t.CodigoTerritorio = 0
-          WHERE l.NumeroPedido = @NumeroPedido
-          AND l.SeriePedido = @SeriePedido
+            SUM(BaseImponible) AS BaseImponible,
+            SUM(TotalIva) AS TotalIVA
+          FROM LineasPedidoCliente
+          WHERE NumeroPedido = @NumeroPedido
+          AND SeriePedido = @SeriePedido
         `);
 
       const baseImponibleTotal = parseFloat(totalesResult.recordset[0].BaseImponible) || 0;
@@ -489,11 +500,11 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           AND SeriePedido = @SeriePedido
         `);
 
-      // 7. Generar albarán para el cliente (SOLO albarán de cliente)
+      // 7. Generar albarán para el cliente
       const numeroAlbaranCliente = await generarAlbaranCliente(transaction, orderHeader, items);
       console.log(`Albarán de cliente generado: ${numeroAlbaranCliente}`);
 
-      // 8. Crear pedidos a proveedores (agrupados por proveedor) - SIN GENERAR ALBARÁN DE PROVEEDOR
+      // 8. Crear pedidos a proveedores (agrupados por proveedor)
       const pedidosPorProveedor = {};
       
       // Agrupar items por proveedor
@@ -548,7 +559,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           `);
       }
 
-      // Crear un pedido por cada proveedor (SOLO PEDIDO, SIN ALBARÁN)
+      // Crear un pedido por cada proveedor
       for (const [codigoProveedor, itemsProveedor] of Object.entries(pedidosPorProveedor)) {
         // Obtener información básica del proveedor
         const proveedorResult = await transaction.request()
@@ -715,10 +726,16 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
         let totalIVAProveedor = 0;
 
         for (const [index, item] of itemsProveedor.entries()) {
-          const importeLinea = item.UnidadesPedidas * (item.Precio || 0);
-          const ivaLinea = importeLinea * (item.PorcentajeIva || 21) / 100;
+          // CORREGIDO: Usar PrecioVentaconIVA1 si está disponible
+          const precioConIva = item.PrecioVentaconIVA1 || item.Precio || 0;
+          const unidades = item.UnidadesPedidas || 0;
+          const porcentajeIva = item.PorcentajeIva || 21;
+
+          // CORREGIDO: Cálculo correcto - el precio ya incluye IVA
+          const baseImponible = (precioConIva * unidades) / (1 + (porcentajeIva / 100));
+          const ivaLinea = baseImponible * (porcentajeIva / 100);
           
-          baseImponibleProveedor += importeLinea;
+          baseImponibleProveedor += baseImponible;
           totalIVAProveedor += ivaLinea;
 
           await transaction.request()
@@ -729,14 +746,14 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
             .input('Orden', index + 1)
             .input('CodigoArticulo', item.CodigoArticulo)
             .input('DescripcionArticulo', item.DescripcionArticulo)
-            .input('UnidadesPedidas', item.UnidadesPedidas)
-            .input('Precio', item.Precio || 0)
-            .input('CodigoIva', item.CodigoIva || 21)
-            .input('PorcentajeIva', item.PorcentajeIva || 21)
-            .input('ImporteBruto', importeLinea)
-            .input('BaseImponible', importeLinea)
+            .input('UnidadesPedidas', unidades)
+            .input('Precio', precioConIva)  // Precio con IVA
+            .input('CodigoIva', item.CodigoIva || porcentajeIva)  // El código de IVA es el porcentaje
+            .input('PorcentajeIva', porcentajeIva)
+            .input('ImporteBruto', baseImponible + ivaLinea)
+            .input('BaseImponible', baseImponible)
             .input('CuotaIva', ivaLinea)
-            .input('ImporteLiquido', importeLinea + ivaLinea)
+            .input('ImporteLiquido', baseImponible + ivaLinea)
             .query(`
               INSERT INTO LineasPedidoProveedor (
                 CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido, Orden,
@@ -777,8 +794,6 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
               NumeroPedido = @NumeroPedido
           `);
 
-        // NOTA: SE ELIMINA LA GENERACIÓN DEL ALBARÁN DE PROVEEDOR
-        // El albarán de proveedor lo debe generar el proveedor, no el sistema
         console.log(`Pedido a proveedor ${codigoProveedor} generado: ${numeroPedidoProveedor}`);
 
         numeroPedidoProveedor++;

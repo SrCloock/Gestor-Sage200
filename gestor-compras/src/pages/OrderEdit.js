@@ -408,7 +408,10 @@ const OrderEdit = () => {
                       <p><strong>Código:</strong> {item.CodigoArticulo}</p>
                       {item.NombreProveedor && <p><strong>Proveedor:</strong> {item.NombreProveedor}</p>}
                       {item.Familia && <p><strong>Familia:</strong> {item.Familia}</p>}
-                      <p><strong>Precio:</strong> {(item.PrecioCompra || item.Precio || 0).toFixed(2)} €</p>
+                      <p><strong>Precio:</strong> {(item.PrecioVentaconIVA1 || item.PrecioVenta || item.Precio || 0).toFixed(2)} €</p>
+                      {item.PorcentajeIva && (
+                        <p><strong>IVA:</strong> {item.PorcentajeIva}%</p>
+                      )}
                     </div>
                   </div>
                   <div className="oe-item-controls">
@@ -423,7 +426,7 @@ const OrderEdit = () => {
                       />
                     </div>
                     <div className="oe-subtotal">
-                      <strong>Subtotal:</strong> {((item.PrecioCompra || item.Precio || 0) * item.Cantidad).toFixed(2)} €
+                      <strong>Subtotal:</strong> {((item.PrecioVentaconIVA1 || item.PrecioVenta || item.Precio || 0) * item.Cantidad).toFixed(2)} €
                     </div>
                     <button
                       className="oe-remove-button"
@@ -442,7 +445,7 @@ const OrderEdit = () => {
               <span>Total del pedido:</span>
               <span className="oe-total-amount">
                 {orderItems.reduce((total, item) => {
-                  const precio = item.PrecioCompra || item.Precio || 0;
+                  const precio = item.PrecioVentaconIVA1 || item.PrecioVenta || item.Precio || 0;
                   return total + (precio * item.Cantidad);
                 }, 0).toFixed(2)} €
               </span>

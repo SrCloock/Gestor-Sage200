@@ -1,5 +1,5 @@
 import React, { memo, useState, useCallback } from 'react';
-import { FaArrowLeft, FaArrowRight, FaPlus, FaBox, FaExpand } from 'react-icons/fa';
+import { FaArrowLeft, FaArrowRight, FaPlus, FaBox, FaExpand, FaInfoCircle } from 'react-icons/fa';
 import '../styles/ProductGrid.css';
 
 const ProductGrid = memo(({ 
@@ -15,6 +15,7 @@ const ProductGrid = memo(({
   const [loadedImages, setLoadedImages] = useState(new Set());
   const [imageErrors, setImageErrors] = useState(new Set());
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [showPriceDetails, setShowPriceDetails] = useState(null);
 
   const handleImageLoad = useCallback((productKey) => {
     setLoadedImages(prev => new Set(prev).add(productKey));
@@ -27,6 +28,11 @@ const ProductGrid = memo(({
   const showFullDescription = (product, e) => {
     e.stopPropagation();
     setSelectedProduct(product);
+  };
+
+  const togglePriceDetails = (productKey, e) => {
+    e.stopPropagation();
+    setShowPriceDetails(showPriceDetails === productKey ? null : productKey);
   };
 
   const createPageNumbers = () => {
@@ -76,6 +82,9 @@ const ProductGrid = memo(({
           const productKey = generateProductKey(product);
           const imageLoaded = loadedImages.has(productKey);
           const imageError = imageErrors.has(productKey);
+          const precioConIva = product.PrecioVenta || product.Precio || 0;
+          const porcentajeIva = product.PorcentajeIva || 21;
+          const precioSinIva = product.PrecioSinIva || (precioConIva / (1 + (porcentajeIva / 100)));
 
           return (
             <div
@@ -130,9 +139,11 @@ const ProductGrid = memo(({
                 <div className="pg-product-details">
                   <div className="pg-product-price-section">
                     <span className="pg-price-label">Precio:</span>
-                    <span className="pg-price-value">
-                      {formatPrice(product.PrecioVenta || product.PrecioCompra || product.Precio)}
-                    </span>
+                    <div className="pg-price-container">
+                      <span className="pg-price-value">
+                        {formatPrice(precioConIva)}
+                      </span>
+                    </div>
                   </div>
 
                   {product.NombreProveedor && (
@@ -240,7 +251,6 @@ const ProductGrid = memo(({
               {selectedProduct.Subfamilia && (
                 <p><strong>Subfamilia:</strong> {selectedProduct.Subfamilia}</p>
               )}
-              <p><strong>Precio:</strong> {formatPrice(selectedProduct.PrecioVenta || selectedProduct.PrecioCompra || selectedProduct.Precio)}</p>
             </div>
           </div>
         </div>

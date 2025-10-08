@@ -279,7 +279,7 @@ const createOrder = async (req, res) => {
 
       // Insertar líneas del pedido
       for (const [index, item] of items.entries()) {
-        // CORREGIDO: Obtener PrecioVenta y CodigoIva del artículo
+        // CORREGIDO: Obtener PrecioVentaconIVA1 y GrupoIva del artículo (sin CodigoIva)
         const articuloResult = await transaction.request()
           .input('CodigoArticulo', item.CodigoArticulo)
           .input('CodigoProveedor', item.CodigoProveedor || '')
@@ -288,8 +288,9 @@ const createOrder = async (req, res) => {
             SELECT 
               DescripcionArticulo, 
               DescripcionLinea,
-              PrecioVenta,  -- CAMBIADO: PrecioCompra por PrecioVenta
-              CodigoIva     -- IMPORTANTE: Obtener el código de IVA del artículo
+              PrecioVenta,
+              PrecioVentaconIVA1,  -- NUEVO: Precio correcto con IVA
+              GrupoIva             -- NUEVO: Grupo IVA del artículo
             FROM Articulos
             WHERE CodigoArticulo = @CodigoArticulo
             AND (CodigoProveedor = @CodigoProveedor OR @CodigoProveedor = '')
@@ -303,29 +304,33 @@ const createOrder = async (req, res) => {
         const articulo = articuloResult.recordset[0];
         const descripcionLinea = articulo.DescripcionLinea || '';
 
-        // CORREGIDO: Obtener información de IVA del ARTÍCULO, no del item
-        const ivaResult = await transaction.request()
-          .input('CodigoIva', articulo.CodigoIva)  // CAMBIADO: Usar el código de IVA del artículo
-          .input('CodigoTerritorio', 0)
+        // CORREGIDO: Obtener el porcentaje de IVA actual para el GrupoIva (solo CodigoIvasinRecargo)
+        const grupoIvaResult = await transaction.request()
+          .input('GrupoIva', articulo.GrupoIva)
           .query(`
-            SELECT CodigoIva, [%Iva], CodigoTerritorio
-            FROM tiposiva 
-            WHERE CodigoIva = @CodigoIva AND CodigoTerritorio = @CodigoTerritorio
+            SELECT TOP 1 CodigoIvasinRecargo
+            FROM GrupoIva 
+            WHERE GrupoIva = @GrupoIva 
+            ORDER BY FechaInicio DESC
           `);
 
-        if (ivaResult.recordset.length === 0) {
-          throw new Error(`Tipo de IVA ${articulo.CodigoIva} no encontrado para el artículo ${item.CodigoArticulo}`);
+        if (grupoIvaResult.recordset.length === 0) {
+          throw new Error(`No se encontró configuración de IVA para el GrupoIva ${articulo.GrupoIva}`);
         }
 
-        const tipoIva = ivaResult.recordset[0];
+        const grupoIvaInfo = grupoIvaResult.recordset[0];
+        const porcentajeIva = parseFloat(grupoIvaInfo.CodigoIvasinRecargo) || 21;
+        
+        // CORREGIDO: En LineasPedidoCliente, CodigoIva debe contener el porcentaje (21, 10, 4, etc.)
+        // y GrupoIva debe contener el grupo (1, 2, 3, etc.)
+        const codigoIva = porcentajeIva; // El código de IVA es el porcentaje mismo
 
         const unidadesPedidas = parseFloat(item.Cantidad) || 1;
-        // CAMBIADO: Usar PrecioVenta del artículo en lugar de PrecioCompra del item
-        const precio = parseFloat(articulo.PrecioVenta) || 0;
-        const porcentajeIva = parseFloat(tipoIva['%Iva']) || 21;
+        // CAMBIADO: Usar PrecioVentaconIVA1 que ya incluye el IVA
+        const precioConIva = parseFloat(articulo.PrecioVentaconIVA1) || 0;
 
-        // Cálculos CORREGIDOS
-        const baseImponible = precio * unidadesPedidas;
+        // Cálculos CORREGIDOS: El precio ya incluye IVA, necesitamos calcular la base imponible
+        const baseImponible = (precioConIva * unidadesPedidas) / (1 + (porcentajeIva / 100));
         const cuotaIva = baseImponible * (porcentajeIva / 100);
         const importeLiquido = baseImponible + cuotaIva;
 
@@ -342,7 +347,7 @@ const createOrder = async (req, res) => {
           .input('UnidadesPendientes', unidadesPedidas)
           .input('Unidades2_', unidadesPedidas)
           .input('UnidadesPendientesFabricar', unidadesPedidas)
-          .input('Precio', precio)  // Este precio ahora es PrecioVenta (con IVA incluido)
+          .input('Precio', precioConIva)  // Precio con IVA incluido
           .input('ImporteBruto', importeLiquido)  // Total con IVA
           .input('ImporteNeto', baseImponible)    // Base imponible (sin IVA)
           .input('ImporteParcial', baseImponible)
@@ -351,9 +356,9 @@ const createOrder = async (req, res) => {
           .input('CuotaIva', cuotaIva)
           .input('TotalIva', cuotaIva)
           .input('ImporteLiquido', importeLiquido)  // Total con IVA
-          .input('CodigoIva', tipoIva.CodigoIva)
-          .input('PorcentajeIva', porcentajeIva)
-          .input('GrupoIva', tipoIva.CodigoTerritorio)
+          .input('CodigoIva', codigoIva)  // Código de IVA = porcentaje (21, 10, 4, etc.)
+          .input('PorcentajeIva', porcentajeIva)  // Porcentaje de IVA correcto
+          .input('GrupoIva', articulo.GrupoIva)  // Grupo IVA del artículo (1, 2, 3, etc.)
           .input('CodigoAlmacen', codigoAlmacen)
           .input('CodigoAlmacenAnterior', codigoAlmacenAnterior)
           .input('FechaRegistro', `${fechaActual.toISOString().split('T')[0]} 00:00:00.000`)
@@ -368,7 +373,7 @@ const createOrder = async (req, res) => {
               ImporteBruto, ImporteNeto, ImporteParcial,
               BaseImponible, BaseIva,
               CuotaIva, TotalIva, ImporteLiquido,
-              CodigoIva, [%Iva], GrupoIva,
+              CodigoIva, [%Iva], GrupoIva,  -- NUEVO: Incluir GrupoIva
               CodigoAlmacen, CodigoAlmacenAnterior, FechaRegistro,
               CodigoDelCliente, CodigoProveedor
             )
@@ -380,7 +385,7 @@ const createOrder = async (req, res) => {
               @ImporteBruto, @ImporteNeto, @ImporteParcial,
               @BaseImponible, @BaseIva,
               @CuotaIva, @TotalIva, @ImporteLiquido,
-              @CodigoIva, @PorcentajeIva, @GrupoIva,
+              @CodigoIva, @PorcentajeIva, @GrupoIva,  -- NUEVO: Incluir GrupoIva
               @CodigoAlmacen, @CodigoAlmacenAnterior, @FechaRegistro,
               @CodigoDelCliente, @CodigoProveedor
             )
@@ -705,7 +710,7 @@ const updateOrder = async (req, res) => {
 
       // 3. Insertar las nuevas líneas del pedido
       for (const [index, item] of items.entries()) {
-        // CORREGIDO: Obtener PrecioVenta y CodigoIva del artículo
+        // CORREGIDO: Obtener PrecioVentaconIVA1 y GrupoIva del artículo (sin CodigoIva)
         const articuloResult = await transaction.request()
           .input('CodigoArticulo', item.CodigoArticulo)
           .input('CodigoEmpresa', CodigoEmpresa)
@@ -713,8 +718,9 @@ const updateOrder = async (req, res) => {
             SELECT 
               DescripcionArticulo, 
               DescripcionLinea,
-              PrecioVenta,  -- CAMBIADO: PrecioCompra por PrecioVenta
-              CodigoIva     -- IMPORTANTE: Obtener el código de IVA del artículo
+              PrecioVenta,
+              PrecioVentaconIVA1,  -- NUEVO: Precio correcto con IVA
+              GrupoIva             -- NUEVO: Grupo IVA del artículo
             FROM Articulos
             WHERE CodigoArticulo = @CodigoArticulo
             AND CodigoEmpresa = @CodigoEmpresa
@@ -727,24 +733,33 @@ const updateOrder = async (req, res) => {
         const articulo = articuloResult.recordset[0];
         const descripcionLinea = articulo.DescripcionLinea || '';
 
-        // CORREGIDO: Obtener información de IVA del ARTÍCULO
-        const ivaResult = await transaction.request()
-          .input('CodigoIva', articulo.CodigoIva)  // CAMBIADO: Usar el código de IVA del artículo
-          .input('CodigoTerritorio', 0)
+        // CORREGIDO: Obtener el porcentaje de IVA actual para el GrupoIva (solo CodigoIvasinRecargo)
+        const grupoIvaResult = await transaction.request()
+          .input('GrupoIva', articulo.GrupoIva)
           .query(`
-            SELECT CodigoIva, [%Iva], CodigoTerritorio
-            FROM tiposiva 
-            WHERE CodigoIva = @CodigoIva AND CodigoTerritorio = @CodigoTerritorio
+            SELECT TOP 1 CodigoIvasinRecargo
+            FROM GrupoIva 
+            WHERE GrupoIva = @GrupoIva 
+            ORDER BY FechaInicio DESC
           `);
 
-        const tipoIva = ivaResult.recordset[0] || { CodigoIva: 21, '%Iva': 21, CodigoTerritorio: 0 };
+        if (grupoIvaResult.recordset.length === 0) {
+          throw new Error(`No se encontró configuración de IVA para el GrupoIva ${articulo.GrupoIva}`);
+        }
+
+        const grupoIvaInfo = grupoIvaResult.recordset[0];
+        const porcentajeIva = parseFloat(grupoIvaInfo.CodigoIvasinRecargo) || 21;
+        
+        // CORREGIDO: En LineasPedidoCliente, CodigoIva debe contener el porcentaje (21, 10, 4, etc.)
+        // y GrupoIva debe contener el grupo (1, 2, 3, etc.)
+        const codigoIva = porcentajeIva; // El código de IVA es el porcentaje mismo
 
         const unidadesPedidas = parseFloat(item.Cantidad) || 1;
-        // CAMBIADO: Usar PrecioVenta del artículo
-        const precio = parseFloat(articulo.PrecioVenta) || 0;
-        const porcentajeIva = parseFloat(tipoIva['%Iva']) || 21;
+        // CAMBIADO: Usar PrecioVentaconIVA1 que ya incluye el IVA
+        const precioConIva = parseFloat(articulo.PrecioVentaconIVA1) || 0;
 
-        const baseImponible = precio * unidadesPedidas;
+        // Cálculos CORREGIDOS: El precio ya incluye IVA, necesitamos calcular la base imponible
+        const baseImponible = (precioConIva * unidadesPedidas) / (1 + (porcentajeIva / 100));
         const cuotaIva = baseImponible * (porcentajeIva / 100);
         const importeLiquido = baseImponible + cuotaIva;
 
@@ -761,7 +776,7 @@ const updateOrder = async (req, res) => {
           .input('UnidadesPendientes', unidadesPedidas)
           .input('Unidades2_', unidadesPedidas)
           .input('UnidadesPendientesFabricar', unidadesPedidas)
-          .input('Precio', precio)  // Este precio ahora es PrecioVenta (con IVA incluido)
+          .input('Precio', precioConIva)  // Precio con IVA incluido
           .input('ImporteBruto', importeLiquido)  // Total con IVA
           .input('ImporteNeto', baseImponible)    // Base imponible (sin IVA)
           .input('ImporteParcial', baseImponible)
@@ -770,9 +785,9 @@ const updateOrder = async (req, res) => {
           .input('CuotaIva', cuotaIva)
           .input('TotalIva', cuotaIva)
           .input('ImporteLiquido', importeLiquido)  // Total con IVA
-          .input('CodigoIva', tipoIva.CodigoIva)
-          .input('PorcentajeIva', porcentajeIva)
-          .input('GrupoIva', tipoIva.CodigoTerritorio)
+          .input('CodigoIva', codigoIva)  // Código de IVA = porcentaje (21, 10, 4, etc.)
+          .input('PorcentajeIva', porcentajeIva)  // Porcentaje de IVA correcto
+          .input('GrupoIva', articulo.GrupoIva)  // Grupo IVA del artículo (1, 2, 3, etc.)
           .input('CodigoAlmacen', 'CEN')
           .input('CodigoAlmacenAnterior', 'CEN')
           .input('FechaRegistro', new Date())
@@ -787,7 +802,7 @@ const updateOrder = async (req, res) => {
               ImporteBruto, ImporteNeto, ImporteParcial,
               BaseImponible, BaseIva,
               CuotaIva, TotalIva, ImporteLiquido,
-              CodigoIva, [%Iva], GrupoIva,
+              CodigoIva, [%Iva], GrupoIva,  -- NUEVO: Incluir GrupoIva
               CodigoAlmacen, CodigoAlmacenAnterior, FechaRegistro,
               CodigoDelCliente, CodigoProveedor
             )
@@ -799,7 +814,7 @@ const updateOrder = async (req, res) => {
               @ImporteBruto, @ImporteNeto, @ImporteParcial,
               @BaseImponible, @BaseIva,
               @CuotaIva, @TotalIva, @ImporteLiquido,
-              @CodigoIva, @PorcentajeIva, @GrupoIva,
+              @CodigoIva, @PorcentajeIva, @GrupoIva,  -- NUEVO: Incluir GrupoIva
               @CodigoAlmacen, @CodigoAlmacenAnterior, @FechaRegistro,
               @CodigoDelCliente, @CodigoProveedor
             )

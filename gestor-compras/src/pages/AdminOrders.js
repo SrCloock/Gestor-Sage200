@@ -106,7 +106,11 @@ const AdminOrders = () => {
         setSelectedOrder(data.order);
         setEditedOrder({
           ...data.order,
-          Productos: data.order.Productos.map(product => ({ ...product }))
+          Productos: data.order.Productos.map(product => ({ 
+            ...product,
+            // CORREGIDO: Usar PrecioVentaconIVA1 como prioridad, luego Precio
+            PrecioFinal: product.PrecioVentaconIVA1 || product.Precio || 0
+          }))
         });
       } else {
         setError(data.message || 'Error al cargar los detalles del pedido');
@@ -244,6 +248,41 @@ const AdminOrders = () => {
       style: 'currency',
       currency: 'EUR'
     }).format(amount || 0);
+  };
+
+  // FUNCIÓN CORREGIDA: Obtener el precio correcto del producto
+  const getProductPrice = (product) => {
+    // Priorizar PrecioVentaconIVA1, si no está disponible usar Precio
+    return product.PrecioVentaconIVA1 || product.Precio || 0;
+  };
+
+  // FUNCIÓN NUEVA: Calcular el total por producto
+  const calculateProductTotal = (product) => {
+    const precio = getProductPrice(product);
+    const cantidad = product.UnidadesPedidas || 0;
+    return precio * cantidad;
+  };
+
+  // FUNCIÓN NUEVA: Calcular el total general del pedido (con IVA)
+  const calculateOrderTotal = () => {
+    if (!editedOrder || !editedOrder.Productos) return 0;
+    return editedOrder.Productos.reduce((total, product) => {
+      return total + calculateProductTotal(product);
+    }, 0);
+  };
+
+  // FUNCIÓN NUEVA: Calcular el importe líquido (con IVA) para mostrar en la lista principal
+  const getOrderTotalWithIVA = (order) => {
+    // Si el pedido ya tiene ImporteLiquido, usarlo (ya incluye IVA)
+    if (order.ImporteLiquido !== undefined && order.ImporteLiquido !== null) {
+      return order.ImporteLiquido;
+    }
+    
+    // Si no, calcularlo a partir de BaseImponible + IVA aproximado
+    // Asumiendo un 21% de IVA si no tenemos el TotalIVA
+    const base = order.BaseImponible || 0;
+    const iva = order.TotalIVA || (base * 0.21);
+    return base + iva;
   };
 
   const renderSortIcon = (campo) => {
@@ -447,7 +486,10 @@ const AdminOrders = () => {
                       <td className="ao-order-client">{order.RazonSocial}</td>
                       <td className="ao-order-cif">{order.CifDni}</td>
                       <td className="ao-order-lines">{order.NumeroLineas}</td>
-                      <td className="ao-order-amount">{formatCurrency(order.BaseImponible)}</td>
+                      {/* CORREGIDO: Mostrar ImporteLiquido (con IVA) en lugar de BaseImponible (sin IVA) */}
+                      <td className="ao-order-amount">
+                        {formatCurrency(getOrderTotalWithIVA(order))}
+                      </td>
                       <td className="ao-order-delivery">
                         <span className={new Date(order.FechaNecesaria) < new Date() ? 'ao-urgent' : ''}>
                           {formatDate(order.FechaNecesaria)}
@@ -588,6 +630,24 @@ const AdminOrders = () => {
                   <span className="ao-info-value">{selectedOrder.ObservacionesPedido || 'Ninguna'}</span>
                 </div>
               </div>
+              
+              {/* NUEVO: Card de resumen de totales */}
+              <div className="ao-info-card">
+                <div className="ao-card-header">
+                  <h3>Resumen del Pedido</h3>
+                  <div className="ao-card-icon">💰</div>
+                </div>
+                <div className="ao-info-row">
+                  <span className="ao-info-label">Total Productos:</span>
+                  <span className="ao-info-value">{editedOrder.Productos ? editedOrder.Productos.length : 0}</span>
+                </div>
+                <div className="ao-info-row">
+                  <span className="ao-info-label">Total General:</span>
+                  <span className="ao-info-value ao-total-amount">
+                    {formatCurrency(calculateOrderTotal())}
+                  </span>
+                </div>
+              </div>
             </div>
             
             <h3 className="ao-products-title">Productos</h3>
@@ -605,7 +665,8 @@ const AdminOrders = () => {
                       <th>Código</th>
                       <th>Descripción</th>
                       <th>Cantidad</th>
-                      <th>Precio</th>
+                      <th>Precio Unitario</th>
+                      <th>Total</th>
                       <th>Proveedor</th>
                       <th>Acciones</th>
                     </tr>
@@ -624,7 +685,13 @@ const AdminOrders = () => {
                             className="ao-quantity-input"
                           />
                         </td>
-                        <td className="ao-product-price">{formatCurrency(product.Precio)}</td>
+                        {/* CORREGIDO: Mostrar precio con IVA */}
+                        <td className="ao-product-price">
+                          {formatCurrency(getProductPrice(product))}
+                        </td>
+                        <td className="ao-product-total">
+                          {formatCurrency(calculateProductTotal(product))}
+                        </td>
                         <td className="ao-product-supplier">{product.NombreProveedor || 'No especificado'}</td>
                         <td className="ao-product-actions">
                           <button

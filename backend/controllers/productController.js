@@ -34,6 +34,8 @@ const getProducts = async (req, res) => {
           a.DescripcionArticulo, 
           a.CodigoProveedor, 
           a.PrecioVenta, 
+          a.PrecioVentaconIVA1,  -- NUEVO: Precio correcto con IVA
+          a.GrupoIva,            -- NUEVO: Grupo IVA del artículo
           a.RutaImagen,
           p.RazonSocial AS NombreProveedor,
           a.CodigoFamilia,
@@ -71,10 +73,23 @@ const getProducts = async (req, res) => {
         finalImage = dbImage;
       }
 
+      // NUEVO: Obtener el porcentaje de IVA actual para el GrupoIva
+      const ivaResult = await pool.request()
+        .input('GrupoIva', product.GrupoIva)
+        .query(`
+          SELECT TOP 1 CodigoIvasinRecargo 
+          FROM GrupoIva 
+          WHERE GrupoIva = @GrupoIva 
+          ORDER BY FechaInicio DESC
+        `);
+
+      const porcentajeIva = ivaResult.recordset[0]?.CodigoIvasinRecargo || 21;
+
       updatedProducts.push({
         ...product,
-        Precio: product.PrecioVenta,
-        PrecioVenta: product.PrecioVenta,
+        Precio: product.PrecioVentaconIVA1,  // CAMBIADO: Usar PrecioVentaconIVA1
+        PrecioVenta: product.PrecioVentaconIVA1,  // CAMBIADO: Usar PrecioVentaconIVA1
+        PorcentajeIva: porcentajeIva,  // NUEVO: Incluir porcentaje de IVA
         RutaImagen: `${serverUrl}/images/${finalImage}`
       });
     }
