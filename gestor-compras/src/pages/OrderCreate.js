@@ -2,17 +2,75 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api';
-import ProductGrid from '../components/ProductGrid';
-import FiltrosAvanzados from '../components/FiltrosAvanzados';
-import { FaSearch, FaCalendarAlt, FaArrowLeft, FaCheck, FaFilter, FaTrash, FaBox } from 'react-icons/fa';
+import ProductCard from '../components/ProductCard';
+import CatalogFilters from '../components/CatalogFilters';
+import { FaSearch, FaCalendarAlt, FaArrowLeft, FaCheck, FaFilter, FaTrash, FaBox, FaSync, FaTimes } from 'react-icons/fa';
 import '../styles/OrderCreate.css';
 
-// Componente ResumenPedido
+// Componente ProductGrid actualizado
+const ProductGrid = ({ products, onAddProduct, currentPage, totalPages, onPageChange, searchTerm, loading }) => {
+  if (loading) {
+    return (
+      <div className="oc-products-loading">
+        <div className="oc-loading-spinner"></div>
+        <p>Cargando productos...</p>
+      </div>
+    );
+  }
+
+  if (products.length === 0) {
+    return (
+      <div className="oc-no-products">
+        <div className="oc-no-products-icon">🔍</div>
+        <h3>No se encontraron productos</h3>
+        <p>{searchTerm ? 'Intenta ajustar los términos de búsqueda' : 'No hay productos disponibles'}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="oc-products-section">
+      <div className="oc-products-grid">
+        {products.map(product => (
+          <ProductCard
+            key={`${product.CodigoArticulo}-${product.CodigoProveedor || 'NP'}`}
+            product={product}
+            onAddToOrder={onAddProduct}
+          />
+        ))}
+      </div>
+      
+      {totalPages > 1 && (
+        <div className="oc-pagination">
+          <button
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="oc-pagination-btn"
+          >
+            Anterior
+          </button>
+          <span className="oc-pagination-info">
+            Página {currentPage} de {totalPages}
+          </span>
+          <button
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="oc-pagination-btn"
+          >
+            Siguiente
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Componente ResumenPedido actualizado
 const ResumenPedido = ({ items, deliveryDate, comment, onUpdateQuantity, onRemoveItem, onDeliveryDateChange, onCommentChange }) => {
   const calcularTotal = () => {
     return items.reduce((total, item) => {
-      const precio = item.PrecioVentaconIVA1 || item.PrecioVenta || item.Precio || 0;
-      return total + (precio * (item.Cantidad || item.UnidadesPedidas || 1));
+      const precio = item.PrecioVenta || 0;
+      return total + (precio * (item.Cantidad || 1));
     }, 0);
   };
 
@@ -67,7 +125,6 @@ const ResumenPedido = ({ items, deliveryDate, comment, onUpdateQuantity, onRemov
 
       <div className="oc-items-list">
         {items.map((item, index) => {
-          // Generar una clave única para cada item
           const itemKey = `${item.CodigoArticulo}-${item.CodigoProveedor || 'NP'}-${index}`;
           return (
             <div key={itemKey} className="oc-resumen-item">
@@ -77,21 +134,17 @@ const ResumenPedido = ({ items, deliveryDate, comment, onUpdateQuantity, onRemov
                 </h4>
                 <div className="oc-item-details">
                   <span className="oc-item-precio">
-                    Precio: {(item.PrecioVentaconIVA1 || item.PrecioVenta || item.Precio || 0).toFixed(2)} €
+                    Precio: {(item.PrecioVenta || 0).toFixed(2)} €
                   </span>
                   {item.PorcentajeIva && (
                     <span className="oc-item-iva">
                       IVA: {item.PorcentajeIva}%
                     </span>
                   )}
-                  <span className="oc-item-proveedor">
-                    Proveedor: {item.NombreProveedor || 'No especificado'}
-                  </span>
-                  {item.Familia && (
-                    <span className="oc-item-familia">Familia: {item.Familia}</span>
-                  )}
-                  {item.Subfamilia && (
-                    <span className="oc-item-subfamilia">Subfamilia: {item.Subfamilia}</span>
+                  {item.NombreProveedor && (
+                    <span className="oc-item-proveedor">
+                      Proveedor: {item.NombreProveedor}
+                    </span>
                   )}
                 </div>
               </div>
@@ -102,14 +155,14 @@ const ResumenPedido = ({ items, deliveryDate, comment, onUpdateQuantity, onRemov
                   <input
                     type="number"
                     min="1"
-                    value={item.Cantidad || item.UnidadesPedidas || 1}
-                    onChange={(e) => onUpdateQuantity(item, e.target.value)}
+                    value={item.Cantidad || 1}
+                    onChange={(e) => onUpdateQuantity(item, parseInt(e.target.value) || 1)}
                     className="oc-cantidad-input"
                   />
                 </div>
                 
                 <div className="oc-item-subtotal">
-                  {((item.PrecioVentaconIVA1 || item.PrecioVenta || item.Precio || 0) * (item.Cantidad || item.UnidadesPedidas || 1)).toFixed(2)} €
+                  {((item.PrecioVenta || 0) * (item.Cantidad || 1)).toFixed(2)} €
                 </div>
                 
                 <button 
@@ -134,7 +187,7 @@ const ResumenPedido = ({ items, deliveryDate, comment, onUpdateQuantity, onRemov
         {deliveryDate && (
           <div className="oc-fecha-entrega">
             <span>Fecha necesaria:</span>
-            <span>{new Date(deliveryDate).toLocaleDateString()}</span>
+            <span>{new Date(deliveryDate).toLocaleDateString('es-ES')}</span>
           </div>
         )}
       </div>
@@ -142,7 +195,7 @@ const ResumenPedido = ({ items, deliveryDate, comment, onUpdateQuantity, onRemov
   );
 };
 
-// Componente principal OrderCreate
+// Componente principal OrderCreate actualizado
 const OrderCreate = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -150,69 +203,48 @@ const OrderCreate = () => {
 
   const [orderItems, setOrderItems] = useState([]);
   const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState({ products: true, submit: false });
   const [error, setError] = useState('');
-  const [sortOrder, setSortOrder] = useState('asc');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState({
+    proveedor: '',
+    precioMin: '',
+    precioMax: ''
+  });
+  const [sortBy, setSortBy] = useState('nombre');
   const [currentPage, setCurrentPage] = useState(1);
   const [deliveryDate, setDeliveryDate] = useState('');
   const [reviewMode, setReviewMode] = useState(false);
   const [comment, setComment] = useState('');
-  const [mostrarFiltros, setMostrarFiltros] = useState(false);
-  const [filtros, setFiltros] = useState({
-    familia: '',
-    subfamilia: '',
-    search: ''
-  });
-  const productsPerPage = 20;
+  const [showFilters, setShowFilters] = useState(false);
+  const productsPerPage = 12;
 
-  // Función MEJORADA para generar claves únicas
+  // Función para generar clave única
   const generateProductKey = (product) => {
-    return `${product.CodigoArticulo}-${product.CodigoProveedor || 'NP'}-${product.CodigoFamilia || 'NF'}-${product.CodigoSubfamilia || 'NS'}`;
+    return `${product.CodigoArticulo}-${product.CodigoProveedor || 'NP'}`;
   };
-
-  // Cache simple en memoria
-  const [productsCache, setProductsCache] = useState(null);
-  const [lastFetchTime, setLastFetchTime] = useState(0);
-  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
   useEffect(() => {
     const fetchProducts = async () => {
-      // Verificar cache primero
-      const now = Date.now();
-      if (productsCache && (now - lastFetchTime) < CACHE_DURATION) {
-        setProducts(productsCache);
-        setLoading(prev => ({ ...prev, products: false }));
-        return;
-      }
-
       try {
         setLoading(prev => ({ ...prev, products: true }));
         setError('');
-        const response = await api.get('/api/products');
         
-        let productsData = response.data.products || response.data;
-
-        // Eliminar duplicados usando la clave única MEJORADA
-        const uniqueProductsMap = new Map();
+        const response = await api.get('/api/catalog/products');
         
-        productsData.forEach(product => {
-          const key = generateProductKey(product);
-          if (!uniqueProductsMap.has(key)) {
-            uniqueProductsMap.set(key, product);
-          }
-        });
-
-        const uniqueProducts = Array.from(uniqueProductsMap.values());
-        setProducts(uniqueProducts);
-        setProductsCache(uniqueProducts);
-        setLastFetchTime(Date.now());
-
+        if (response.data.success) {
+          setProducts(response.data.products);
+          setFilteredProducts(response.data.products);
+        } else {
+          setError('Error al cargar los productos');
+        }
       } catch (err) {
-        console.error('Error al cargar productos:', err);
+        console.error('Error fetching products:', err);
         if (err.response?.status === 401) {
           setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
         } else {
-          setError('Error al cargar productos: ' + (err.message || 'Error desconocido'));
+          setError('Error al conectar con el servidor');
         }
       } finally {
         setLoading(prev => ({ ...prev, products: false }));
@@ -232,41 +264,65 @@ const OrderCreate = () => {
     }
   }, [location, user]);
 
-  // Filtrar y ordenar productos - BUSCADOR MEJORADO
-  const productosFiltrados = products
-    .filter(product => {
-      if (filtros.search.trim()) {
-        const term = filtros.search.toLowerCase().trim();
-        const descripcion = product.DescripcionArticulo?.toLowerCase() || '';
-        const codigo = product.CodigoArticulo?.toLowerCase() || '';
-        const proveedor = product.NombreProveedor?.toLowerCase() || '';
-        const familia = product.Familia?.toLowerCase() || '';
-        const subfamilia = product.Subfamilia?.toLowerCase() || '';
+  // Aplicar filtros y búsqueda (igual que en Catalog)
+  useEffect(() => {
+    let result = [...products];
 
-        if (!descripcion.includes(term) &&
-            !codigo.includes(term) &&
-            !proveedor.includes(term) &&
-            !familia.includes(term) &&
-            !subfamilia.includes(term)) {
-          return false;
-        }
+    // Filtro de búsqueda
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(product => 
+        product.DescripcionArticulo?.toLowerCase().includes(term) ||
+        product.CodigoArticulo?.toLowerCase().includes(term) ||
+        product.NombreProveedor?.toLowerCase().includes(term)
+      );
+    }
+
+    // Filtro por proveedor
+    if (filters.proveedor) {
+      result = result.filter(product => 
+        product.CodigoProveedor === filters.proveedor
+      );
+    }
+
+    // Filtro por precio mínimo
+    if (filters.precioMin) {
+      result = result.filter(product => 
+        product.PrecioVenta >= parseFloat(filters.precioMin)
+      );
+    }
+
+    // Filtro por precio máximo
+    if (filters.precioMax) {
+      result = result.filter(product => 
+        product.PrecioVenta <= parseFloat(filters.precioMax)
+      );
+    }
+
+    // Ordenar
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'nombre':
+          return a.DescripcionArticulo.localeCompare(b.DescripcionArticulo);
+        case 'precio-asc':
+          return a.PrecioVenta - b.PrecioVenta;
+        case 'precio-desc':
+          return b.PrecioVenta - a.PrecioVenta;
+        case 'proveedor':
+          return a.NombreProveedor.localeCompare(b.NombreProveedor);
+        default:
+          return 0;
       }
-      
-      const matchesFamilia = !filtros.familia || product.Familia === filtros.familia;
-      const matchesSubfamilia = !filtros.subfamilia || product.Subfamilia === filtros.subfamilia;
-      
-      return matchesFamilia && matchesSubfamilia;
-    })
-    .sort((a, b) => {
-      return sortOrder === 'asc' 
-        ? (a.DescripcionArticulo || '').localeCompare(b.DescripcionArticulo || '')
-        : (b.DescripcionArticulo || '').localeCompare(a.DescripcionArticulo || '');
     });
+
+    setFilteredProducts(result);
+    setCurrentPage(1);
+  }, [products, searchTerm, filters, sortBy]);
 
   const indexOfLastProduct = currentPage * productsPerPage;
   const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
-  const currentProducts = productosFiltrados.slice(indexOfFirstProduct, indexOfLastProduct);
-  const totalPages = Math.ceil(productosFiltrados.length / productsPerPage);
+  const currentProducts = filteredProducts.slice(indexOfFirstProduct, indexOfLastProduct);
+  const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
 
   const handlePageChange = (newPage) => {
     if (newPage > 0 && newPage <= totalPages) {
@@ -338,23 +394,16 @@ const OrderCreate = () => {
         CodigoArticulo: item.CodigoArticulo,
         DescripcionArticulo: item.DescripcionArticulo,
         Cantidad: Number(item.Cantidad),
-        PrecioCompra: item.PrecioCompra || item.Precio,
+        PrecioCompra: item.PrecioVenta,
         CodigoProveedor: item.CodigoProveedor || null,
         CodigoCliente: user.codigoCliente,
         CifDni: user.cifDni
       }));
 
-      console.log('Enviando pedido con datos:', {
-        items: itemsToSend,
-        deliveryDate: deliveryDate || null,
-        comment: comment
-      });
-
-      // CORREGIDO: Enviar comment en lugar de ObservacionesPedido
       const response = await api.post('/api/orders', {
         items: itemsToSend,
         deliveryDate: deliveryDate || null,
-        comment: comment  // CORREGIDO: Se envía como 'comment'
+        comment: comment
       });
 
       if (response.data.success) {
@@ -364,7 +413,7 @@ const OrderCreate = () => {
             seriePedido: response.data.seriePedido,
             deliveryDate: deliveryDate,
             items: orderItems,
-            comment: comment,  // CORREGIDO: Pasar el comentario a la pantalla de revisión
+            comment: comment,
             total: response.data.importeLiquido || calcularTotal()
           }
         });
@@ -385,32 +434,16 @@ const OrderCreate = () => {
 
   const calcularTotal = () => {
     return orderItems.reduce((sum, item) => {
-      const precio = item.PrecioVentaconIVA1 || item.PrecioVenta || item.Precio || 0;
+      const precio = item.PrecioVenta || 0;
       return sum + (precio * (item.Cantidad || 1));
     }, 0);
   };
 
-  const handleFiltroChange = (e) => {
-    const { name, value } = e.target;
-    setFiltros(prev => {
-      if (name === 'familia') {
-        return { ...prev, familia: value, subfamilia: '' };
-      }
-      return { ...prev, [name]: value };
-    });
-    setCurrentPage(1);
+  const handleRefresh = () => {
+    window.location.reload();
   };
 
-  const limpiarFiltros = () => {
-    setFiltros({ familia: '', subfamilia: '', search: '' });
-    setCurrentPage(1);
-  };
-
-  const opcionesFamilias = [...new Set(products.map(p => p.Familia).filter(Boolean))].sort();
-  const opcionesSubfamilias = 
-    products
-      .filter(p => p.Familia && p.Subfamilia)
-      .map(p => ({ familia: p.Familia, valor: p.Subfamilia }));
+  const hasActiveFilters = filters.proveedor || filters.precioMin || filters.precioMax;
 
   return (
     <div className="oc-container">
@@ -440,16 +473,13 @@ const OrderCreate = () => {
               <input
                 type="text"
                 placeholder="Buscar productos por nombre, código o proveedor..."
-                value={filtros.search}
-                onChange={(e) => {
-                  setFiltros(prev => ({ ...prev, search: e.target.value }));
-                  setCurrentPage(1);
-                }}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="oc-search-input"
               />
-              {filtros.search && (
+              {searchTerm && (
                 <button 
-                  onClick={() => setFiltros(prev => ({ ...prev, search: '' }))}
+                  onClick={() => setSearchTerm('')}
                   className="oc-clear-search"
                 >
                   ×
@@ -457,35 +487,46 @@ const OrderCreate = () => {
               )}
             </div>
 
-            <div className="oc-filter-container">
-              <FaFilter className="oc-filter-icon" />
+            <div className="oc-sort-container">
               <select
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-                className="oc-filter-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="oc-sort-select"
               >
-                <option value="asc">Ordenar A-Z</option>
-                <option value="desc">Ordenar Z-A</option>
+                <option value="nombre">Ordenar por nombre</option>
+                <option value="precio-asc">Precio: menor a mayor</option>
+                <option value="precio-desc">Precio: mayor a menor</option>
+                <option value="proveedor">Ordenar por proveedor</option>
               </select>
             </div>
 
             <button 
-              onClick={() => setMostrarFiltros(!mostrarFiltros)}
+              onClick={() => setShowFilters(!showFilters)}
               className="oc-toggle-filters"
             >
               <FaFilter />
-              {mostrarFiltros ? 'Ocultar Filtros' : 'Mostrar Filtros'}
+              {showFilters ? 'Ocultar Filtros' : 'Mostrar Filtros'}
+              {hasActiveFilters && <span className="oc-active-filters-dot"></span>}
             </button>
+
+            {hasActiveFilters && (
+              <button 
+                onClick={() => setFilters({ proveedor: '', precioMin: '', precioMax: '' })}
+                className="oc-clear-filters"
+              >
+                <FaTimes />
+                Limpiar
+              </button>
+            )}
           </div>
 
-          {mostrarFiltros && (
-            <FiltrosAvanzados
-              filtros={filtros}
-              onFiltroChange={handleFiltroChange}
-              onLimpiarFiltros={limpiarFiltros}
-              opcionesFamilias={opcionesFamilias}
-              opcionesSubfamilias={opcionesSubfamilias}
-            />
+          {showFilters && (
+            <div className="oc-filters-section">
+              <CatalogFilters 
+                filters={filters}
+                onFiltersChange={setFilters}
+              />
+            </div>
           )}
 
           <ProductGrid
@@ -494,8 +535,7 @@ const OrderCreate = () => {
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={handlePageChange}
-            searchTerm={filtros.search}
-            generateProductKey={generateProductKey}
+            searchTerm={searchTerm}
             loading={loading.products}
           />
         </div>

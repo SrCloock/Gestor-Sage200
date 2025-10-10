@@ -3,14 +3,15 @@ const cors = require('cors');
 const path = require('path');
 
 const authRoutes = require('./routes/authRoutes');
-const productRoutes = require('./routes/productRoutes');
+const productRoutes = require('./routes/catalog');
 const orderRoutes = require('./routes/orderRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const receptionRoutes = require('./routes/receptionRoutes');
-const allOrdersRoutes = require('./routes/allOrders'); // AGREGAR ESTA LÍNEA
+const allOrdersRoutes = require('./routes/allOrders');
+const catalogRoutes = require('./routes/catalog'); // NUEVA RUTA DEL CATÁLOGO
 
 const { connect } = require('./db/Sage200db');
-const { syncImagesWithDB } = require('./controllers/productController');
+const { syncImagesWithDB } = require('./controllers/catalogController');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -19,7 +20,7 @@ const PORT = process.env.PORT || 5000;
 app.use('/images', express.static(path.join(__dirname, 'public', 'images')));
 
 // Configuración CORS detallada
-const allowedOrigins = ['http://localhost:3000'];
+const allowedOrigins = ['http://localhost:3000','http://localhost:5000','http://localhost:4000'];
 
 const corsOptions = {
   origin: function (origin, callback) {
@@ -65,6 +66,16 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/reception', receptionRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/all-orders', allOrdersRoutes);
+app.use('/api/catalog', catalogRoutes); // NUEVA RUTA DEL CATÁLOGO
+
+// Ruta de salud para verificar que el servidor funciona
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Servidor funcionando correctamente',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Middleware de errores
 app.use((err, req, res, next) => {
@@ -78,4 +89,5 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`📦 Ruta del catálogo: http://localhost:${PORT}/api/catalog`);
 });

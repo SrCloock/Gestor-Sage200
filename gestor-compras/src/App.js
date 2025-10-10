@@ -2,7 +2,7 @@ import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
 import Home from './pages/Home';
-import ProductCatalog from './pages/ProductCatalog';
+import Catalog from './components/Catalog';
 import OrderCreate from './pages/OrderCreate';
 import OrderReview from './pages/OrderReview';
 import OrderList from './pages/OrderList';
@@ -29,7 +29,7 @@ function App() {
 
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<Home />} />
-              <Route path="/catalogo" element={<ProductCatalog />} />
+              <Route path="/catalogo" element={<Catalog />} />
               <Route path="/crear-pedido" element={<OrderCreate />} />
               <Route path="/revisar-pedido" element={<OrderReview />} />
               <Route path="/mis-pedidos" element={<OrderList />} />
