@@ -4,10 +4,22 @@ import { AuthContext } from '../context/AuthContext';
 import api from '../api';
 import ProductCard from '../components/ProductCard';
 import CatalogFilters from '../components/CatalogFilters';
-import { FaSearch, FaCalendarAlt, FaArrowLeft, FaCheck, FaFilter, FaTrash, FaBox, FaSync, FaTimes } from 'react-icons/fa';
+import { 
+  FaSearch, 
+  FaCalendarAlt, 
+  FaArrowLeft, 
+  FaCheck, 
+  FaFilter, 
+  FaTrash, 
+  FaBox, 
+  FaSync, 
+  FaTimes,
+  FaComment,
+  FaShoppingCart
+} from 'react-icons/fa';
 import '../styles/OrderCreate.css';
 
-// Componente ProductGrid actualizado
+// Componente ProductGrid unificado
 const ProductGrid = ({ products, onAddProduct, currentPage, totalPages, onPageChange, searchTerm, loading }) => {
   if (loading) {
     return (
@@ -36,6 +48,7 @@ const ProductGrid = ({ products, onAddProduct, currentPage, totalPages, onPageCh
             key={`${product.CodigoArticulo}-${product.CodigoProveedor || 'NP'}`}
             product={product}
             onAddToOrder={onAddProduct}
+            showAddButton={true}
           />
         ))}
       </div>
@@ -65,8 +78,16 @@ const ProductGrid = ({ products, onAddProduct, currentPage, totalPages, onPageCh
   );
 };
 
-// Componente ResumenPedido actualizado
-const ResumenPedido = ({ items, deliveryDate, comment, onUpdateQuantity, onRemoveItem, onDeliveryDateChange, onCommentChange }) => {
+// Componente ResumenPedido mejorado
+const ResumenPedido = ({ 
+  items, 
+  deliveryDate, 
+  comment, 
+  onUpdateQuantity, 
+  onRemoveItem, 
+  onDeliveryDateChange, 
+  onCommentChange 
+}) => {
   const calcularTotal = () => {
     return items.reduce((total, item) => {
       const precio = item.PrecioVenta || 0;
@@ -78,7 +99,10 @@ const ResumenPedido = ({ items, deliveryDate, comment, onUpdateQuantity, onRemov
     return (
       <div className="oc-resumen-pedido">
         <div className="oc-resumen-header">
-          <h3>Resumen del Pedido</h3>
+          <h3>
+            <FaShoppingCart className="oc-header-icon" />
+            Resumen del Pedido
+          </h3>
           <span className="oc-total-items">0 productos</span>
         </div>
         <div className="oc-empty-cart">
@@ -93,101 +117,127 @@ const ResumenPedido = ({ items, deliveryDate, comment, onUpdateQuantity, onRemov
   return (
     <div className="oc-resumen-pedido">
       <div className="oc-resumen-header">
-        <h3>Resumen del Pedido</h3>
+        <h3>
+          <FaShoppingCart className="oc-header-icon" />
+          Resumen del Pedido
+        </h3>
         <span className="oc-total-items">{items.length} productos</span>
       </div>
 
-      <div className="oc-delivery-section">
-        <div className="oc-delivery-input">
-          <FaCalendarAlt className="oc-delivery-icon" />
-          <label htmlFor="deliveryDate">Fecha de entrega (opcional):</label>
-          <input
-            type="date"
-            id="deliveryDate"
-            value={deliveryDate}
-            onChange={(e) => onDeliveryDateChange(e.target.value)}
-            min={new Date().toISOString().split('T')[0]}
-            className="oc-date-input"
-          />
+      {/* Sección de información del pedido */}
+      <div className="oc-order-info-section">
+        <div className="oc-delivery-section">
+          <div className="oc-delivery-input">
+            <FaCalendarAlt className="oc-input-icon" />
+            <div className="oc-input-group">
+              <label htmlFor="deliveryDate">Fecha de entrega (opcional):</label>
+              <input
+                type="date"
+                id="deliveryDate"
+                value={deliveryDate}
+                onChange={(e) => onDeliveryDateChange(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                className="oc-date-input"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="oc-comment-section">
+          <div className="oc-comment-input">
+            <FaComment className="oc-input-icon" />
+            <div className="oc-input-group">
+              <label>Comentarios del pedido:</label>
+              <textarea 
+                value={comment}
+                onChange={(e) => onCommentChange(e.target.value)}
+                rows="3"
+                placeholder="Agregue comentarios sobre el pedido, instrucciones especiales, etc..."
+                className="oc-comment-textarea"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="oc-comment-section">
-        <label>Comentarios:</label>
-        <textarea 
-          value={comment}
-          onChange={(e) => onCommentChange(e.target.value)}
-          rows="3"
-          placeholder="Agregue comentarios sobre el pedido..."
-          className="oc-comment-textarea"
-        />
-      </div>
-
-      <div className="oc-items-list">
-        {items.map((item, index) => {
-          const itemKey = `${item.CodigoArticulo}-${item.CodigoProveedor || 'NP'}-${index}`;
-          return (
-            <div key={itemKey} className="oc-resumen-item">
-              <div className="oc-item-info">
-                <h4 className="oc-item-descripcion" title={item.DescripcionArticulo}>
-                  {item.DescripcionArticulo}
-                </h4>
-                <div className="oc-item-details">
-                  <span className="oc-item-precio">
-                    Precio: {(item.PrecioVenta || 0).toFixed(2)} €
-                  </span>
-                  {item.PorcentajeIva && (
-                    <span className="oc-item-iva">
-                      IVA: {item.PorcentajeIva}%
-                    </span>
-                  )}
-                  {item.NombreProveedor && (
-                    <span className="oc-item-proveedor">
-                      Proveedor: {item.NombreProveedor}
-                    </span>
-                  )}
-                </div>
-              </div>
-              
-              <div className="oc-item-controls">
-                <div className="oc-item-cantidad">
-                  <label>Unidades:</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={item.Cantidad || 1}
-                    onChange={(e) => onUpdateQuantity(item, parseInt(e.target.value) || 1)}
-                    className="oc-cantidad-input"
-                  />
+      {/* Lista de productos */}
+      <div className="oc-items-list-container">
+        <div className="oc-items-list-header">
+          <span>Productos seleccionados</span>
+          <span>Cantidad</span>
+        </div>
+        <div className="oc-items-list">
+          {items.map((item, index) => {
+            const itemKey = `${item.CodigoArticulo}-${item.CodigoProveedor || 'NP'}-${index}`;
+            return (
+              <div key={itemKey} className="oc-order-item">
+                <div className="oc-item-info">
+                  <div className="oc-item-image">
+                    <img 
+                      src={item.RutaImagen || '/images/default-product.jpg'} 
+                      alt={item.DescripcionArticulo}
+                      onError={(e) => {
+                        e.target.src = '/images/default-product.jpg';
+                      }}
+                    />
+                  </div>
+                  <div className="oc-item-details">
+                    <h4 className="oc-item-description" title={item.DescripcionArticulo}>
+                      {item.DescripcionArticulo}
+                    </h4>
+                    <div className="oc-item-meta">
+                      <span className="oc-item-code">Código: {item.CodigoArticulo}</span>
+                      {item.NombreProveedor && (
+                        <span className="oc-item-supplier">Proveedor: {item.NombreProveedor}</span>
+                      )}
+                      <span className="oc-item-price">
+                        Precio: {(item.PrecioVenta || 0).toFixed(2)} €
+                      </span>
+                    </div>
+                  </div>
                 </div>
                 
-                <div className="oc-item-subtotal">
-                  {((item.PrecioVenta || 0) * (item.Cantidad || 1)).toFixed(2)} €
+                <div className="oc-item-controls">
+                  <div className="oc-item-quantity">
+                    <label>Cantidad:</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={item.Cantidad || 1}
+                      onChange={(e) => onUpdateQuantity(item, parseInt(e.target.value) || 1)}
+                      className="oc-quantity-input"
+                    />
+                  </div>
+                  
+                  <div className="oc-item-subtotal">
+                    {((item.PrecioVenta || 0) * (item.Cantidad || 1)).toFixed(2)} €
+                  </div>
+                  
+                  <button 
+                    onClick={() => onRemoveItem(item)}
+                    className="oc-remove-item-btn"
+                    title="Eliminar producto"
+                  >
+                    <FaTrash />
+                  </button>
                 </div>
-                
-                <button 
-                  onClick={() => onRemoveItem(item)}
-                  className="oc-remove-item"
-                  title="Eliminar producto"
-                >
-                  <FaTrash />
-                </button>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
-      <div className="oc-resumen-total">
+      {/* Total del pedido */}
+      <div className="oc-order-total-section">
         <div className="oc-total-line">
           <span>Total del pedido:</span>
           <span className="oc-total-amount">{calcularTotal().toFixed(2)} €</span>
         </div>
         
         {deliveryDate && (
-          <div className="oc-fecha-entrega">
-            <span>Fecha necesaria:</span>
-            <span>{new Date(deliveryDate).toLocaleDateString('es-ES')}</span>
+          <div className="oc-delivery-info">
+            <FaCalendarAlt className="oc-info-icon" />
+            <span>Fecha solicitada: {new Date(deliveryDate).toLocaleDateString('es-ES')}</span>
           </div>
         )}
       </div>
@@ -195,7 +245,7 @@ const ResumenPedido = ({ items, deliveryDate, comment, onUpdateQuantity, onRemov
   );
 };
 
-// Componente principal OrderCreate actualizado
+// Componente principal OrderCreate
 const OrderCreate = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -253,6 +303,7 @@ const OrderCreate = () => {
 
     fetchProducts();
 
+    // Si viene de Catalog con un producto seleccionado
     if (location.state?.selectedProduct) {
       const selectedProduct = location.state.selectedProduct;
       setOrderItems([{
@@ -264,7 +315,7 @@ const OrderCreate = () => {
     }
   }, [location, user]);
 
-  // Aplicar filtros y búsqueda (igual que en Catalog)
+  // Aplicar filtros y búsqueda
   useEffect(() => {
     let result = [...products];
 
@@ -439,29 +490,39 @@ const OrderCreate = () => {
     }, 0);
   };
 
-  const handleRefresh = () => {
-    window.location.reload();
-  };
-
   const hasActiveFilters = filters.proveedor || filters.precioMin || filters.precioMax;
 
   return (
     <div className="oc-container">
       <div className="oc-header">
-        <button onClick={() => navigate('/catalogo')} className="oc-back-button">
-          <FaArrowLeft className="oc-back-icon" />
-          Volver al Catálogo
-        </button>
-        <div className="oc-title-section">
-          <h2>Crear Nuevo Pedido</h2>
-          <p>Seleccione los productos y complete la información del pedido</p>
+        <div className="oc-header-left">
+          <button onClick={() => navigate('/catalogo')} className="oc-back-button">
+            <FaArrowLeft className="oc-back-icon" />
+            Volver al Catálogo
+          </button>
+          <div className="oc-title-section">
+            <FaShoppingCart className="oc-title-icon" />
+            <div>
+              <h2>Crear Nuevo Pedido</h2>
+              <p className="oc-subtitle">Seleccione los productos y complete la información del pedido</p>
+            </div>
+          </div>
+        </div>
+        <div className="oc-header-actions">
+          <button onClick={() => window.location.reload()} className="oc-refresh-button">
+            <FaSync className="oc-refresh-icon" />
+            Actualizar
+          </button>
         </div>
       </div>
 
       {error && (
         <div className="oc-error-message">
+          <div className="oc-error-icon">⚠️</div>
           <p>{error}</p>
-          <button onClick={() => setError('')} className="oc-error-close">×</button>
+          <button onClick={() => setError('')} className="oc-error-close">
+            <FaTimes />
+          </button>
         </div>
       )}
 
@@ -560,6 +621,9 @@ const OrderCreate = () => {
               >
                 <FaCheck className="oc-review-icon" />
                 Revisar Pedido
+                {orderItems.length > 0 && (
+                  <span className="oc-items-badge">{orderItems.length}</span>
+                )}
               </button>
             </div>
           ) : (

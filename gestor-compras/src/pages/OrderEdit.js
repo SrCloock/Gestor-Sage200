@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import api from '../api';
 import ProductCard from '../components/ProductCard';
 import CatalogFilters from '../components/CatalogFilters';
-import { FaCalendarAlt, FaSearch, FaTrash, FaArrowLeft, FaFilter, FaTimes, FaBox } from 'react-icons/fa';
+import { FaCalendarAlt, FaSearch, FaSync, FaTrash, FaArrowLeft, FaFilter, FaTimes, FaBox, FaCheck, FaComment, FaShoppingCart } from 'react-icons/fa';
 import '../styles/OrderEdit.css';
 
 // Componente ProductGrid para OrderEdit
@@ -36,6 +36,7 @@ const ProductGrid = ({ products, onAddProduct, currentPage, totalPages, onPageCh
             key={`${product.CodigoArticulo}-${product.CodigoProveedor || 'NP'}`}
             product={product}
             onAddToOrder={onAddProduct}
+            showAddButton={true}
           />
         ))}
       </div>
@@ -65,7 +66,174 @@ const ProductGrid = ({ products, onAddProduct, currentPage, totalPages, onPageCh
   );
 };
 
-// Componente principal OrderEdit actualizado
+// Componente ResumenPedido para OrderEdit
+const ResumenPedido = ({ 
+  items, 
+  deliveryDate, 
+  comment, 
+  onUpdateQuantity, 
+  onRemoveItem, 
+  onDeliveryDateChange, 
+  onCommentChange 
+}) => {
+  const calcularTotal = () => {
+    return items.reduce((total, item) => {
+      const precio = item.PrecioVenta || 0;
+      return total + (precio * (item.Cantidad || 1));
+    }, 0);
+  };
+
+  if (items.length === 0) {
+    return (
+      <div className="oe-resumen-pedido">
+        <div className="oe-resumen-header">
+          <h3>
+            <FaShoppingCart className="oe-header-icon" />
+            Resumen del Pedido
+          </h3>
+          <span className="oe-total-items">0 productos</span>
+        </div>
+        <div className="oe-empty-cart">
+          <FaBox className="oe-empty-cart-icon" />
+          <p>No hay productos en el pedido</p>
+          <p>Agregue productos desde el catálogo</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="oe-resumen-pedido">
+      <div className="oe-resumen-header">
+        <h3>
+          <FaShoppingCart className="oe-header-icon" />
+          Resumen del Pedido
+        </h3>
+        <span className="oe-total-items">{items.length} productos</span>
+      </div>
+
+      {/* Sección de información del pedido */}
+      <div className="oe-order-info-section">
+        <div className="oe-delivery-section">
+          <div className="oe-delivery-input">
+            <FaCalendarAlt className="oe-input-icon" />
+            <div className="oe-input-group">
+              <label htmlFor="deliveryDate">Fecha de entrega (opcional):</label>
+              <input
+                type="date"
+                id="deliveryDate"
+                value={deliveryDate}
+                onChange={(e) => onDeliveryDateChange(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                className="oe-date-input"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="oe-comment-section">
+          <div className="oe-comment-input">
+            <FaComment className="oe-input-icon" />
+            <div className="oe-input-group">
+              <label>Comentarios del pedido:</label>
+              <textarea 
+                value={comment}
+                onChange={(e) => onCommentChange(e.target.value)}
+                rows="3"
+                placeholder="Agregue comentarios sobre el pedido, instrucciones especiales, etc..."
+                className="oe-comment-textarea"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Lista de productos */}
+      <div className="oe-items-list-container">
+        <div className="oe-items-list-header">
+          <span>Productos seleccionados</span>
+          <span>Cantidad</span>
+        </div>
+        <div className="oe-items-list">
+          {items.map((item, index) => {
+            const itemKey = `${item.CodigoArticulo}-${item.CodigoProveedor || 'NP'}-${index}`;
+            return (
+              <div key={itemKey} className="oe-order-item">
+                <div className="oe-item-info">
+                  <div className="oe-item-image">
+                    <img 
+                      src={item.RutaImagen || '/images/default-product.jpg'} 
+                      alt={item.DescripcionArticulo}
+                      onError={(e) => {
+                        e.target.src = '/images/default-product.jpg';
+                      }}
+                    />
+                  </div>
+                  <div className="oe-item-details">
+                    <h4 className="oe-item-description" title={item.DescripcionArticulo}>
+                      {item.DescripcionArticulo}
+                    </h4>
+                    <div className="oe-item-meta">
+                      <span className="oe-item-code">Código: {item.CodigoArticulo}</span>
+                      {item.NombreProveedor && (
+                        <span className="oe-item-supplier">Proveedor: {item.NombreProveedor}</span>
+                      )}
+                      <span className="oe-item-price">
+                        Precio: {(item.PrecioVenta || 0).toFixed(2)} €
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="oe-item-controls">
+                  <div className="oe-item-quantity">
+                    <label>Cantidad:</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={item.Cantidad || 1}
+                      onChange={(e) => onUpdateQuantity(item, parseInt(e.target.value) || 1)}
+                      className="oe-quantity-input"
+                    />
+                  </div>
+                  
+                  <div className="oe-item-subtotal">
+                    {((item.PrecioVenta || 0) * (item.Cantidad || 1)).toFixed(2)} €
+                  </div>
+                  
+                  <button 
+                    onClick={() => onRemoveItem(item)}
+                    className="oe-remove-item-btn"
+                    title="Eliminar producto"
+                  >
+                    <FaTrash />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Total del pedido */}
+      <div className="oe-order-total-section">
+        <div className="oe-total-line">
+          <span>Total del pedido:</span>
+          <span className="oe-total-amount">{calcularTotal().toFixed(2)} €</span>
+        </div>
+        
+        {deliveryDate && (
+          <div className="oe-delivery-info">
+            <FaCalendarAlt className="oe-info-icon" />
+            <span>Fecha solicitada: {new Date(deliveryDate).toLocaleDateString('es-ES')}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Componente principal OrderEdit
 const OrderEdit = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
@@ -178,7 +346,7 @@ const OrderEdit = () => {
     }
   }, [orderId, user]);
 
-  // Aplicar filtros y búsqueda (igual que en Catalog)
+  // Aplicar filtros y búsqueda
   useEffect(() => {
     let result = [...products];
 
@@ -272,9 +440,7 @@ const OrderEdit = () => {
 
   const handleRemoveItem = (itemToRemove) => {
     setOrderItems(prev => 
-      prev.filter(item => 
-        generateProductKey(item) !== generateProductKey(itemToRemove)
-      )
+      prev.filter(item => generateProductKey(item) !== generateProductKey(itemToRemove))
     );
   };
 
@@ -289,16 +455,16 @@ const OrderEdit = () => {
     );
   };
 
-  const handleSubmitChanges = async () => {
+  const handleSaveOrder = async () => {
     try {
-      setError('');
       setLoading(prev => ({ ...prev, submit: true }));
+      setError('');
 
       const itemsToSend = orderItems.map(item => ({
         CodigoArticulo: item.CodigoArticulo,
         DescripcionArticulo: item.DescripcionArticulo,
         Cantidad: Number(item.Cantidad),
-        PrecioCompra: item.PrecioCompra || item.PrecioVenta,
+        PrecioCompra: item.PrecioVenta,
         CodigoProveedor: item.CodigoProveedor || null,
         CodigoCliente: user.codigoCliente,
         CifDni: user.cifDni
@@ -332,41 +498,20 @@ const OrderEdit = () => {
     }
   };
 
-  const handleRefresh = () => {
-    window.location.reload();
-  };
-
   const calcularTotal = () => {
-    return orderItems.reduce((total, item) => {
+    return orderItems.reduce((sum, item) => {
       const precio = item.PrecioVenta || 0;
-      return total + (precio * item.Cantidad);
+      return sum + (precio * (item.Cantidad || 1));
     }, 0);
   };
 
   const hasActiveFilters = filters.proveedor || filters.precioMin || filters.precioMax;
 
-  if (loading.order || loading.products) {
+  if (loading.order) {
     return (
       <div className="oe-loading-container">
         <div className="oe-spinner"></div>
-        <p>Cargando datos del pedido...</p>
-      </div>
-    );
-  }
-
-  if (error && !loading.order && !loading.products) {
-    return (
-      <div className="oe-error-container">
-        <div className="oe-error-icon">⚠️</div>
-        <p>{error}</p>
-        <div className="oe-error-actions">
-          <button onClick={handleRefresh} className="oe-retry-button">
-            Reintentar
-          </button>
-          <button onClick={() => navigate('/mis-pedidos')} className="oe-back-button">
-            Volver al Historial
-          </button>
-        </div>
+        <p>Cargando pedido...</p>
       </div>
     );
   }
@@ -374,20 +519,34 @@ const OrderEdit = () => {
   return (
     <div className="oe-container">
       <div className="oe-header">
-        <button onClick={() => navigate('/mis-pedidos')} className="oe-back-button">
-          <FaArrowLeft className="oe-back-icon" />
-          Volver al Historial
-        </button>
-        <div className="oe-title-section">
-          <h2>Editar Pedido #{orderId}</h2>
-          <p>Modifique los productos y detalles de su pedido</p>
+        <div className="oe-header-left">
+          <button onClick={() => navigate('/mis-pedidos')} className="oe-back-button">
+            <FaArrowLeft className="oe-back-icon" />
+            Volver a Mis Pedidos
+          </button>
+          <div className="oe-title-section">
+            <FaShoppingCart className="oe-title-icon" />
+            <div>
+              <h2>Editar Pedido #{orderId}</h2>
+              <p className="oe-subtitle">Modifique los productos y la información del pedido</p>
+            </div>
+          </div>
+        </div>
+        <div className="oe-header-actions">
+          <button onClick={() => window.location.reload()} className="oe-refresh-button">
+            <FaSync className="oe-refresh-icon" />
+            Actualizar
+          </button>
         </div>
       </div>
 
       {error && (
         <div className="oe-error-message">
+          <div className="oe-error-icon">⚠️</div>
           <p>{error}</p>
-          <button onClick={() => setError('')} className="oe-error-close">×</button>
+          <button onClick={() => setError('')} className="oe-error-close">
+            <FaTimes />
+          </button>
         </div>
       )}
 
@@ -467,134 +626,37 @@ const OrderEdit = () => {
         </div>
 
         <div className="oe-order-summary">
-          <div className="oe-resumen-pedido">
-            <div className="oe-resumen-header">
-              <h3>Productos en el Pedido</h3>
-              <span className="oe-total-items">{orderItems.length} productos</span>
-            </div>
+          <ResumenPedido
+            items={orderItems}
+            deliveryDate={deliveryDate}
+            comment={comment}
+            onUpdateQuantity={handleUpdateQuantity}
+            onRemoveItem={handleRemoveItem}
+            onDeliveryDateChange={setDeliveryDate}
+            onCommentChange={setComment}
+          />
 
-            <div className="oe-delivery-section">
-              <div className="oe-delivery-input">
-                <FaCalendarAlt className="oe-delivery-icon" />
-                <label htmlFor="deliveryDate">Nueva fecha de entrega (opcional):</label>
-                <input
-                  type="date"
-                  id="deliveryDate"
-                  value={deliveryDate}
-                  onChange={(e) => setDeliveryDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="oe-date-input"
-                />
-              </div>
-            </div>
-
-            <div className="oe-comment-section">
-              <label>Comentarios:</label>
-              <textarea 
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                rows="3"
-                placeholder="Agregue comentarios sobre el pedido..."
-                className="oe-comment-textarea"
-              />
-            </div>
-
-            {orderItems.length === 0 ? (
-              <div className="oe-empty-cart">
-                <FaBox className="oe-empty-cart-icon" />
-                <p>No hay productos en el pedido</p>
-                <p>Agregue productos desde el catálogo</p>
-              </div>
-            ) : (
-              <div className="oe-items-list">
-                {orderItems.map((item) => (
-                  <div key={generateProductKey(item)} className="oe-resumen-item">
-                    <div className="oe-item-info">
-                      <h4 className="oe-item-descripcion" title={item.DescripcionArticulo}>
-                        {item.DescripcionArticulo}
-                      </h4>
-                      <div className="oe-item-details">
-                        <span className="oe-item-precio">
-                          Precio: {(item.PrecioVenta || 0).toFixed(2)} €
-                        </span>
-                        {item.PorcentajeIva && (
-                          <span className="oe-item-iva">
-                            IVA: {item.PorcentajeIva}%
-                          </span>
-                        )}
-                        {item.NombreProveedor && (
-                          <span className="oe-item-proveedor">
-                            Proveedor: {item.NombreProveedor}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="oe-item-controls">
-                      <div className="oe-item-cantidad">
-                        <label>Unidades:</label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={item.Cantidad}
-                          onChange={(e) => handleUpdateQuantity(item, parseInt(e.target.value) || 1)}
-                          className="oe-cantidad-input"
-                        />
-                      </div>
-                      
-                      <div className="oe-item-subtotal">
-                        {((item.PrecioVenta || 0) * item.Cantidad).toFixed(2)} €
-                      </div>
-                      
-                      <button 
-                        onClick={() => handleRemoveItem(item)}
-                        className="oe-remove-item"
-                        title="Eliminar producto"
-                      >
-                        <FaTrash />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="oe-resumen-total">
-              <div className="oe-total-line">
-                <span>Total del pedido:</span>
-                <span className="oe-total-amount">{calcularTotal().toFixed(2)} €</span>
-              </div>
-              
-              {deliveryDate && (
-                <div className="oe-fecha-entrega">
-                  <span>Fecha necesaria:</span>
-                  <span>{new Date(deliveryDate).toLocaleDateString('es-ES')}</span>
-                </div>
+          <div className="oe-actions">
+            <button
+              onClick={handleSaveOrder}
+              disabled={loading.submit || orderItems.length === 0}
+              className="oe-save-button"
+            >
+              {loading.submit ? (
+                <>
+                  <div className="oe-button-spinner"></div>
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <FaCheck className="oe-save-icon" />
+                  Guardar Cambios
+                  {orderItems.length > 0 && (
+                    <span className="oe-items-badge">{orderItems.length}</span>
+                  )}
+                </>
               )}
-            </div>
-
-            <div className="oe-actions">
-              <button
-                onClick={handleSubmitChanges}
-                disabled={loading.submit || orderItems.length === 0}
-                className="oe-submit-button"
-              >
-                {loading.submit ? (
-                  <>
-                    <div className="oe-button-spinner"></div>
-                    Guardando cambios...
-                  </>
-                ) : (
-                  'Guardar Cambios'
-                )}
-              </button>
-              <button
-                onClick={() => navigate('/mis-pedidos')}
-                className="oe-cancel-button"
-              >
-                Cancelar
-              </button>
-            </div>
+            </button>
           </div>
         </div>
       </div>

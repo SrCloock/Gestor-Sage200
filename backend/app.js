@@ -14,13 +14,13 @@ const { connect } = require('./db/Sage200db');
 const { syncImagesWithDB } = require('./controllers/catalogController');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware para servir imágenes
 app.use('/images', express.static(path.join(__dirname, 'public', 'images')));
 
 // Configuración CORS detallada
-const allowedOrigins = ['http://localhost:3000','http://localhost:5000','http://localhost:4000'];
+const allowedOrigins = ['http://localhost:3000','http://localhost:3001','http://localhost:4000'];
 
 const corsOptions = {
   origin: function (origin, callback) {
