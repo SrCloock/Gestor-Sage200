@@ -120,13 +120,13 @@ const OrderList = () => {
   }, [searchTerm, statusFilter, sortBy, orders, getStatusText]);
 
   const handleViewDetails = (orderId) => {
-    navigate(`/mis-pedidos/${orderId}`);
+    navigate(`/api/mis-pedidos/${orderId}`);
   };
 
   const handleEditOrder = (orderId) => {
     const order = orders.find(o => o.NumeroPedido === orderId);
     if (order && canEditOrder(order)) {
-      navigate(`/editar-pedido/${orderId}`);
+      navigate(`/api/editar-pedido/${orderId}`);
     }
   };
 

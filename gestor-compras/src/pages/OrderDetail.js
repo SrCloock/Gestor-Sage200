@@ -189,7 +189,7 @@ const OrderDetail = () => {
       <div className="od-actions">
         {canConfirmReception() && (
           <button 
-            onClick={() => navigate(`/mis-pedidos/${orderId}/recepcion`)}
+            onClick={() => navigate(`/api/mis-pedidos/${orderId}/recepcion`)}
             className="od-action-button od-primary-button"
           >
             Confirmar Recepción

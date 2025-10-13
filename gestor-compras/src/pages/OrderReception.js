@@ -20,7 +20,7 @@ const OrderReception = () => {
     const fetchOrderReception = async () => {
       try {
         setLoading(true);
-        const response = await api.get(`/reception/${orderId}`);
+        const response = await api.get(`/api/reception/${orderId}`);
         
         if (response.data.success) {
           setOrder(response.data.order);
@@ -82,7 +82,7 @@ const OrderReception = () => {
         return;
       }
 
-      const response = await api.post(`/reception/${orderId}/confirm`, {
+      const response = await api.post(`/api/reception/${orderId}/confirm`, {
         items: receptionItems
       });
       
@@ -97,7 +97,7 @@ const OrderReception = () => {
         
         // Esperar y navegar con flag de actualización
         setTimeout(() => {
-          navigate(`/mis-pedidos/${orderId}`, { 
+          navigate(`/api/mis-pedidos/${orderId}`, { 
             state: { 
               refreshed: true,
               receptionConfirmed: true,
@@ -176,7 +176,7 @@ const OrderReception = () => {
             </span>
           </div>
         </div>
-        <button onClick={() => navigate(`/mis-pedidos/${orderId}`)} className="orr-back-button">
+        <button onClick={() => navigate(`/api/mis-pedidos/${orderId}`)} className="orr-back-button">
           ← Volver al detalle
         </button>
       </div>
@@ -299,7 +299,7 @@ const OrderReception = () => {
 
       <div className="orr-actions">
         <button 
-          onClick={() => navigate(`/mis-pedidos/${orderId}`)}
+          onClick={() => navigate(`/api/mis-pedidos/${orderId}`)}
           className="orr-button orr-secondary-button"
         >
           Volver al detalle

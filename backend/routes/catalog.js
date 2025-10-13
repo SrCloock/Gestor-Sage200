@@ -1,4 +1,3 @@
-// routes/catalog.js
 const express = require('express');
 const router = express.Router();
 const { getCatalogProducts, getProductFilters } = require('../controllers/catalogController');

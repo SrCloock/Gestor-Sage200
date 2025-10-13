@@ -28,12 +28,12 @@ api.interceptors.response.use(response => {
   
   if (error.response?.status === 401) {
     const currentPath = window.location.pathname;
-    if (!currentPath.includes('/login')) {
+    if (!currentPath.includes('/api/login')) {
       console.warn('Sesión expirada, redirigiendo a login...');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       setTimeout(() => {
-        window.location.href = '/login';
+        window.location.href = '/api/login';
       }, 100);
     }
   }
@@ -48,7 +48,7 @@ api.interceptors.response.use(response => {
 // ========== AUTENTICACIÓN ==========
 export const loginUser = async (credentials) => {
   try {
-    const response = await api.post('/auth/login', credentials);
+    const response = await api.post('/api/auth/login', credentials);
     return response;
   } catch (error) {
     console.error('Error en login:', error);
@@ -57,17 +57,17 @@ export const loginUser = async (credentials) => {
 };
 
 export const getProfile = () => {
-  return api.get('/auth/me');
+  return api.get('/api/auth/me');
 };
 
 export const adminLogin = (credentials) => {
-  return api.post('/admin/login', credentials);
+  return api.post('/api/admin/login', credentials);
 };
 
 // ========== PRODUCTOS ==========
 export const getProducts = async () => {
   try {
-    const response = await api.get('/products');
+    const response = await api.get('/api/products');
     return response;
   } catch (error) {
     console.error('Error obteniendo productos:', error);
@@ -76,17 +76,17 @@ export const getProducts = async () => {
 };
 
 export const searchProducts = (filters) => {
-  return api.get('/products/search', { params: filters });
+  return api.get('/api/products/search', { params: filters });
 };
 
 export const getProductById = (id) => {
-  return api.get(`/products/${id}`);
+  return api.get('/api/products/${id}');
 };
 
 // ========== PEDIDOS ==========
 export const createOrder = async (orderData) => {
   try {
-    const response = await api.post('/orders', orderData);
+    const response = await api.post('/api/orders', orderData);
     return response;
   } catch (error) {
     console.error('Error creando pedido:', error);
@@ -99,7 +99,7 @@ export const createOrder = async (orderData) => {
 
 export const getOrders = async (CodigoCliente) => {
   try {
-    const response = await api.get(`/orders/${CodigoCliente}`);
+    const response = await api.get('/api/orders/${CodigoCliente}');
     return response;
   } catch (error) {
     console.error('Error obteniendo pedidos:', error);
@@ -108,18 +108,18 @@ export const getOrders = async (CodigoCliente) => {
 };
 
 export const getOrderDetail = (CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido) => {
-  return api.get('/orders/detail', {
+  return api.get('/api/orders/detail', {
     params: { CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido }
   });
 };
 
 // ========== ADMINISTRACIÓN ==========
 export const createUser = (userData) => {
-  return api.post('/admin/users', userData);
+  return api.post('/api/admin/users', userData);
 };
 
 export const getLastClientCode = () => {
-  return api.get('/admin/last-client-code');
+  return api.get('/api/admin/last-client-code');
 };
 
 export default api;

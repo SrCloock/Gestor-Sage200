@@ -67,6 +67,8 @@ const getPendingOrders = async (req, res) => {
           StatusAprobado,
           SeriePedido,
           BaseImponible,
+          TotalIva,
+          ImporteLiquido,
           FechaNecesaria,
           ObservacionesPedido,
           CodigoCliente
@@ -106,7 +108,7 @@ const getPendingOrders = async (req, res) => {
     res.status(200).json({
       success: true,
       orders: result.recordset,
-      paginacion: {
+      pagination: {
         pagina: parseInt(page),
         porPagina: parseInt(limit),
         total,

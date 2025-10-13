@@ -33,10 +33,10 @@ const ProductCard = ({ product, onAddToOrder, showAddButton = true }) => {
     
     // Si es una ruta relativa, construir URL completa
     if (RutaImagen.startsWith('/')) {
-      return `http://localhost:3000${RutaImagen}`;
+      return 'http://localhost:3000${RutaImagen}';
     }
     
-    return `/images/products/${RutaImagen}`;
+    return '/api/images/products/${RutaImagen}';
   };
 
   const handleAddClick = () => {
@@ -77,11 +77,6 @@ const ProductCard = ({ product, onAddToOrder, showAddButton = true }) => {
               <span>{NombreProveedor}</span>
             </div>
           )}
-          
-          <div className="product-tax">
-            <FaBox className="meta-icon" />
-            <span>IVA: {PorcentajeIva}%</span>
-          </div>
         </div>
       </div>
       

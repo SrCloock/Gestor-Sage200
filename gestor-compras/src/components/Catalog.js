@@ -1,4 +1,4 @@
-// components/Catalog.js
+// components/Catalog.js - VERSIÓN CON PAGINACIÓN Y ESTÉTICA ORIGINAL
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api';
@@ -10,7 +10,6 @@ import '../styles/Catalog.css';
 const Catalog = () => {
   const { user } = useContext(AuthContext);
   const [products, setProducts] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,97 +19,124 @@ const Catalog = () => {
     precioMax: ''
   });
   const [sortBy, setSortBy] = useState('nombre');
+  
+  // Estados de paginación
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0
+  });
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        
-        const response = await api.get('/api/catalog/products');
-        
-        if (response.data.success) {
-          setProducts(response.data.products);
-          setFilteredProducts(response.data.products);
-        } else {
-          setError('Error al cargar los productos');
-        }
-      } catch (err) {
-        console.error('Error fetching products:', err);
-        setError('Error al conectar con el servidor');
-      } finally {
-        setLoading(false);
+  // Función para buscar productos con todos los parámetros
+  const fetchProducts = async (page = 1) => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      const params = {
+        page,
+        limit: pagination.limit,
+        sortBy,
+        ...(searchTerm && { search: searchTerm }),
+        ...(filters.proveedor && { proveedor: filters.proveedor }),
+        ...(filters.precioMin && { precioMin: filters.precioMin }),
+        ...(filters.precioMax && { precioMax: filters.precioMax })
+      };
+
+      const response = await api.get('/api/catalog/products', { params });
+      
+      if (response.data.success) {
+        setProducts(response.data.products);
+        setPagination({
+          page: response.data.pagination.page,
+          limit: response.data.pagination.limit,
+          total: response.data.pagination.total,
+          totalPages: response.data.pagination.totalPages
+        });
+      } else {
+        setError('Error al cargar los productos');
       }
-    };
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setError('Error al conectar con el servidor');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchProducts();
-  }, []);
-
-  // Aplicar filtros y búsqueda
+  // Cargar productos cuando cambien los filtros, búsqueda u ordenamiento
   useEffect(() => {
-    let result = [...products];
+    fetchProducts(1);
+  }, [searchTerm, filters, sortBy]);
 
-    // Filtro de búsqueda
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter(product => 
-        product.DescripcionArticulo?.toLowerCase().includes(term) ||
-        product.CodigoArticulo?.toLowerCase().includes(term) ||
-        product.NombreProveedor?.toLowerCase().includes(term)
-      );
+  // Cambiar de página
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      fetchProducts(newPage);
     }
-
-    // Filtro por proveedor
-    if (filters.proveedor) {
-      result = result.filter(product => 
-        product.CodigoProveedor === filters.proveedor
-      );
-    }
-
-    // Filtro por precio mínimo
-    if (filters.precioMin) {
-      result = result.filter(product => 
-        product.PrecioVenta >= parseFloat(filters.precioMin)
-      );
-    }
-
-    // Filtro por precio máximo
-    if (filters.precioMax) {
-      result = result.filter(product => 
-        product.PrecioVenta <= parseFloat(filters.precioMax)
-      );
-    }
-
-    // Ordenar
-    result.sort((a, b) => {
-      switch (sortBy) {
-        case 'nombre':
-          return a.DescripcionArticulo.localeCompare(b.DescripcionArticulo);
-        case 'precio-asc':
-          return a.PrecioVenta - b.PrecioVenta;
-        case 'precio-desc':
-          return b.PrecioVenta - a.PrecioVenta;
-        case 'proveedor':
-          return a.NombreProveedor.localeCompare(b.NombreProveedor);
-        default:
-          return 0;
-      }
-    });
-
-    setFilteredProducts(result);
-  }, [products, searchTerm, filters, sortBy]);
+  };
 
   const handleAddToOrder = (product) => {
-    // Esta función se conectará con el sistema de pedidos
     console.log('Añadir al pedido:', product);
-    // Aquí implementarás la lógica para añadir al carrito/pedido
   };
 
   const handleRefresh = () => {
-    window.location.reload();
+    fetchProducts(pagination.page);
   };
 
-  if (loading) {
+  // Generar botones de paginación
+  const renderPaginationButtons = () => {
+    const buttons = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, pagination.page - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(pagination.totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    // Botón anterior
+    buttons.push(
+      <button
+        key="prev"
+        onClick={() => handlePageChange(pagination.page - 1)}
+        disabled={pagination.page === 1}
+        className="pagination-btn"
+      >
+        ‹
+      </button>
+    );
+
+    // Botones de páginas
+    for (let i = startPage; i <= endPage; i++) {
+      buttons.push(
+        <button
+          key={i}
+          onClick={() => handlePageChange(i)}
+          className={`pagination-btn ${pagination.page === i ? 'active' : ''}`}
+        >
+          {i}
+        </button>
+      );
+    }
+
+    // Botón siguiente
+    buttons.push(
+      <button
+        key="next"
+        onClick={() => handlePageChange(pagination.page + 1)}
+        disabled={pagination.page === pagination.totalPages}
+        className="pagination-btn"
+      >
+        ›
+      </button>
+    );
+
+    return buttons;
+  };
+
+  if (loading && products.length === 0) {
     return (
       <div className="catalog-loading">
         <div className="loading-spinner"></div>
@@ -119,7 +145,7 @@ const Catalog = () => {
     );
   }
 
-  if (error) {
+  if (error && products.length === 0) {
     return (
       <div className="catalog-error">
         <div className="error-icon">⚠️</div>
@@ -140,7 +166,7 @@ const Catalog = () => {
           <h1>Catálogo de Productos</h1>
         </div>
         <p className="catalog-subtitle">
-          {filteredProducts.length} productos disponibles
+          Mostrando {((pagination.page - 1) * pagination.limit) + 1} - {Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total} productos
         </p>
       </div>
 
@@ -185,16 +211,16 @@ const Catalog = () => {
         />
         
         <div className="products-grid">
-          {filteredProducts.length === 0 ? (
+          {products.length === 0 ? (
             <div className="no-products">
               <div className="no-products-icon">🔍</div>
               <h3>No se encontraron productos</h3>
               <p>Intenta ajustar los filtros o términos de búsqueda</p>
             </div>
           ) : (
-            filteredProducts.map(product => (
+            products.map(product => (
               <ProductCard
-                key={product.CodigoArticulo}
+                key={`${product.CodigoArticulo}-${product.CodigoProveedor || 'NP'}`}
                 product={product}
                 onAddToOrder={handleAddToOrder}
               />
@@ -202,6 +228,33 @@ const Catalog = () => {
           )}
         </div>
       </div>
+
+      {/* Paginación */}
+      {pagination.totalPages > 1 && (
+        <div className="pagination-container">
+          <div className="pagination-info">
+            Página {pagination.page} de {pagination.totalPages}
+          </div>
+          <div className="pagination-controls">
+            {renderPaginationButtons()}
+          </div>
+          <div className="pagination-size">
+            <label>Mostrar:</label>
+            <select
+              value={pagination.limit}
+              onChange={(e) => {
+                setPagination(prev => ({ ...prev, limit: parseInt(e.target.value), page: 1 }));
+                setTimeout(() => fetchProducts(1), 0);
+              }}
+            >
+              <option value="12">12</option>
+              <option value="20">20</option>
+              <option value="40">40</option>
+              <option value="60">60</option>
+            </select>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
