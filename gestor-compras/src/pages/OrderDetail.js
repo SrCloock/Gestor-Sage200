@@ -77,6 +77,11 @@ const OrderDetail = () => {
     return 'Desconocido';
   };
 
+  // CORREGIDO: Navegación sin /api
+  const handleConfirmReception = () => {
+    navigate(`/mis-pedidos/${orderId}/recepcion`);
+  };
+
   const handleRefresh = () => {
     window.location.reload();
   };
@@ -189,7 +194,7 @@ const OrderDetail = () => {
       <div className="od-actions">
         {canConfirmReception() && (
           <button 
-            onClick={() => navigate(`/api/mis-pedidos/${orderId}/recepcion`)}
+            onClick={handleConfirmReception}
             className="od-action-button od-primary-button"
           >
             Confirmar Recepción

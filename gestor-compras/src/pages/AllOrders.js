@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import api from '../api';
 import { FaSearch, FaSort, FaSortUp, FaSortDown, FaTimes, FaSync, FaEye, FaFilter } from 'react-icons/fa';
 import '../styles/AllOrders.css';
 
@@ -28,6 +28,7 @@ const AllOrders = () => {
   const [showFilters, setShowFilters] = useState(false);
 
   const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (user && user.isAdmin) {
@@ -40,7 +41,7 @@ const AllOrders = () => {
       setLoading(true);
       setError('');
       
-      const params = {
+      const params = new URLSearchParams({
         page: pagination.page,
         limit: pagination.limit,
         ordenarPor: sorting.field,
@@ -50,27 +51,42 @@ const AllOrders = () => {
         ...(filters.importeMin && { importeMin: filters.importeMin }),
         ...(filters.importeMax && { importeMax: filters.importeMax }),
         ...(filters.estado && { estado: filters.estado })
-      };
+      }).toString();
 
-      const response = await api.get('/admin/all-orders', { params });
+      // CORREGIDO: Usar fetch en lugar de api.get para mejor control de errores
+      const response = await fetch(`/api/admin/all-orders?${params}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        throw new Error(`El servidor devolvió HTML en lugar de JSON: ${text.substring(0, 100)}...`);
+      }
+
+      const data = await response.json();
       
-      if (response.data.success) {
-        setOrders(response.data.orders || []);
+      if (data.success) {
+        setOrders(data.orders || []);
         setPagination(prev => ({
           ...prev,
-          total: response.data.pagination?.total || 0,
-          totalPages: response.data.pagination?.totalPages || 0
+          total: data.pagination?.total || 0,
+          totalPages: data.pagination?.totalPages || 0
         }));
       } else {
-        setError(response.data.message || 'Error al cargar pedidos');
+        setError(data.message || 'Error al cargar pedidos');
       }
     } catch (error) {
       console.error('Error fetching all orders:', error);
-      if (error.response?.status === 404) {
-        setError('El servicio de pedidos no está disponible. Contacte al administrador.');
-      } else {
-        setError('Error al cargar los pedidos: ' + (error.message || 'Error desconocido'));
-      }
+      setError(error.message || 'Error al cargar los pedidos');
     } finally {
       setLoading(false);
     }
@@ -117,8 +133,9 @@ const AllOrders = () => {
     }
   };
 
+  // CORREGIDO: Navegación sin /api
   const handleViewDetails = (orderId) => {
-    window.open(`/api/admin/orders/${orderId}`, '_blank');
+    navigate(`/mis-pedidos/${orderId}`);
   };
 
   const handleFilterChange = (e) => {
@@ -283,6 +300,9 @@ const AllOrders = () => {
         <div className="ao-error-message">
           <div className="ao-error-icon">⚠️</div>
           <p>{error}</p>
+          <button onClick={() => setError('')} className="ao-error-close">
+            <FaTimes />
+          </button>
         </div>
       )}
 
@@ -414,7 +434,7 @@ const AllOrders = () => {
                       <td className="ao-order-cif">{order.CifDni}</td>
                       <td className="ao-order-lines">{order.NumeroLineas}</td>
                       <td className="ao-order-amount">
-                        {formatCurrency(order.ImporteLiquido)}
+                        {formatCurrency(order.ImporteLiquido || 0)}
                       </td>
                       <td className="ao-order-status">
                         <span className={`ao-status-badge ${getStatusBadgeClass(order)}`}>

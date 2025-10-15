@@ -1,92 +1,105 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 
+// Crear el contexto - ESTA ES LA CLAVE
 export const AuthContext = createContext();
 
+// Provider component
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
+  // Verificar sesión al cargar
   useEffect(() => {
-
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const userData = JSON.parse(storedUser);
-        setUser(userData);
-        console.log('Usuario cargado desde localStorage:', userData);
-      } catch (parseError) {
-        console.error('Error parseando usuario desde localStorage:', parseError);
-        localStorage.removeItem('user');
-      }
-    }
-    setLoading(false);
+    checkAuth();
   }, []);
+
+  const checkAuth = async () => {
+    try {
+      const response = await fetch('/api/auth/user', {
+        method: 'GET',
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setUser(data.user);
+        }
+      }
+    } catch (error) {
+      console.error('Error verificando autenticación:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const login = async (username, password) => {
     try {
-      setError('');
-      console.log('Intentando login para usuario:', username);
+      setLoading(true);
       
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
         },
-        body: JSON.stringify({ username, password })
+        credentials: 'include',
+        body: JSON.stringify({ username, password }),
       });
-      
-      // Verificar si la respuesta es JSON válida
+
+      // Verificar si la respuesta es OK antes de verificar el content-type
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
-        console.error('Respuesta no JSON:', text.substring(0, 200));
-        throw new Error('El servidor devolvió una respuesta inválida');
+        throw new Error(`El servidor devolvió HTML en lugar de JSON: ${text.substring(0, 100)}...`);
       }
-      
+
       const data = await response.json();
-      console.log('Respuesta del login:', data);
       
       if (data.success) {
         setUser(data.user);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        console.log('Login exitoso para usuario:', data.user);
-        return true;
+        return { success: true, user: data.user };
       } else {
-        throw new Error(data.message || 'Error en el login');
+        return { success: false, message: data.message };
       }
     } catch (error) {
       console.error('Login error:', error);
-      setError(error.message || 'Error de conexión con el servidor');
-      return false;
+      throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
-  const logout = () => {
-    console.log('Cerrando sesión...');
-    setUser(null);
-    setError('');
-    localStorage.removeItem('user');
-    setTimeout(() => {
-      window.location.href = '/login';
-    }, 100);
+  const logout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (error) {
+      console.error('Error en logout:', error);
+    } finally {
+      setUser(null);
+    }
   };
 
-  const clearError = () => {
-    setError('');
+  const value = {
+    user,
+    login,
+    logout,
+    loading,
+    checkAuth
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      error,
-      login, 
-      logout,
-      clearError 
-    }}>
-      {!loading && children}
+    <AuthContext.Provider value={value}>
+      {children}
     </AuthContext.Provider>
   );
 };
+
+// Exportación por defecto para compatibilidad
+export default AuthContext;

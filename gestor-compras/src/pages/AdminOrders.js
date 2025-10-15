@@ -56,6 +56,7 @@ const AdminOrders = () => {
         ...(filtros.fechaHasta && { fechaHasta: filtros.fechaHasta })
       }).toString();
 
+      // CORREGIDO: Ruta API correcta
       const response = await fetch(`/api/admin/orders/pending?${params}`, {
         method: 'GET',
         credentials: 'include',
@@ -63,6 +64,11 @@ const AdminOrders = () => {
           'Content-Type': 'application/json',
         },
       });
+
+      // Manejo mejorado de errores
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
 
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
@@ -73,25 +79,25 @@ const AdminOrders = () => {
       const data = await response.json();
       
       if (data.success) {
-        setOrders(data.orders);
+        setOrders(data.orders || []);
         
         // CORRECCIÓN: Verificación segura para paginacion
-        const paginationData = data.paginacion || {
-          total: data.orders?.length || 0,
-          totalPaginas: Math.ceil((data.orders?.length || 0) / paginacion.porPagina) || 1
+        const paginationData = data.pagination || data.paginacion || {
+          total: (data.orders || []).length,
+          totalPaginas: Math.ceil((data.orders || []).length / paginacion.porPagina) || 1
         };
         
         setPaginacion(prev => ({
           ...prev,
-          total: paginationData.total,
-          totalPaginas: paginationData.totalPaginas
+          total: paginationData.total || 0,
+          totalPaginas: paginationData.totalPages || paginationData.totalPaginas || 1
         }));
       } else {
         setError(data.message || 'Error al cargar los pedidos');
       }
     } catch (error) {
       console.error('Error fetching orders:', error);
-      setError('Error de configuración del servidor. Contacte al administrador.');
+      setError(error.message || 'Error de configuración del servidor. Contacte al administrador.');
     } finally {
       setLoading(false);
     }
@@ -99,6 +105,7 @@ const AdminOrders = () => {
 
   const fetchOrderDetails = async (orderId) => {
     try {
+      // CORREGIDO: Ruta API correcta
       const response = await fetch(`/api/admin/orders/${orderId}`, {
         method: 'GET',
         credentials: 'include',
@@ -107,15 +114,18 @@ const AdminOrders = () => {
         },
       });
 
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
       const data = await response.json();
       
       if (data.success) {
         setSelectedOrder(data.order);
         setEditedOrder({
           ...data.order,
-          Productos: data.order.Productos.map(product => ({ 
+          Productos: (data.order.Productos || []).map(product => ({ 
             ...product,
-            // CORREGIDO: Usar PrecioVentaconIVA1 como prioridad, luego Precio
             PrecioFinal: product.PrecioVentaconIVA1 || product.Precio || 0
           }))
         });
@@ -124,11 +134,13 @@ const AdminOrders = () => {
       }
     } catch (error) {
       console.error('Error fetching order details:', error);
-      setError('Error al cargar los detalles del pedido');
+      setError(error.message || 'Error al cargar los detalles del pedido');
     }
   };
 
   const handleQuantityChange = (index, newQuantity) => {
+    if (!editedOrder?.Productos) return;
+    
     const updatedProducts = [...editedOrder.Productos];
     updatedProducts[index].UnidadesPedidas = Math.max(0, parseInt(newQuantity) || 0);
     setEditedOrder({
@@ -137,8 +149,9 @@ const AdminOrders = () => {
     });
   };
 
-  // FUNCIÓN: Eliminar producto del pedido
   const handleRemoveProduct = (index) => {
+    if (!editedOrder?.Productos) return;
+    
     const updatedProducts = [...editedOrder.Productos];
     updatedProducts.splice(index, 1);
     setEditedOrder({
@@ -152,12 +165,18 @@ const AdminOrders = () => {
       setLoading(true);
       setError('');
       
+      if (!editedOrder?.Productos) {
+        setError('No hay datos del pedido para procesar');
+        return;
+      }
+
       // Validar que hay al menos un producto con cantidad > 0
       const validProducts = editedOrder.Productos.filter(product => product.UnidadesPedidas > 0);
       
       // Si no hay productos válidos, enviar array vacío para eliminar el pedido
       const productsToSend = validProducts.length > 0 ? validProducts : [];
 
+      // CORREGIDO: Ruta API correcta
       const response = await fetch(`/api/admin/orders/${selectedOrder.NumeroPedido}/approve`, {
         method: 'PUT',
         credentials: 'include',
@@ -169,10 +188,14 @@ const AdminOrders = () => {
         })
       });
 
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
       const data = await response.json();
       
       if (data.success) {
-        setSuccessMessage(data.message);
+        setSuccessMessage(data.message || 'Pedido aprobado correctamente');
         fetchPendingOrders();
         setTimeout(() => {
           setSelectedOrder(null);
@@ -184,7 +207,7 @@ const AdminOrders = () => {
       }
     } catch (error) {
       console.error('Error approving order:', error);
-      setError('Error al procesar el pedido');
+      setError(error.message || 'Error al procesar el pedido');
     } finally {
       setLoading(false);
     }
@@ -200,6 +223,7 @@ const AdminOrders = () => {
 
   const aplicarFiltros = () => {
     setPaginacion(prev => ({ ...prev, pagina: 1 }));
+    fetchPendingOrders();
   };
 
   const limpiarFiltros = () => {
@@ -233,11 +257,12 @@ const AdminOrders = () => {
   };
 
   const cambiarItemsPorPagina = (cantidad) => {
-    setPaginacion(prev => ({ 
-      ...prev, 
-      porPagina: cantidad,
-      pagina: 1
-    }));
+    setPaginacion({ 
+      pagina: 1,
+      porPagina: parseInt(cantidad),
+      total: paginacion.total,
+      totalPaginas: Math.ceil(paginacion.total / parseInt(cantidad))
+    });
   };
 
   const generateProductKey = (product, index) => {
@@ -246,8 +271,12 @@ const AdminOrders = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES');
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('es-ES');
+    } catch (error) {
+      return 'Fecha inválida';
+    }
   };
 
   const formatCurrency = (amount) => {
@@ -257,20 +286,16 @@ const AdminOrders = () => {
     }).format(amount || 0);
   };
 
-  // FUNCIÓN CORREGIDA: Obtener el precio correcto del producto
   const getProductPrice = (product) => {
-    // Priorizar PrecioVentaconIVA1, si no está disponible usar Precio
     return product.PrecioVentaconIVA1 || product.Precio || 0;
   };
 
-  // FUNCIÓN NUEVA: Calcular el total por producto
   const calculateProductTotal = (product) => {
     const precio = getProductPrice(product);
     const cantidad = product.UnidadesPedidas || 0;
     return precio * cantidad;
   };
 
-  // FUNCIÓN NUEVA: Calcular el total general del pedido (con IVA)
   const calculateOrderTotal = () => {
     if (!editedOrder || !editedOrder.Productos) return 0;
     return editedOrder.Productos.reduce((total, product) => {
@@ -278,15 +303,11 @@ const AdminOrders = () => {
     }, 0);
   };
 
-  // FUNCIÓN NUEVA: Calcular el importe líquido (con IVA) para mostrar en la lista principal
   const getOrderTotalWithIVA = (order) => {
-    // Si el pedido ya tiene ImporteLiquido, usarlo (ya incluye IVA)
     if (order.ImporteLiquido !== undefined && order.ImporteLiquido !== null) {
       return order.ImporteLiquido;
     }
     
-    // Si no, calcularlo a partir de BaseImponible + IVA aproximado
-    // Asumiendo un 21% de IVA si no tenemos el TotalIVA
     const base = order.BaseImponible || 0;
     const iva = order.TotalIVA || (base * 0.21);
     return base + iva;
@@ -337,6 +358,9 @@ const AdminOrders = () => {
         <div className="ao-error-message">
           <div className="ao-error-icon">⚠️</div>
           <p>{error}</p>
+          <button onClick={() => setError('')} className="ao-error-close">
+            <FaTimes />
+          </button>
         </div>
       )}
       
@@ -426,14 +450,18 @@ const AdminOrders = () => {
             <div className="ao-stat-card">
               <div className="ao-stat-icon">⏳</div>
               <div className="ao-stat-content">
-                <span className="ao-stat-value">{orders.filter(o => new Date(o.FechaNecesaria) < new Date()).length}</span>
+                <span className="ao-stat-value">
+                  {orders.filter(o => new Date(o.FechaNecesaria) < new Date()).length}
+                </span>
                 <span className="ao-stat-label">Urgentes</span>
               </div>
             </div>
             <div className="ao-stat-card">
               <div className="ao-stat-icon">✅</div>
               <div className="ao-stat-content">
-                <span className="ao-stat-value">{orders.filter(o => o.StatusAprobado === -1).length}</span>
+                <span className="ao-stat-value">
+                  {orders.filter(o => o.StatusAprobado === -1).length}
+                </span>
                 <span className="ao-stat-label">Aprobados</span>
               </div>
             </div>
@@ -493,7 +521,6 @@ const AdminOrders = () => {
                       <td className="ao-order-client">{order.RazonSocial}</td>
                       <td className="ao-order-cif">{order.CifDni}</td>
                       <td className="ao-order-lines">{order.NumeroLineas}</td>
-                      {/* CORREGIDO: Mostrar ImporteLiquido (con IVA) en lugar de BaseImponible (sin IVA) */}
                       <td className="ao-order-amount">
                         {formatCurrency(getOrderTotalWithIVA(order))}
                       </td>
@@ -532,12 +559,14 @@ const AdminOrders = () => {
                 <button 
                   onClick={() => cambiarPagina(1)} 
                   disabled={paginacion.pagina === 1}
+                  className="ao-pagination-btn"
                 >
                   «
                 </button>
                 <button 
                   onClick={() => cambiarPagina(paginacion.pagina - 1)} 
                   disabled={paginacion.pagina === 1}
+                  className="ao-pagination-btn"
                 >
                   ‹
                 </button>
@@ -554,7 +583,7 @@ const AdminOrders = () => {
                     <button
                       key={paginaNum}
                       onClick={() => cambiarPagina(paginaNum)}
-                      className={paginacion.pagina === paginaNum ? 'ao-pagina-activa' : ''}
+                      className={`ao-pagination-btn ${paginacion.pagina === paginaNum ? 'ao-pagination-active' : ''}`}
                     >
                       {paginaNum}
                     </button>
@@ -564,12 +593,14 @@ const AdminOrders = () => {
                 <button 
                   onClick={() => cambiarPagina(paginacion.pagina + 1)} 
                   disabled={paginacion.pagina === paginacion.totalPaginas}
+                  className="ao-pagination-btn"
                 >
                   ›
                 </button>
                 <button 
                   onClick={() => cambiarPagina(paginacion.totalPaginas)} 
                   disabled={paginacion.pagina === paginacion.totalPaginas}
+                  className="ao-pagination-btn"
                 >
                   »
                 </button>
@@ -579,7 +610,7 @@ const AdminOrders = () => {
                 <label>Mostrar:</label>
                 <select
                   value={paginacion.porPagina}
-                  onChange={(e) => cambiarItemsPorPagina(parseInt(e.target.value))}
+                  onChange={(e) => cambiarItemsPorPagina(e.target.value)}
                 >
                   <option value="10">10</option>
                   <option value="25">25</option>
@@ -638,7 +669,6 @@ const AdminOrders = () => {
                 </div>
               </div>
               
-              {/* NUEVO: Card de resumen de totales */}
               <div className="ao-info-card">
                 <div className="ao-card-header">
                   <h3>Resumen del Pedido</h3>
@@ -659,7 +689,7 @@ const AdminOrders = () => {
             
             <h3 className="ao-products-title">Productos</h3>
             <div className="ao-products-container">
-              {editedOrder.Productos && editedOrder.Productos.length === 0 ? (
+              {!editedOrder.Productos || editedOrder.Productos.length === 0 ? (
                 <div className="ao-empty-products">
                   <div className="ao-empty-products-icon">📦</div>
                   <p>No hay productos en este pedido</p>
@@ -679,7 +709,7 @@ const AdminOrders = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {editedOrder.Productos && editedOrder.Productos.map((product, index) => (
+                    {editedOrder.Productos.map((product, index) => (
                       <tr key={generateProductKey(product, index)} className="ao-product-row">
                         <td className="ao-product-code">{product.CodigoArticulo}</td>
                         <td className="ao-product-desc">{product.DescripcionArticulo}</td>
@@ -692,7 +722,6 @@ const AdminOrders = () => {
                             className="ao-quantity-input"
                           />
                         </td>
-                        {/* CORREGIDO: Mostrar precio con IVA */}
                         <td className="ao-product-price">
                           {formatCurrency(getProductPrice(product))}
                         </td>

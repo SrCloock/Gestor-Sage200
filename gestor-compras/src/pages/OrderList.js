@@ -51,7 +51,7 @@ const OrderList = () => {
         setError('');
         console.log('Obteniendo pedidos para cliente:', user?.codigoCliente);
         
-        const response = await api.get('/orders', {
+        const response = await api.get('/api/orders', {
           params: { codigoCliente: user?.codigoCliente }
         });
         
@@ -119,14 +119,15 @@ const OrderList = () => {
     return result;
   }, [searchTerm, statusFilter, sortBy, orders, getStatusText]);
 
+  // CORREGIDO: Rutas de navegación sin /api
   const handleViewDetails = (orderId) => {
-    navigate(`/api/mis-pedidos/${orderId}`);
+    navigate(`/mis-pedidos/${orderId}`);
   };
 
   const handleEditOrder = (orderId) => {
     const order = orders.find(o => o.NumeroPedido === orderId);
     if (order && canEditOrder(order)) {
-      navigate(`/api/editar-pedido/${orderId}`);
+      navigate(`/editar-pedido/${orderId}`);
     }
   };
 
