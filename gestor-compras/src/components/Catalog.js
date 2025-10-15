@@ -44,7 +44,7 @@ const Catalog = () => {
         ...(filters.precioMax && { precioMax: filters.precioMax })
       };
 
-      const response = await api.get('/api/catalog/products', { params });
+      const response = await api.get('/catalog/products', { params });
       
       if (response.data.success) {
         setProducts(response.data.products);

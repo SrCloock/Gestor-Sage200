@@ -11,7 +11,7 @@ const CatalogFilters = ({ filters, onFiltersChange }) => {
   useEffect(() => {
     const fetchFilters = async () => {
       try {
-        const response = await api.get('/api/catalog/filters');
+        const response = await api.get('/catalog/filters');
         if (response.data.success) {
           setProveedores(response.data.filters.proveedores);
         }

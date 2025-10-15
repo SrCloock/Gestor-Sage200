@@ -1,6 +1,6 @@
 // components/ProductCard.js - Versión mejorada
 import React from 'react';
-import { FaShoppingCart, FaTag, FaUserTie, FaBox } from 'react-icons/fa';
+import { FaShoppingCart, FaTag, FaUserTie } from 'react-icons/fa';
 import '../styles/ProductCard.css';
 
 const ProductCard = ({ product, onAddToOrder, showAddButton = true }) => {
@@ -9,34 +9,33 @@ const ProductCard = ({ product, onAddToOrder, showAddButton = true }) => {
     DescripcionArticulo,
     PrecioVenta,
     NombreProveedor,
-    PorcentajeIva,
     RutaImagen
   } = product;
 
   // Función mejorada para manejar errores de imagen
   const handleImageError = (e) => {
-    console.log('Error cargando imagen:', RutaImagen);
+    console.warn('Error cargando imagen:', RutaImagen);
     e.target.src = '/images/default-product.jpg';
     e.target.onerror = null; // Prevenir bucles
   };
 
-  // Función para construir la URL de la imagen
+  // 🖼️ Construir la URL de la imagen correctamente
   const getImageUrl = () => {
-    if (!RutaImagen) {
-      return '/images/default-product.jpg';
-    }
-    
-    // Si la ruta ya es una URL completa
-    if (RutaImagen.startsWith('http')) {
-      return RutaImagen;
-    }
-    
-    // Si es una ruta relativa, construir URL completa
+    if (!RutaImagen) return '/images/default-product.jpg';
+
+    // Si ya es URL completa (http o https)
+    if (RutaImagen.startsWith('http')) return RutaImagen;
+
+    // ✅ Usar variable de entorno o fallback a /api
+    const baseURL = process.env.REACT_APP_API_URL || '/api';
+
+    // Si empieza con "/", ejemplo "/images/product.jpg"
     if (RutaImagen.startsWith('/')) {
-      return 'http://localhost:3000${RutaImagen}';
+      return `${baseURL}${RutaImagen}`;
     }
-    
-    return '/api/images/products/${RutaImagen}';
+
+    // Si es solo el nombre de la imagen (ruta relativa en BD)
+    return `${baseURL}/images/products/${RutaImagen}`;
   };
 
   const handleAddClick = () => {

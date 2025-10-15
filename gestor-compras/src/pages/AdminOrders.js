@@ -56,7 +56,7 @@ const AdminOrders = () => {
         ...(filtros.fechaHasta && { fechaHasta: filtros.fechaHasta })
       }).toString();
 
-      const response = await fetch(`http://localhost:3000/api/admin/orders/pending?${params}`, {
+      const response = await fetch(`/api/admin/orders/pending?${params}`, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -74,10 +74,17 @@ const AdminOrders = () => {
       
       if (data.success) {
         setOrders(data.orders);
+        
+        // CORRECCIÓN: Verificación segura para paginacion
+        const paginationData = data.paginacion || {
+          total: data.orders?.length || 0,
+          totalPaginas: Math.ceil((data.orders?.length || 0) / paginacion.porPagina) || 1
+        };
+        
         setPaginacion(prev => ({
           ...prev,
-          total: data.paginacion.total,
-          totalPaginas: data.paginacion.totalPaginas
+          total: paginationData.total,
+          totalPaginas: paginationData.totalPaginas
         }));
       } else {
         setError(data.message || 'Error al cargar los pedidos');
@@ -92,7 +99,7 @@ const AdminOrders = () => {
 
   const fetchOrderDetails = async (orderId) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/admin/orders/${orderId}`, {
+      const response = await fetch(`/api/admin/orders/${orderId}`, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -151,7 +158,7 @@ const AdminOrders = () => {
       // Si no hay productos válidos, enviar array vacío para eliminar el pedido
       const productsToSend = validProducts.length > 0 ? validProducts : [];
 
-      const response = await fetch(`http://localhost:3000/api/admin/orders/${selectedOrder.NumeroPedido}/approve`, {
+      const response = await fetch(`/api/admin/orders/${selectedOrder.NumeroPedido}/approve`, {
         method: 'PUT',
         credentials: 'include',
         headers: {

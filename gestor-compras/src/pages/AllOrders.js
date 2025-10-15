@@ -52,7 +52,7 @@ const AllOrders = () => {
         ...(filters.estado && { estado: filters.estado })
       };
 
-      const response = await api.get('/api/admin/all-orders', { params });
+      const response = await api.get('/admin/all-orders', { params });
       
       if (response.data.success) {
         setOrders(response.data.orders || []);

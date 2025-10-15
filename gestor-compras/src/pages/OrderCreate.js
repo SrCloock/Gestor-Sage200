@@ -281,7 +281,7 @@ const OrderCreate = () => {
         setLoading(prev => ({ ...prev, products: true }));
         setError('');
         
-        const response = await api.get('/api/catalog/products');
+        const response = await api.get('/catalog/products');
         
         if (response.data.success) {
           setProducts(response.data.products);
@@ -451,7 +451,7 @@ const OrderCreate = () => {
         CifDni: user.cifDni
       }));
 
-      const response = await api.post('/api/orders', {
+      const response = await api.post('/orders', {
         items: itemsToSend,
         deliveryDate: deliveryDate || null,
         comment: comment

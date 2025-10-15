@@ -1,54 +1,57 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+// 🔧 URL base: usa la del entorno o por defecto '/api'
+const API_URL = process.env.REACT_APP_API_URL || '/api';
+
 const api = axios.create({
   baseURL: API_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  withCredentials: true // 🔥 Importante para cookies / sesiones
 });
 
-// Interceptor para añadir token a las peticiones
+// ========== INTERCEPTORES ==========
+
+// Añade el token a las peticiones (si existe)
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
-}, error => {
-  return Promise.reject(error);
-});
+}, error => Promise.reject(error));
 
-// Interceptor MEJORADO para manejar errores globales
-api.interceptors.response.use(response => {
-  return response;
-}, error => {
-  console.error('Error en interceptor:', error.response?.status, error.message);
-  
-  if (error.response?.status === 401) {
-    const currentPath = window.location.pathname;
-    if (!currentPath.includes('/api/login')) {
-      console.warn('Sesión expirada, redirigiendo a login...');
+// Manejo global de errores
+api.interceptors.response.use(
+  response => response,
+  error => {
+    console.error('Error en interceptor:', error.response?.status, error.message);
+    
+    if (error.response?.status === 401) {
+      // Si el usuario perdió la sesión
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       setTimeout(() => {
-        window.location.href = '/api/login';
+        window.location.href = '/login'; // 🔥 corregido: antes decía /api/login
       }, 100);
     }
+    
+    if (error.message?.includes('Network Error')) {
+      console.error('🚨 Error de conexión con el servidor');
+    }
+    
+    return Promise.reject(error);
   }
-  
-  if (error.code === 'NETWORK_ERROR' || error.message.includes('Network Error')) {
-    console.error('Error de conexión con el servidor');
-  }
-  
-  return Promise.reject(error);
-});
+);
 
-// ========== AUTENTICACIÓN ==========
+// ========== ENDPOINTS ==========
+
+// 🔐 Autenticación
 export const loginUser = async (credentials) => {
   try {
-    const response = await api.post('/api/auth/login', credentials);
+    const response = await api.post('/auth/login', credentials);
     return response;
   } catch (error) {
     console.error('Error en login:', error);
@@ -56,18 +59,13 @@ export const loginUser = async (credentials) => {
   }
 };
 
-export const getProfile = () => {
-  return api.get('/api/auth/me');
-};
+export const getProfile = () => api.get('/auth/me');
+export const adminLogin = (credentials) => api.post('/admin/login', credentials);
 
-export const adminLogin = (credentials) => {
-  return api.post('/api/admin/login', credentials);
-};
-
-// ========== PRODUCTOS ==========
+// 🛒 Productos
 export const getProducts = async () => {
   try {
-    const response = await api.get('/api/products');
+    const response = await api.get('/products');
     return response;
   } catch (error) {
     console.error('Error obteniendo productos:', error);
@@ -75,31 +73,23 @@ export const getProducts = async () => {
   }
 };
 
-export const searchProducts = (filters) => {
-  return api.get('/api/products/search', { params: filters });
-};
+export const searchProducts = (filters) => api.get('/products/search', { params: filters });
+export const getProductById = (id) => api.get(`/products/${id}`);
 
-export const getProductById = (id) => {
-  return api.get('/api/products/${id}');
-};
-
-// ========== PEDIDOS ==========
+// 📦 Pedidos
 export const createOrder = async (orderData) => {
   try {
-    const response = await api.post('/api/orders', orderData);
+    const response = await api.post('/orders', orderData);
     return response;
   } catch (error) {
     console.error('Error creando pedido:', error);
-    if (error.response?.status === 401) {
-      console.warn('Sesión expirada durante creación de pedido');
-    }
     throw error;
   }
 };
 
 export const getOrders = async (CodigoCliente) => {
   try {
-    const response = await api.get('/api/orders/${CodigoCliente}');
+    const response = await api.get(`/orders/${CodigoCliente}`);
     return response;
   } catch (error) {
     console.error('Error obteniendo pedidos:', error);
@@ -108,18 +98,13 @@ export const getOrders = async (CodigoCliente) => {
 };
 
 export const getOrderDetail = (CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido) => {
-  return api.get('/api/orders/detail', {
+  return api.get('/orders/detail', {
     params: { CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido }
   });
 };
 
-// ========== ADMINISTRACIÓN ==========
-export const createUser = (userData) => {
-  return api.post('/api/admin/users', userData);
-};
-
-export const getLastClientCode = () => {
-  return api.get('/api/admin/last-client-code');
-};
+// ⚙️ Administración
+export const createUser = (userData) => api.post('/admin/users', userData);
+export const getLastClientCode = () => api.get('/admin/last-client-code');
 
 export default api;

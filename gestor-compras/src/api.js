@@ -1,7 +1,10 @@
 import axios from 'axios';
 
+
+const isProduction = !window.location.hostname.includes('localhost');
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3000',
+  baseURL: isProduction ? '/api' : 'http://localhost:3000/api',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -9,7 +12,6 @@ const api = axios.create({
   }
 });
 
-// Interceptor para manejar errores globalmente
 api.interceptors.response.use(
   response => response,
   error => {

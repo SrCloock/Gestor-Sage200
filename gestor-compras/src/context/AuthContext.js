@@ -8,7 +8,7 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Verificar si hay usuario en localStorage al cargar
+
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }) => {
       setError('');
       console.log('Intentando login para usuario:', username);
       
-      const response = await fetch('http://localhost:3000/api/auth/login', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -68,7 +68,6 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setError('');
     localStorage.removeItem('user');
-    // Redirigir al login después de limpiar
     setTimeout(() => {
       window.location.href = '/login';
     }, 100);
