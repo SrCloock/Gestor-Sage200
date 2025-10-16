@@ -269,7 +269,7 @@ const OrderEdit = () => {
         setLoading(prev => ({ ...prev, order: true }));
         setError('');
         
-        const response = await api.get(`/api/orders/${orderId}`, {
+        const response = await api.get(`/orders/${orderId}`, {
           params: {
             codigoCliente: user?.codigoCliente,
             seriePedido: 'WebCD'
@@ -317,7 +317,7 @@ const OrderEdit = () => {
         setLoading(prev => ({ ...prev, products: true }));
         setError('');
         
-        const response = await api.get('/api/catalog/products');
+        const response = await api.get('/catalog/products');
         
         if (response.data.success) {
           setProducts(response.data.products);
@@ -470,7 +470,7 @@ const OrderEdit = () => {
         CifDni: user.cifDni
       }));
 
-      const response = await api.put(`/api/orders/${orderId}`, {
+      const response = await api.put(`/orders/${orderId}`, {
         items: itemsToSend,
         deliveryDate: deliveryDate || null,
         comment: comment

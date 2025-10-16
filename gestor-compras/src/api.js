@@ -1,34 +1,30 @@
-// api.js
 import axios from 'axios';
 
-// Usar URL relativa para evitar problemas CORS
-const API_URL = process.env.REACT_APP_API_URL || '';
+// 👇 Detectamos entorno
+const apiBase = window.location.hostname.includes('localhost')
+  ? 'https://54bf727d326f.ngrok-free.app/api'
+  : '/api';
 
 const api = axios.create({
-  baseURL: API_URL,
-  timeout: 30000,
+  baseURL: apiBase,
+  withCredentials: true,
   headers: {
-    'Content-Type': 'application/json'
-  },
-  withCredentials: true // 🔥 IMPORTANTE para cookies/sesiones
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
 });
 
-// Interceptor para respuestas
+// Interceptor para manejar errores globalmente
 api.interceptors.response.use(
   response => response,
   error => {
-    console.error('Error en interceptor:', error.response?.status, error.message);
-    
-    if (error.response?.status === 401) {
-      // Sesión expirada
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+    if (error.response) {
+      return Promise.reject({
+        message: error.response.data?.message || 'Error en la solicitud',
+        status: error.response.status,
+        data: error.response.data
+      });
     }
-    
-    if (error.message?.includes('Network Error')) {
-      console.error('🚨 Error de conexión con el servidor');
-    }
-    
     return Promise.reject(error);
   }
 );

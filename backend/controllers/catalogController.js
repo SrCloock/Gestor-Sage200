@@ -13,7 +13,7 @@ const getCatalogProducts = async (req, res) => {
     const { search, proveedor, precioMin, precioMax, sortBy } = req.query;
 
     // Construir condiciones WHERE dinámicamente
-    let whereConditions = ["a.CodigoEmpresa = '9999'"];
+    let whereConditions = ["a.CodigoEmpresa = '1'"];
     let inputParams = {};
     
     if (search) {
@@ -60,7 +60,7 @@ const getCatalogProducts = async (req, res) => {
         a.RutaImagen,
         gi.CodigoIvasinRecargo as PorcentajeIva
       FROM Articulos a
-      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor AND p.CodigoEmpresa = '9999'
+      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor AND p.CodigoEmpresa = '1'
       LEFT JOIN (
         SELECT GrupoIva, MAX(FechaInicio) as MaxFecha
         FROM GrupoIva 
@@ -89,7 +89,7 @@ const getCatalogProducts = async (req, res) => {
     const countQuery = `
       SELECT COUNT(*) as total
       FROM Articulos a
-      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor AND p.CodigoEmpresa = '9999'
+      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor AND p.CodigoEmpresa = '1'
       ${whereClause}
     `;
     
@@ -144,7 +144,7 @@ const getProductFilters = async (req, res) => {
       SELECT DISTINCT p.CodigoProveedor, p.Nombre as NombreProveedor
       FROM Proveedores p
       INNER JOIN Articulos a ON p.CodigoProveedor = a.CodigoProveedor
-      WHERE p.CodigoEmpresa = '9999'
+      WHERE p.CodigoEmpresa = '1'
       ORDER BY p.Nombre
     `;
 

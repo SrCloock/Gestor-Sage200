@@ -19,7 +19,7 @@ const OrderDetail = () => {
         setError('');
         console.log('Obteniendo detalles del pedido:', orderId, 'para cliente:', user?.codigoCliente);
         
-        const response = await api.get(`/api/orders/${orderId}`, {
+        const response = await api.get(`/orders/${orderId}`, {
           params: {
             codigoCliente: user?.codigoCliente,
             seriePedido: 'WebCD'

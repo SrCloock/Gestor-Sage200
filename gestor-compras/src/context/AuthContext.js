@@ -1,4 +1,3 @@
-// context/AuthContext.js
 import React, { createContext, useState, useEffect } from 'react';
 
 export const AuthContext = createContext();
@@ -8,55 +7,55 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Verificar sesión al cargar
+  // 👇 Detectamos el entorno y fijamos la URL base
+  const apiBase = window.location.hostname.includes('localhost')
+    ? 'https://54bf727d326f.ngrok-free.app' // tu backend vía ngrok
+    : window.location.origin; // en producción, mismo dominio
+
   useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const response = await fetch('/api/auth/user', {
-        method: 'GET',
-        credentials: 'include' // IMPORTANTE para las cookies de sesión
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setUser(data.user);
-          localStorage.setItem('user', JSON.stringify(data.user));
-        }
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        setUser(userData);
+        console.log('Usuario cargado desde localStorage:', userData);
+      } catch (parseError) {
+        console.error('Error parseando usuario desde localStorage:', parseError);
+        localStorage.removeItem('user');
       }
-    } catch (error) {
-      console.error('Error verificando autenticación:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+    setLoading(false);
+  }, []);
 
   const login = async (username, password) => {
     try {
       setError('');
-      setLoading(true);
-      
-      const response = await fetch('/api/auth/login', {
+      console.log('Intentando login para usuario:', username);
+
+      // 👇 usamos la base definida arriba
+      const response = await fetch(`${apiBase}/api/auth/login`, {
         method: 'POST',
-        headers: {
+        headers: { 
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
-        credentials: 'include', // CRÍTICO para sesiones
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password })
       });
 
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Respuesta no JSON:', text.substring(0, 200));
+        throw new Error('El servidor devolvió una respuesta inválida');
       }
 
       const data = await response.json();
-      
+      console.log('Respuesta del login:', data);
+
       if (data.success) {
         setUser(data.user);
         localStorage.setItem('user', JSON.stringify(data.user));
+        console.log('Login exitoso para usuario:', data.user);
         return true;
       } else {
         throw new Error(data.message || 'Error en el login');
@@ -65,41 +64,24 @@ export const AuthProvider = ({ children }) => {
       console.error('Login error:', error);
       setError(error.message || 'Error de conexión con el servidor');
       return false;
-    } finally {
-      setLoading(false);
     }
   };
 
-  const logout = async () => {
-    try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include'
-      });
-    } catch (error) {
-      console.error('Error en logout:', error);
-    } finally {
-      setUser(null);
-      setError('');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
-    }
-  };
-
-  const clearError = () => {
+  const logout = () => {
+    console.log('Cerrando sesión...');
+    setUser(null);
     setError('');
+    localStorage.removeItem('user');
+    setTimeout(() => {
+      window.location.href = '/login';
+    }, 100);
   };
+
+  const clearError = () => setError('');
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      error,
-      login, 
-      logout,
-      clearError 
-    }}>
-      {children}
+    <AuthContext.Provider value={{ user, loading, error, login, logout, clearError }}>
+      {!loading && children}
     </AuthContext.Provider>
   );
 };

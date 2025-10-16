@@ -20,7 +20,7 @@ const OrderReception = () => {
     const fetchOrderReception = async () => {
       try {
         setLoading(true);
-        const response = await api.get(`/api/reception/${orderId}`);
+        const response = await api.get(`/reception/${orderId}`);
         
         if (response.data.success) {
           setOrder(response.data.order);
@@ -82,7 +82,7 @@ const OrderReception = () => {
         return;
       }
 
-      const response = await api.post(`/api/reception/${orderId}/confirm`, {
+      const response = await api.post(`/reception/${orderId}/confirm`, {
         items: receptionItems
       });
       

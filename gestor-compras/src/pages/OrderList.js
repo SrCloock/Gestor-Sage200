@@ -51,7 +51,7 @@ const OrderList = () => {
         setError('');
         console.log('Obteniendo pedidos para cliente:', user?.codigoCliente);
         
-        const response = await api.get('/api/orders', {
+        const response = await api.get('/orders', {
           params: { codigoCliente: user?.codigoCliente }
         });
         
