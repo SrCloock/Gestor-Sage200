@@ -1,27 +1,34 @@
+// api.js
 import axios from 'axios';
 
-
-const isProduction = !window.location.hostname.includes('localhost');
+// Usar URL relativa para evitar problemas CORS
+const API_URL = process.env.REACT_APP_API_URL || '';
 
 const api = axios.create({
-  baseURL: isProduction ? '/api' : 'http://localhost:3000/api',
-  withCredentials: true,
+  baseURL: API_URL,
+  timeout: 30000,
   headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }
+    'Content-Type': 'application/json'
+  },
+  withCredentials: true // 🔥 IMPORTANTE para cookies/sesiones
 });
 
+// Interceptor para respuestas
 api.interceptors.response.use(
   response => response,
   error => {
-    if (error.response) {
-      return Promise.reject({
-        message: error.response.data?.message || 'Error en la solicitud',
-        status: error.response.status,
-        data: error.response.data
-      });
+    console.error('Error en interceptor:', error.response?.status, error.message);
+    
+    if (error.response?.status === 401) {
+      // Sesión expirada
+      localStorage.removeItem('user');
+      window.location.href = '/login';
     }
+    
+    if (error.message?.includes('Network Error')) {
+      console.error('🚨 Error de conexión con el servidor');
+    }
+    
     return Promise.reject(error);
   }
 );

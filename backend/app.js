@@ -15,7 +15,7 @@ const catalogRoutes = require('./routes/catalog');
 const { connect } = require('./db/Sage200db');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT ||
 
 // =========================
 // MIDDLEWARE DE SESIÓN (CRÍTICO PARA EL LOGIN)
@@ -48,7 +48,6 @@ const corsOptions = {
     }
     
     const allowedOrigins = [
-      'http://localhost:3000',
       'http://localhost:3001', 
       'http://localhost:3002',
       'http://localhost:4000',

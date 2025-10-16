@@ -1,12 +1,12 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+// context/AuthContext.js
+import React, { createContext, useState, useEffect } from 'react';
 
-// Crear el contexto - ESTA ES LA CLAVE
 export const AuthContext = createContext();
 
-// Provider component
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   // Verificar sesión al cargar
   useEffect(() => {
@@ -17,13 +17,14 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await fetch('/api/auth/user', {
         method: 'GET',
-        credentials: 'include'
+        credentials: 'include' // IMPORTANTE para las cookies de sesión
       });
 
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
           setUser(data.user);
+          localStorage.setItem('user', JSON.stringify(data.user));
         }
       }
     } catch (error) {
@@ -35,6 +36,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (username, password) => {
     try {
+      setError('');
       setLoading(true);
       
       const response = await fetch('/api/auth/login', {
@@ -42,32 +44,27 @@ export const AuthProvider = ({ children }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
+        credentials: 'include', // CRÍTICO para sesiones
         body: JSON.stringify({ username, password }),
       });
 
-      // Verificar si la respuesta es OK antes de verificar el content-type
       if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        throw new Error(`El servidor devolvió HTML en lugar de JSON: ${text.substring(0, 100)}...`);
       }
 
       const data = await response.json();
       
       if (data.success) {
         setUser(data.user);
-        return { success: true, user: data.user };
+        localStorage.setItem('user', JSON.stringify(data.user));
+        return true;
       } else {
-        return { success: false, message: data.message };
+        throw new Error(data.message || 'Error en el login');
       }
     } catch (error) {
       console.error('Login error:', error);
-      throw error;
+      setError(error.message || 'Error de conexión con el servidor');
+      return false;
     } finally {
       setLoading(false);
     }
@@ -83,23 +80,26 @@ export const AuthProvider = ({ children }) => {
       console.error('Error en logout:', error);
     } finally {
       setUser(null);
+      setError('');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
     }
   };
 
-  const value = {
-    user,
-    login,
-    logout,
-    loading,
-    checkAuth
+  const clearError = () => {
+    setError('');
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      error,
+      login, 
+      logout,
+      clearError 
+    }}>
       {children}
     </AuthContext.Provider>
   );
 };
-
-// Exportación por defecto para compatibilidad
-export default AuthContext;
