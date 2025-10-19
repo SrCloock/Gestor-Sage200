@@ -281,11 +281,18 @@ const OrderCreate = () => {
         setLoading(prev => ({ ...prev, products: true }));
         setError('');
         
-        const response = await api.get('/catalog/products');
+        // OBTENER TODOS LOS PRODUCTOS SIN PAGINACIÓN
+        const response = await api.get('/catalog/products', {
+          params: {
+            limit: 10000, // Número grande para obtener todos
+            page: 1
+          }
+        });
         
         if (response.data.success) {
           setProducts(response.data.products);
           setFilteredProducts(response.data.products);
+          console.log(`✅ Cargados ${response.data.products.length} productos`);
         } else {
           setError('Error al cargar los productos');
         }
@@ -445,11 +452,13 @@ const OrderCreate = () => {
         CodigoArticulo: item.CodigoArticulo,
         DescripcionArticulo: item.DescripcionArticulo,
         Cantidad: Number(item.Cantidad),
-        PrecioCompra: item.PrecioVenta,
+        PrecioVenta: item.PrecioVenta, // Enviamos PrecioVenta directamente
         CodigoProveedor: item.CodigoProveedor || null,
         CodigoCliente: user.codigoCliente,
         CifDni: user.cifDni
       }));
+
+      console.log('📤 Enviando pedido con items:', itemsToSend);
 
       const response = await api.post('/orders', {
         items: itemsToSend,

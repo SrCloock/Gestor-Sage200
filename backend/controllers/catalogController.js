@@ -3,52 +3,46 @@ const { getPool } = require('../db/Sage200db');
 const getCatalogProducts = async (req, res) => {
   try {
     const pool = await getPool();
-    
-    // Parámetros de paginación
+
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
-    
-    // Parámetros de filtrado
+
     const { search, proveedor, precioMin, precioMax, sortBy } = req.query;
 
-    // Construir condiciones WHERE dinámicamente
+    // CAMBIO: Filtrar por empresa 1 en lugar de 9999
     let whereConditions = ["a.CodigoEmpresa = '1'"];
     let inputParams = {};
-    
+
     if (search) {
-      whereConditions.push('(a.DescripcionArticulo LIKE @search OR a.CodigoArticulo LIKE @search OR p.Nombre LIKE @search)');
+      whereConditions.push(
+        '(a.DescripcionArticulo LIKE @search OR a.CodigoArticulo LIKE @search OR p.Nombre LIKE @search)'
+      );
       inputParams.search = `%${search}%`;
     }
-    
+
     if (proveedor) {
       whereConditions.push('a.CodigoProveedor = @proveedor');
       inputParams.proveedor = proveedor;
     }
-    
+
     if (precioMin) {
       whereConditions.push('a.PrecioVenta >= @precioMin');
       inputParams.precioMin = parseFloat(precioMin);
     }
-    
+
     if (precioMax) {
       whereConditions.push('a.PrecioVenta <= @precioMax');
       inputParams.precioMax = parseFloat(precioMax);
     }
-    
-    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
-    
-    // Ordenamiento
-    let orderBy = 'a.DescripcionArticulo';
-    if (sortBy === 'precio-asc') {
-      orderBy = 'a.PrecioVenta ASC';
-    } else if (sortBy === 'precio-desc') {
-      orderBy = 'a.PrecioVenta DESC';
-    } else if (sortBy === 'proveedor') {
-      orderBy = 'p.Nombre';
-    }
 
-    // Consulta principal con paginación
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    let orderBy = 'a.DescripcionArticulo';
+    if (sortBy === 'precio-asc') orderBy = 'a.PrecioVenta ASC';
+    else if (sortBy === 'precio-desc') orderBy = 'a.PrecioVenta DESC';
+    else if (sortBy === 'proveedor') orderBy = 'p.Nombre';
+
     const query = `
       SELECT 
         a.CodigoArticulo,
@@ -60,7 +54,7 @@ const getCatalogProducts = async (req, res) => {
         a.RutaImagen,
         gi.CodigoIvasinRecargo as PorcentajeIva
       FROM Articulos a
-      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor AND p.CodigoEmpresa = '1'
+      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor AND p.CodigoEmpresa = '1'  -- CAMBIO: Empresa 1
       LEFT JOIN (
         SELECT GrupoIva, MAX(FechaInicio) as MaxFecha
         FROM GrupoIva 
@@ -74,39 +68,29 @@ const getCatalogProducts = async (req, res) => {
     `;
 
     let request = pool.request();
-    // Agregar parámetros a la solicitud
     Object.keys(inputParams).forEach(key => {
-      if (key === 'precioMin' || key === 'precioMax') {
-        request = request.input(key, inputParams[key]);
-      } else {
-        request = request.input(key, inputParams[key]);
-      }
+      request = request.input(key, inputParams[key]);
     });
 
     const result = await request.query(query);
 
-    // Consulta para el total de productos (para paginación)
     const countQuery = `
       SELECT COUNT(*) as total
       FROM Articulos a
-      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor AND p.CodigoEmpresa = '1'
+      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor AND p.CodigoEmpresa = '1'  -- CAMBIO: Empresa 1
       ${whereClause}
     `;
-    
+
     let countRequest = pool.request();
     Object.keys(inputParams).forEach(key => {
-      if (key === 'precioMin' || key === 'precioMax') {
-        countRequest = countRequest.input(key, inputParams[key]);
-      } else {
-        countRequest = countRequest.input(key, inputParams[key]);
-      }
+      countRequest = countRequest.input(key, inputParams[key]);
     });
-    
+
     const countResult = await countRequest.query(countQuery);
     const total = countResult.recordset[0].total;
     const totalPages = Math.ceil(total / limit);
 
-    // Procesar los resultados para incluir imagen por defecto si no hay ruta
+    // Lógica para asignar imagen por defecto y parsear precios e IVA
     const products = result.recordset.map(product => ({
       ...product,
       RutaImagen: product.RutaImagen || '/images/default-product.png',
@@ -116,13 +100,8 @@ const getCatalogProducts = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      products: products,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages
-      }
+      products,
+      pagination: { page, limit, total, totalPages }
     });
 
   } catch (error) {
@@ -138,13 +117,12 @@ const getCatalogProducts = async (req, res) => {
 const getProductFilters = async (req, res) => {
   try {
     const pool = await getPool();
-    
-    // Obtener proveedores únicos
+
     const proveedoresQuery = `
       SELECT DISTINCT p.CodigoProveedor, p.Nombre as NombreProveedor
       FROM Proveedores p
       INNER JOIN Articulos a ON p.CodigoProveedor = a.CodigoProveedor
-      WHERE p.CodigoEmpresa = '1'
+      WHERE p.CodigoEmpresa = '1'  -- CAMBIO: Empresa 1
       ORDER BY p.Nombre
     `;
 
@@ -152,9 +130,7 @@ const getProductFilters = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      filters: {
-        proveedores: proveedoresResult.recordset
-      }
+      filters: { proveedores: proveedoresResult.recordset }
     });
 
   } catch (error) {

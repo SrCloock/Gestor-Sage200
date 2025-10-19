@@ -7,20 +7,16 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // 👇 Detectamos el entorno y fijamos la URL base
   const apiBase = window.location.hostname.includes('localhost')
-    ? 'https://54bf727d326f.ngrok-free.app' // tu backend vía ngrok
-    : window.location.origin; // en producción, mismo dominio
+    ? 'http://localhost:3000'
+    : 'http://217.18.162.40:3000';
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
-        const userData = JSON.parse(storedUser);
-        setUser(userData);
-        console.log('Usuario cargado desde localStorage:', userData);
-      } catch (parseError) {
-        console.error('Error parseando usuario desde localStorage:', parseError);
+        setUser(JSON.parse(storedUser));
+      } catch {
         localStorage.removeItem('user');
       }
     }
@@ -30,9 +26,6 @@ export const AuthProvider = ({ children }) => {
   const login = async (username, password) => {
     try {
       setError('');
-      console.log('Intentando login para usuario:', username);
-
-      // 👇 usamos la base definida arriba
       const response = await fetch(`${apiBase}/api/auth/login`, {
         method: 'POST',
         headers: { 
@@ -45,30 +38,24 @@ export const AuthProvider = ({ children }) => {
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
-        console.error('Respuesta no JSON:', text.substring(0, 200));
-        throw new Error('El servidor devolvió una respuesta inválida');
+        throw new Error('El servidor devolvió una respuesta inválida: ' + text.substring(0, 200));
       }
 
       const data = await response.json();
-      console.log('Respuesta del login:', data);
-
       if (data.success) {
         setUser(data.user);
         localStorage.setItem('user', JSON.stringify(data.user));
-        console.log('Login exitoso para usuario:', data.user);
         return true;
       } else {
         throw new Error(data.message || 'Error en el login');
       }
-    } catch (error) {
-      console.error('Login error:', error);
-      setError(error.message || 'Error de conexión con el servidor');
+    } catch (err) {
+      setError(err.message || 'Error de conexión con el servidor');
       return false;
     }
   };
 
   const logout = () => {
-    console.log('Cerrando sesión...');
     setUser(null);
     setError('');
     localStorage.removeItem('user');

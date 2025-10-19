@@ -1,9 +1,8 @@
 import axios from 'axios';
 
-// 👇 Detectamos entorno
 const apiBase = window.location.hostname.includes('localhost')
-  ? 'https://54bf727d326f.ngrok-free.app/api'
-  : '/api';
+  ? 'http://localhost:3000/api'
+  : 'http://217.18.162.40:3000/api';
 
 const api = axios.create({
   baseURL: apiBase,
@@ -14,7 +13,6 @@ const api = axios.create({
   }
 });
 
-// Interceptor para manejar errores globalmente
 api.interceptors.response.use(
   response => response,
   error => {
