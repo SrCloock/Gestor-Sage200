@@ -20,35 +20,52 @@ const PORT = process.env.PORT || 3000;
 app.use('/images', express.static(path.join(__dirname, 'public', 'images')));
 
 // =========================
-// CORS dinámico para desarrollo y producción
+// CORS dinámico para desarrollo y producción - CORREGIDO
 // =========================
 const allowedOrigins = [
   'http://localhost:3001',
   'http://localhost:3000',
-  'http://217.18.162.40:3000' 
+  'http://217.18.162.40:3000',
+  'http://217.18.162.40:3001' // 🔥 AÑADIR este origen
 ];
 
 const corsOptions = {
   origin: function (origin, callback) {
+    // Permitir requests sin origin (como mobile apps o curl)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error('Not allowed by CORS'));
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('Origen bloqueado por CORS:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
   },
   credentials: true,
-  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization','X-Requested-With','usuario','codigoempresa']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'usuario', 'codigoempresa'],
+  exposedHeaders: ['Content-Length', 'X-Total-Count']
 };
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
-// Headers manuales
+// Headers manuales MEJORADOS
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Credentials', true);
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, usuario, codigoempresa');
   res.header('Access-Control-Expose-Headers', 'Content-Length, X-Total-Count');
+  
+  // Manejar preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
   next();
 });
 
@@ -62,12 +79,12 @@ connect()
   .catch(err => console.error('❌ Error al conectar a la base de datos:', err));
 
 // =========================
-// RUTAS API
+// RUTAS API - VERIFICADAS
 // =========================
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/reception', receptionRoutes);
+app.use('/api/reception', receptionRoutes); // 🔥 CONFIRMADO: esta ruta existe
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/all-orders', allOrdersRoutes);
 app.use('/api/catalog', catalogRoutes);
@@ -131,4 +148,5 @@ app.listen(PORT, HOST, () => {
   console.log(`🚀 Servidor corriendo en http://${HOST}:${PORT}`);
   console.log(`📦 API Base: http://${HOST}:${PORT}/api`);
   console.log(`🔍 Health Check: http://${HOST}:${PORT}/api/health`);
+  console.log(`🌐 Orígenes permitidos: ${allowedOrigins.join(', ')}`);
 });

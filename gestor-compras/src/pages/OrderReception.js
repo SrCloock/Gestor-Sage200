@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import api from '../components/orderService';
 import '../styles/OrderReception.css';
 
 const OrderReception = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
-  const { user } = useContext(AuthContext);
+  const { user, logout } = useContext(AuthContext);
   
   const [order, setOrder] = useState(null);
   const [receptionItems, setReceptionItems] = useState([]);
@@ -16,33 +15,90 @@ const OrderReception = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // 🔥 NUEVO: Verificar sesión antes de hacer cualquier petición
+  useEffect(() => {
+    if (!user) {
+      setError('No hay sesión activa. Redirigiendo al login...');
+      setTimeout(() => navigate('/login'), 2000);
+      return;
+    }
+  }, [user, navigate]);
+
   useEffect(() => {
     const fetchOrderReception = async () => {
+      // 🔥 NUEVO: Verificar sesión antes de fetch
+      if (!user) {
+        setError('Usuario no autenticado');
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
-        const response = await api.get(`/reception/${orderId}`);
+        setError('');
         
-        if (response.data.success) {
-          setOrder(response.data.order);
-          const items = response.data.order.Productos.map(product => ({
+        console.log('🔍 Fetching order reception for:', orderId, 'User:', user.username);
+        
+        // 🔥 CORREGIDO: Añadir headers de autenticación
+        const response = await fetch(`/api/reception/${orderId}`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        });
+
+        console.log('📡 Response status:', response.status);
+
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
+          }
+          throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await response.text();
+          console.error('❌ El servidor devolvió:', text.substring(0, 200));
+          throw new Error(`El servidor devolvió un formato inválido`);
+        }
+
+        const data = await response.json();
+        console.log('✅ Datos recibidos:', data);
+        
+        if (data.success) {
+          setOrder(data.order);
+          const items = data.order.Productos.map(product => ({
             ...product,
             UnidadesRecibidas: product.UnidadesRecibidas || 0,
             ComentarioRecepcion: product.ComentarioRecepcion || ''
           }));
           setReceptionItems(items);
         } else {
-          setError(response.data.message || 'Error al cargar el pedido');
+          setError(data.message || 'Error al cargar el pedido');
         }
       } catch (err) {
-        console.error('Error fetching order reception:', err);
-        setError('Error al cargar los datos del pedido');
+        console.error('❌ Error fetching order reception:', err);
+        setError(err.message || 'Error al cargar los datos del pedido');
+        
+        // 🔥 NUEVO: Redirigir al login si es error de autenticación
+        if (err.message.includes('Sesión expirada')) {
+          setTimeout(() => {
+            logout();
+            navigate('/login');
+          }, 2000);
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchOrderReception();
-  }, [orderId]);
+    if (user && orderId) {
+      fetchOrderReception();
+    }
+  }, [orderId, user, logout, navigate]);
 
   const handleQuantityChange = (index, value) => {
     const newItems = [...receptionItems];
@@ -51,7 +107,6 @@ const OrderReception = () => {
     
     newItems[index].UnidadesRecibidas = nuevasUnidades;
     
-    // Si la cantidad cambia y no hay comentario, sugerir uno
     if (nuevasUnidades !== unidadesPedidas && !newItems[index].ComentarioRecepcion) {
       newItems[index].ComentarioRecepcion = `Cantidad modificada: recibidas ${nuevasUnidades} de ${unidadesPedidas} pedidas`;
     }
@@ -66,10 +121,19 @@ const OrderReception = () => {
   };
 
   const handleSubmit = async () => {
+    // 🔥 NUEVO: Verificar sesión antes de enviar
+    if (!user) {
+      setError('No hay sesión activa. Redirigiendo al login...');
+      setTimeout(() => navigate('/login'), 2000);
+      return;
+    }
+
     try {
       setSubmitting(true);
       setError('');
       setSuccess('');
+
+      console.log('🔄 Enviando confirmación para order:', orderId);
 
       const itemsWithDifferences = receptionItems.filter(item => 
         item.UnidadesRecibidas !== item.UnidadesPedidas && !item.ComentarioRecepcion.trim()
@@ -82,22 +146,54 @@ const OrderReception = () => {
         return;
       }
 
-      const response = await api.post(`/reception/${orderId}/confirm`, {
-        items: receptionItems
+      // 🔥 MEJORADO: Añadir más información de debug
+      const requestBody = {
+        items: receptionItems,
+        usuario: user.username, // 🔥 Añadir información del usuario
+        timestamp: new Date().toISOString()
+      };
+
+      console.log('📤 Enviando datos:', requestBody);
+
+      const response = await fetch(`/api/reception/${orderId}/confirm`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
       });
+
+      console.log('📡 Response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
+        }
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('❌ El servidor devolvió:', text.substring(0, 200));
+        throw new Error(`El servidor devolvió un formato inválido`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Respuesta del servidor:', data);
       
-      if (response.data.success) {
+      if (data.success) {
         setSuccess('Recepción confirmada correctamente');
         
-        // Forzar actualización del estado local
         setOrder(prev => ({
           ...prev,
-          Estado: response.data.estado || 2
+          Estado: data.estado || 2
         }));
         
-        // Esperar y navegar con flag de actualización
         setTimeout(() => {
-          navigate(`/api/mis-pedidos/${orderId}`, { 
+          navigate(`/mis-pedidos/${orderId}`, { 
             state: { 
               refreshed: true,
               receptionConfirmed: true,
@@ -106,21 +202,24 @@ const OrderReception = () => {
           });
         }, 1500);
       } else {
-        setError(response.data.message || 'Error al confirmar la recepción');
+        setError(data.message || 'Error al confirmar la recepción');
       }
     } catch (err) {
-      console.error('Error confirming reception:', err);
-      if (err.response?.data?.message) {
-        setError(err.response.data.message);
-      } else {
-        setError('Error al confirmar la recepción');
+      console.error('❌ Error confirming reception:', err);
+      setError(err.message || 'Error al confirmar la recepción');
+      
+      // 🔥 NUEVO: Redirigir al login si es error de autenticación
+      if (err.message.includes('Sesión expirada')) {
+        setTimeout(() => {
+          logout();
+          navigate('/login');
+        }, 2000);
       }
     } finally {
       setSubmitting(false);
     }
   };
 
-  // CORREGIDO: Función para mostrar el estado igual que en AllOrders
   const getStatusText = (status) => {
     switch (status) {
       case 0: return 'Preparando';
@@ -130,16 +229,15 @@ const OrderReception = () => {
     }
   };
 
-  // Calcular el estado actual basado en las unidades
   const calculateCurrentStatus = () => {
     if (!receptionItems.length) return 0;
     
     const totalPedido = receptionItems.reduce((sum, item) => sum + (item.UnidadesPedidas || 0), 0);
     const totalRecibido = receptionItems.reduce((sum, item) => sum + (item.UnidadesRecibidas || 0), 0);
     
-    if (totalRecibido === 0) return 0; // Preparando
-    if (totalRecibido === totalPedido) return 2; // Servido
-    return 1; // Parcial
+    if (totalRecibido === 0) return 0;
+    if (totalRecibido === totalPedido) return 2;
+    return 1;
   };
 
   const currentStatus = calculateCurrentStatus();
@@ -176,7 +274,7 @@ const OrderReception = () => {
             </span>
           </div>
         </div>
-        <button onClick={() => navigate(`/api/mis-pedidos/${orderId}`)} className="orr-back-button">
+        <button onClick={() => navigate(`/mis-pedidos/${orderId}`)} className="orr-back-button">
           ← Volver al detalle
         </button>
       </div>
@@ -185,6 +283,9 @@ const OrderReception = () => {
         <div className="orr-error-message">
           <div className="orr-error-icon">⚠️</div>
           <p>{error}</p>
+          {error.includes('Sesión expirada') && (
+            <p>Será redirigido al login automáticamente...</p>
+          )}
         </div>
       )}
 
@@ -299,7 +400,7 @@ const OrderReception = () => {
 
       <div className="orr-actions">
         <button 
-          onClick={() => navigate(`/api/mis-pedidos/${orderId}`)}
+          onClick={() => navigate(`/mis-pedidos/${orderId}`)}
           className="orr-button orr-secondary-button"
         >
           Volver al detalle

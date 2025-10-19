@@ -144,6 +144,93 @@ const getAllOrders = async (req, res) => {
   }
 };
 
+// Añadir endpoint para detalles de pedidos para admin
+const getOrderDetails = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    // Validar que orderId sea un número
+    if (!orderId || isNaN(parseInt(orderId))) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'ID de pedido inválido' 
+      });
+    }
+
+    const pool = await getPool();
+
+    console.log('Buscando detalles del pedido (admin):', orderId);
+
+    // Cabecera del pedido
+    const orderResult = await pool.request()
+      .input('NumeroPedido', parseInt(orderId))
+      .input('SeriePedido', 'WebCD')
+      .query(`
+        SELECT 
+          c.*,
+          CASE 
+            WHEN c.StatusAprobado = 0 THEN 'Pendiente'
+            WHEN c.StatusAprobado = -1 AND c.Estado = 0 THEN 'Preparando'
+            WHEN c.StatusAprobado = -1 AND c.Estado = 1 THEN 'Parcial'
+            WHEN c.StatusAprobado = -1 AND c.Estado = 2 THEN 'Servido'
+            ELSE 'Desconocido'
+          END as EstadoDescripcion
+        FROM CabeceraPedidoCliente c
+        WHERE c.NumeroPedido = @NumeroPedido
+        AND c.SeriePedido = @SeriePedido
+      `);
+
+    if (orderResult.recordset.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Pedido no encontrado' 
+      });
+    }
+
+    // Líneas del pedido
+    const linesResult = await pool.request()
+      .input('NumeroPedido', parseInt(orderId))
+      .input('SeriePedido', 'WebCD')
+      .query(`
+        SELECT 
+          l.Orden,
+          l.CodigoArticulo,
+          l.DescripcionArticulo,
+          l.UnidadesPedidas,
+          l.UnidadesRecibidas,
+          l.UnidadesPendientes,
+          l.Precio,
+          l.CodigoProveedor,
+          l.ComentarioRecepcion,
+          l.FechaRecepcion,
+          p.RazonSocial as NombreProveedor
+        FROM LineasPedidoCliente l
+        LEFT JOIN Proveedores p ON l.CodigoProveedor = p.CodigoProveedor
+        WHERE l.NumeroPedido = @NumeroPedido
+        AND l.SeriePedido = @SeriePedido
+        ORDER BY l.Orden
+      `);
+
+    console.log(`Encontradas ${linesResult.recordset.length} líneas para el pedido ${orderId}`);
+
+    res.status(200).json({
+      success: true,
+      order: {
+        ...orderResult.recordset[0],
+        productos: linesResult.recordset
+      }
+    });
+  } catch (error) {
+    console.error('Error al obtener detalle del pedido (admin):', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error al obtener el detalle del pedido',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 router.get('/', getAllOrders);
+router.get('/:orderId', getOrderDetails);
 
 module.exports = router;

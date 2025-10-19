@@ -133,9 +133,14 @@ const AllOrders = () => {
     }
   };
 
-  // CORREGIDO: Navegación sin /api
+  // CORREGIDO: Navegación para admin y usuario normal
   const handleViewDetails = (orderId) => {
-    navigate(`/mis-pedidos/${orderId}`);
+    // Para admin, usar ruta específica de admin
+    if (user?.isAdmin) {
+      navigate(`/admin/orders/${orderId}`);
+    } else {
+      navigate(`/mis-pedidos/${orderId}`);
+    }
   };
 
   const handleFilterChange = (e) => {

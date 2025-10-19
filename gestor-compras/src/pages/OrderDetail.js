@@ -17,14 +17,22 @@ const OrderDetail = () => {
       try {
         setLoading(true);
         setError('');
-        console.log('Obteniendo detalles del pedido:', orderId, 'para cliente:', user?.codigoCliente);
+        console.log('Obteniendo detalles del pedido:', orderId, 'para usuario:', user?.username);
         
-        const response = await api.get(`/orders/${orderId}`, {
-          params: {
-            codigoCliente: user?.codigoCliente,
-            seriePedido: 'WebCD'
-          }
-        });
+        let response;
+        
+        // Si es admin, usar endpoint de admin
+        if (user?.isAdmin) {
+          response = await api.get(`/admin/all-orders/${orderId}`);
+        } else {
+          // Si es usuario normal, usar endpoint normal
+          response = await api.get(`/orders/${orderId}`, {
+            params: {
+              codigoCliente: user?.codigoCliente,
+              seriePedido: 'WebCD'
+            }
+          });
+        }
         
         console.log('Respuesta del API:', response.data);
         
@@ -47,10 +55,10 @@ const OrderDetail = () => {
       }
     };
   
-    if (user?.codigoCliente) {
+    if (user) {
       fetchOrderDetails();
     } else {
-      setError('No se pudo identificar el cliente');
+      setError('No se pudo identificar el usuario');
       setLoading(false);
     }
   }, [orderId, user]);
