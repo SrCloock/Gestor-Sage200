@@ -20,52 +20,37 @@ const PORT = process.env.PORT || 3000;
 app.use('/images', express.static(path.join(__dirname, 'public', 'images')));
 
 // =========================
-// CORS dinámico para desarrollo y producción - CORREGIDO
+// CORS COMPLETAMENTE PERMISIVO TEMPORALMENTE
 // =========================
-const allowedOrigins = [
-  'http://localhost:3001',
-  'http://localhost:3000',
-  'http://217.18.162.40:3000',
-  'http://217.18.162.40:3001' // 🔥 AÑADIR este origen
-];
-
-const corsOptions = {
+app.use(cors({
   origin: function (origin, callback) {
-    // Permitir requests sin origin (como mobile apps o curl)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      console.log('Origen bloqueado por CORS:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
+    // 🔥 PERMITIR TODOS LOS ORÍGENES TEMPORALMENTE
+    callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'usuario', 'codigoempresa'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'usuario', 'codigoempresa', 'Accept', '*'],
   exposedHeaders: ['Content-Length', 'X-Total-Count']
-};
-
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+}));
 
 // Headers manuales MEJORADOS
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
+  
+  // 🔥 PERMITIR CUALQUIER ORIGEN
+  res.header('Access-Control-Allow-Origin', origin || '*');
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, usuario, codigoempresa');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, usuario, codigoempresa, Accept, Origin, X-Requested-With, Content-Type, Accept');
   res.header('Access-Control-Expose-Headers', 'Content-Length, X-Total-Count');
   
   // Manejar preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('🛬 Preflight request recibida para:', req.path, 'desde:', origin);
     return res.status(200).end();
   }
   
+  console.log(`🌐 ${req.method} ${req.path} - Origin: ${origin}`);
   next();
 });
 
@@ -79,12 +64,12 @@ connect()
   .catch(err => console.error('❌ Error al conectar a la base de datos:', err));
 
 // =========================
-// RUTAS API - VERIFICADAS
+// RUTAS API
 // =========================
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/reception', receptionRoutes); // 🔥 CONFIRMADO: esta ruta existe
+app.use('/api/reception', receptionRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/all-orders', allOrdersRoutes);
 app.use('/api/catalog', catalogRoutes);
@@ -121,10 +106,17 @@ if (fs.existsSync(staticPath)) {
 // Middleware de errores
 // =========================
 app.use((err, req, res, next) => {
-  console.error('Error del servidor:', err.stack);
+  console.error('❌ Error del servidor:', err.stack);
+  
   if (err.message === 'Not allowed by CORS') {
-    return res.status(403).json({ success: false, message: 'Origen no permitido por CORS' });
+    return res.status(403).json({ 
+      success: false, 
+      message: 'Origen no permitido por CORS',
+      allowedOrigins: ['http://localhost:3001', 'http://localhost:3000', 'http://217.18.162.40:3000', 'http://217.18.162.40:3001'],
+      receivedOrigin: req.headers.origin
+    });
   }
+  
   res.status(500).json({
     success: false,
     message: 'Error interno del servidor',
@@ -137,7 +129,12 @@ app.use((err, req, res, next) => {
 // Rutas API no encontradas
 // =========================
 app.use('/api/*', (req, res) => {
-  res.status(404).json({ success: false, message: `Ruta API no encontrada: ${req.originalUrl}`, timestamp: new Date().toISOString() });
+  console.log(`❌ Ruta API no encontrada: ${req.originalUrl}`);
+  res.status(404).json({ 
+    success: false, 
+    message: `Ruta API no encontrada: ${req.originalUrl}`, 
+    timestamp: new Date().toISOString() 
+  });
 });
 
 // =========================
@@ -148,5 +145,6 @@ app.listen(PORT, HOST, () => {
   console.log(`🚀 Servidor corriendo en http://${HOST}:${PORT}`);
   console.log(`📦 API Base: http://${HOST}:${PORT}/api`);
   console.log(`🔍 Health Check: http://${HOST}:${PORT}/api/health`);
-  console.log(`🌐 Orígenes permitidos: ${allowedOrigins.join(', ')}`);
+  console.log(`🔐 CORS configurado para PERMITIR TODOS LOS ORÍGENES`);
+  console.log(`⚠️  ADVERTENCIA: Esta configuración es solo para desarrollo`);
 });

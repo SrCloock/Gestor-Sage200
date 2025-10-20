@@ -15,19 +15,92 @@ const OrderReception = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // 🔥 NUEVO: Verificar sesión antes de hacer cualquier petición
+  // 🔥 CORREGIDO: Función mejorada para fetch con autenticación
+  const fetchWithAuth = async (url, options = {}) => {
+    try {
+      const storedUser = JSON.parse(localStorage.getItem('user'));
+      
+      if (!storedUser) {
+        throw new Error('No hay usuario en sesión');
+      }
+
+      const defaultOptions = {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'usuario': storedUser.username || '',
+          'codigoempresa': storedUser.codigoCliente || ''
+        },
+      };
+
+      const config = { 
+        ...defaultOptions, 
+        ...options,
+        headers: {
+          ...defaultOptions.headers,
+          ...options.headers
+        }
+      };
+      
+      // Si en las opciones se pasa un body, lo convertimos a JSON
+      if (config.body && typeof config.body !== 'string') {
+        config.body = JSON.stringify(config.body);
+      }
+
+      console.log('🔐 Headers enviados:', config.headers);
+      console.log('📤 URL:', url);
+      console.log('👤 Usuario:', storedUser.username);
+
+      const response = await fetch(url, config);
+      
+      console.log('📡 Response status:', response.status);
+      
+      if (response.status === 401) {
+        console.log('❌ Error 401 - Sesión expirada');
+        localStorage.removeItem('user');
+        throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
+      } else if (response.status === 403) {
+        console.log('❌ Error 403 - Acceso denegado');
+        const errorText = await response.text();
+        console.log('📄 Respuesta del servidor (403):', errorText);
+        throw new Error('Acceso denegado. No tiene permisos para esta acción.');
+      } else if (response.status === 404) {
+        throw new Error('Recurso no encontrado');
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('❌ Error en fetchWithAuth:', error);
+      throw error;
+    }
+  };
+
+  // Verificar sesión
   useEffect(() => {
+    console.log('🔐 Estado de autenticación:', {
+      usuario: user,
+      tieneUser: !!user,
+      tieneLocalStorage: !!localStorage.getItem('user'),
+      orderId: orderId
+    });
+    
     if (!user) {
-      setError('No hay sesión activa. Redirigiendo al login...');
-      setTimeout(() => navigate('/login'), 2000);
-      return;
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        console.log('🔄 Restaurando usuario desde localStorage');
+      } else {
+        setError('No hay sesión activa. Redirigiendo al login...');
+        setTimeout(() => navigate('/login'), 2000);
+        return;
+      }
     }
   }, [user, navigate]);
 
   useEffect(() => {
     const fetchOrderReception = async () => {
-      // 🔥 NUEVO: Verificar sesión antes de fetch
-      if (!user) {
+      const storedUser = JSON.parse(localStorage.getItem('user'));
+      if (!storedUser) {
         setError('Usuario no autenticado');
         setLoading(false);
         return;
@@ -37,24 +110,13 @@ const OrderReception = () => {
         setLoading(true);
         setError('');
         
-        console.log('🔍 Fetching order reception for:', orderId, 'User:', user.username);
+        console.log('🔍 Fetching order reception for:', orderId, 'User:', storedUser.username);
         
-        // 🔥 CORREGIDO: Añadir headers de autenticación
-        const response = await fetch(`/api/reception/${orderId}`, {
-          method: 'GET',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
+        const response = await fetchWithAuth(`/api/reception/${orderId}`, {
+          method: 'GET'
         });
 
-        console.log('📡 Response status:', response.status);
-
         if (!response.ok) {
-          if (response.status === 401 || response.status === 403) {
-            throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
-          }
           throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
 
@@ -83,8 +145,7 @@ const OrderReception = () => {
         console.error('❌ Error fetching order reception:', err);
         setError(err.message || 'Error al cargar los datos del pedido');
         
-        // 🔥 NUEVO: Redirigir al login si es error de autenticación
-        if (err.message.includes('Sesión expirada')) {
+        if (err.message.includes('Sesión expirada') || err.message.includes('Acceso denegado')) {
           setTimeout(() => {
             logout();
             navigate('/login');
@@ -121,8 +182,8 @@ const OrderReception = () => {
   };
 
   const handleSubmit = async () => {
-    // 🔥 NUEVO: Verificar sesión antes de enviar
-    if (!user) {
+    const storedUser = JSON.parse(localStorage.getItem('user'));
+    if (!storedUser) {
       setError('No hay sesión activa. Redirigiendo al login...');
       setTimeout(() => navigate('/login'), 2000);
       return;
@@ -146,31 +207,23 @@ const OrderReception = () => {
         return;
       }
 
-      // 🔥 MEJORADO: Añadir más información de debug
       const requestBody = {
         items: receptionItems,
-        usuario: user.username, // 🔥 Añadir información del usuario
+        usuario: storedUser.username,
+        codigoempresa: storedUser.codigoCliente,
         timestamp: new Date().toISOString()
       };
 
       console.log('📤 Enviando datos:', requestBody);
 
-      const response = await fetch(`/api/reception/${orderId}/confirm`, {
+      const response = await fetchWithAuth(`/api/reception/${orderId}/confirm`, {
         method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
+        body: requestBody
       });
 
       console.log('📡 Response status:', response.status, response.statusText);
 
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
-        }
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
 
@@ -206,14 +259,16 @@ const OrderReception = () => {
       }
     } catch (err) {
       console.error('❌ Error confirming reception:', err);
-      setError(err.message || 'Error al confirmar la recepción');
       
-      // 🔥 NUEVO: Redirigir al login si es error de autenticación
-      if (err.message.includes('Sesión expirada')) {
+      // 🔥 MEJORADO: Manejo específico de errores
+      if (err.message.includes('Sesión expirada') || err.message.includes('Acceso denegado')) {
+        setError(err.message);
         setTimeout(() => {
           logout();
           navigate('/login');
         }, 2000);
+      } else {
+        setError(err.message || 'Error al confirmar la recepción');
       }
     } finally {
       setSubmitting(false);
