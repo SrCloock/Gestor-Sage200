@@ -15,8 +15,14 @@ export const AuthProvider = ({ children }) => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const userData = JSON.parse(storedUser);
+        console.log('🔄 Usuario cargado desde localStorage:', {
+          username: userData.username,
+          isAdmin: userData.isAdmin
+        });
+        setUser(userData);
       } catch {
+        console.error('❌ Error parseando usuario del localStorage');
         localStorage.removeItem('user');
       }
     }
@@ -43,6 +49,10 @@ export const AuthProvider = ({ children }) => {
 
       const data = await response.json();
       if (data.success) {
+        console.log('✅ Login exitoso:', {
+          username: data.user.username,
+          isAdmin: data.user.isAdmin
+        });
         setUser(data.user);
         localStorage.setItem('user', JSON.stringify(data.user));
         return true;
@@ -50,25 +60,31 @@ export const AuthProvider = ({ children }) => {
         throw new Error(data.message || 'Error en el login');
       }
     } catch (err) {
+      console.error('❌ Error en login:', err);
       setError(err.message || 'Error de conexión con el servidor');
       return false;
     }
   };
 
   const logout = () => {
+    console.log('🚪 Cerrando sesión...');
     setUser(null);
     setError('');
     localStorage.removeItem('user');
-    setTimeout(() => {
-      window.location.href = '/login';
-    }, 100);
+    
+    // Limpiar cualquier cookie de sesión
+    fetch(`${apiBase}/api/auth/logout`, {
+      method: 'POST',
+      credentials: 'include'
+    }).catch(err => console.error('Error en logout:', err));
+    
+    // Redirección inmediata
+    window.location.href = '/login';
   };
 
-  const clearError = () => setError('');
-
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, logout, clearError }}>
-      {!loading && children}
+    <AuthContext.Provider value={{ user, loading, error, login, logout }}>
+      {children}
     </AuthContext.Provider>
   );
 };

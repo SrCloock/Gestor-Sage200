@@ -34,8 +34,6 @@ function App() {
               <Route path="/revisar-pedido" element={<OrderReview />} />
               <Route path="/mis-pedidos" element={<OrderList />} />
               <Route path="/mis-pedidos/:orderId" element={<OrderDetail />} />
-              {/* NUEVA RUTA PARA ADMIN */}
-              <Route path="/admin/orders/:orderId" element={<OrderDetail />} />
               <Route path="/editar-pedido/:orderId" element={<OrderEdit />} />
               <Route path="/mis-pedidos/:orderId/recepcion" element={<OrderReception />} />
               <Route path="/admin/orders" element={<AdminOrders />} />
