@@ -56,7 +56,6 @@ const AdminOrders = () => {
         ...(filtros.fechaHasta && { fechaHasta: filtros.fechaHasta })
       }).toString();
 
-      // CORREGIDO: Ruta API correcta
       const response = await fetch(`/api/admin/orders/pending?${params}`, {
         method: 'GET',
         credentials: 'include',
@@ -65,7 +64,6 @@ const AdminOrders = () => {
         },
       });
 
-      // Manejo mejorado de errores
       if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
@@ -81,7 +79,6 @@ const AdminOrders = () => {
       if (data.success) {
         setOrders(data.orders || []);
         
-        // CORRECCIÓN: Verificación segura para paginacion
         const paginationData = data.pagination || data.paginacion || {
           total: (data.orders || []).length,
           totalPaginas: Math.ceil((data.orders || []).length / paginacion.porPagina) || 1
@@ -105,7 +102,6 @@ const AdminOrders = () => {
 
   const fetchOrderDetails = async (orderId) => {
     try {
-      // CORREGIDO: Ruta API correcta
       const response = await fetch(`/api/admin/orders/${orderId}`, {
         method: 'GET',
         credentials: 'include',
@@ -170,13 +166,9 @@ const AdminOrders = () => {
         return;
       }
 
-      // Validar que hay al menos un producto con cantidad > 0
       const validProducts = editedOrder.Productos.filter(product => product.UnidadesPedidas > 0);
-      
-      // Si no hay productos válidos, enviar array vacío para eliminar el pedido
       const productsToSend = validProducts.length > 0 ? validProducts : [];
 
-      // CORREGIDO: Ruta API correcta
       const response = await fetch(`/api/admin/orders/${selectedOrder.NumeroPedido}/approve`, {
         method: 'PUT',
         credentials: 'include',
@@ -624,8 +616,8 @@ const AdminOrders = () => {
       )}
       
       {selectedOrder && editedOrder && (
-        <div className="ao-modal-overlay">
-          <div className="ao-modal">
+        <div className="ao-modal-overlay" onClick={() => { setSelectedOrder(null); setEditedOrder(null); }}>
+          <div className="ao-modal" onClick={(e) => e.stopPropagation()}>
             <div className="ao-modal-header">
               <h2>Detalles del Pedido #{selectedOrder.NumeroPedido}</h2>
               <button 
@@ -639,110 +631,118 @@ const AdminOrders = () => {
               </button>
             </div>
             
-            <div className="ao-modal-grid">
-              <div className="ao-info-card">
-                <div className="ao-card-header">
-                  <h3>Información del cliente</h3>
-                  <div className="ao-card-icon">👤</div>
+            <div className="ao-modal-content">
+              <div className="ao-modal-grid">
+                <div className="ao-info-card">
+                  <div className="ao-card-header">
+                    <h3>Información del cliente</h3>
+                    <div className="ao-card-icon">👤</div>
+                  </div>
+                  <div className="ao-info-content">
+                    <div className="ao-info-row">
+                      <span className="ao-info-label">Nombre:</span>
+                      <span className="ao-info-value">{selectedOrder.RazonSocial}</span>
+                    </div>
+                    <div className="ao-info-row">
+                      <span className="ao-info-label">CIF/DNI:</span>
+                      <span className="ao-info-value">{selectedOrder.CifDni}</span>
+                    </div>
+                    <div className="ao-info-row">
+                      <span className="ao-info-label">Dirección:</span>
+                      <span className="ao-info-value">
+                        {selectedOrder.Domicilio}, {selectedOrder.CodigoPostal} {selectedOrder.Municipio}, {selectedOrder.Provincia}
+                      </span>
+                    </div>
+                    <div className="ao-info-row">
+                      <span className="ao-info-label">Fecha necesaria:</span>
+                      <span className="ao-info-value">{formatDate(selectedOrder.FechaNecesaria)}</span>
+                    </div>
+                    <div className="ao-info-row">
+                      <span className="ao-info-label">Observaciones:</span>
+                      <span className="ao-info-value">{selectedOrder.ObservacionesPedido || 'Ninguna'}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="ao-info-row">
-                  <span className="ao-info-label">Nombre:</span>
-                  <span className="ao-info-value">{selectedOrder.RazonSocial}</span>
-                </div>
-                <div className="ao-info-row">
-                  <span className="ao-info-label">CIF/DNI:</span>
-                  <span className="ao-info-value">{selectedOrder.CifDni}</span>
-                </div>
-                <div className="ao-info-row">
-                  <span className="ao-info-label">Dirección:</span>
-                  <span className="ao-info-value">
-                    {selectedOrder.Domicilio}, {selectedOrder.CodigoPostal} {selectedOrder.Municipio}, {selectedOrder.Provincia}
-                  </span>
-                </div>
-                <div className="ao-info-row">
-                  <span className="ao-info-label">Fecha necesaria:</span>
-                  <span className="ao-info-value">{formatDate(selectedOrder.FechaNecesaria)}</span>
-                </div>
-                <div className="ao-info-row">
-                  <span className="ao-info-label">Observaciones:</span>
-                  <span className="ao-info-value">{selectedOrder.ObservacionesPedido || 'Ninguna'}</span>
+                
+                <div className="ao-info-card">
+                  <div className="ao-card-header">
+                    <h3>Resumen del Pedido</h3>
+                    <div className="ao-card-icon">💰</div>
+                  </div>
+                  <div className="ao-info-content">
+                    <div className="ao-info-row">
+                      <span className="ao-info-label">Total Productos:</span>
+                      <span className="ao-info-value">{editedOrder.Productos ? editedOrder.Productos.length : 0}</span>
+                    </div>
+                    <div className="ao-info-row">
+                      <span className="ao-info-label">Total General:</span>
+                      <span className="ao-info-value ao-total-amount">
+                        {formatCurrency(calculateOrderTotal())}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
               
-              <div className="ao-info-card">
-                <div className="ao-card-header">
-                  <h3>Resumen del Pedido</h3>
-                  <div className="ao-card-icon">💰</div>
-                </div>
-                <div className="ao-info-row">
-                  <span className="ao-info-label">Total Productos:</span>
-                  <span className="ao-info-value">{editedOrder.Productos ? editedOrder.Productos.length : 0}</span>
-                </div>
-                <div className="ao-info-row">
-                  <span className="ao-info-label">Total General:</span>
-                  <span className="ao-info-value ao-total-amount">
-                    {formatCurrency(calculateOrderTotal())}
-                  </span>
-                </div>
+              <h3 className="ao-products-title">Productos</h3>
+              <div className="ao-products-container">
+                {!editedOrder.Productos || editedOrder.Productos.length === 0 ? (
+                  <div className="ao-empty-products">
+                    <div className="ao-empty-products-icon">📦</div>
+                    <p>No hay productos en este pedido</p>
+                    <p>Al aprobar, el pedido será eliminado automáticamente</p>
+                  </div>
+                ) : (
+                  <div className="ao-products-scroll">
+                    <table className="ao-products-table">
+                      <thead>
+                        <tr>
+                          <th>Código</th>
+                          <th>Descripción</th>
+                          <th>Cantidad</th>
+                          <th>Precio Unitario</th>
+                          <th>Total</th>
+                          <th>Proveedor</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {editedOrder.Productos.map((product, index) => (
+                          <tr key={generateProductKey(product, index)} className="ao-product-row">
+                            <td className="ao-product-code">{product.CodigoArticulo}</td>
+                            <td className="ao-product-desc">{product.DescripcionArticulo}</td>
+                            <td className="ao-product-quantity">
+                              <input
+                                type="number"
+                                value={product.UnidadesPedidas}
+                                onChange={(e) => handleQuantityChange(index, e.target.value)}
+                                min="0"
+                                className="ao-quantity-input"
+                              />
+                            </td>
+                            <td className="ao-product-price">
+                              {formatCurrency(getProductPrice(product))}
+                            </td>
+                            <td className="ao-product-total">
+                              {formatCurrency(calculateProductTotal(product))}
+                            </td>
+                            <td className="ao-product-supplier">{product.NombreProveedor || 'No especificado'}</td>
+                            <td className="ao-product-actions">
+                              <button
+                                onClick={() => handleRemoveProduct(index)}
+                                className="ao-remove-btn"
+                                title="Eliminar producto"
+                              >
+                                <FaTrash />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-            </div>
-            
-            <h3 className="ao-products-title">Productos</h3>
-            <div className="ao-products-container">
-              {!editedOrder.Productos || editedOrder.Productos.length === 0 ? (
-                <div className="ao-empty-products">
-                  <div className="ao-empty-products-icon">📦</div>
-                  <p>No hay productos en este pedido</p>
-                  <p>Al aprobar, el pedido será eliminado automáticamente</p>
-                </div>
-              ) : (
-                <table className="ao-products-table">
-                  <thead>
-                    <tr>
-                      <th>Código</th>
-                      <th>Descripción</th>
-                      <th>Cantidad</th>
-                      <th>Precio Unitario</th>
-                      <th>Total</th>
-                      <th>Proveedor</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {editedOrder.Productos.map((product, index) => (
-                      <tr key={generateProductKey(product, index)} className="ao-product-row">
-                        <td className="ao-product-code">{product.CodigoArticulo}</td>
-                        <td className="ao-product-desc">{product.DescripcionArticulo}</td>
-                        <td className="ao-product-quantity">
-                          <input
-                            type="number"
-                            value={product.UnidadesPedidas}
-                            onChange={(e) => handleQuantityChange(index, e.target.value)}
-                            min="0"
-                            className="ao-quantity-input"
-                          />
-                        </td>
-                        <td className="ao-product-price">
-                          {formatCurrency(getProductPrice(product))}
-                        </td>
-                        <td className="ao-product-total">
-                          {formatCurrency(calculateProductTotal(product))}
-                        </td>
-                        <td className="ao-product-supplier">{product.NombreProveedor || 'No especificado'}</td>
-                        <td className="ao-product-actions">
-                          <button
-                            onClick={() => handleRemoveProduct(index)}
-                            className="ao-remove-btn"
-                            title="Eliminar producto"
-                          >
-                            <FaTrash />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
             </div>
             
             <div className="ao-modal-actions">

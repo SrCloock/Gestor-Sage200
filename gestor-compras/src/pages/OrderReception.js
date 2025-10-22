@@ -161,6 +161,7 @@ const OrderReception = () => {
     }
   }, [orderId, user, logout, navigate]);
 
+  // 🔥 CORREGIDO: Función mejorada para manejar cambios de cantidad
   const handleQuantityChange = (index, value) => {
     const newItems = [...receptionItems];
     const unidadesPedidas = newItems[index].UnidadesPedidas;
@@ -168,16 +169,31 @@ const OrderReception = () => {
     
     newItems[index].UnidadesRecibidas = nuevasUnidades;
     
-    if (nuevasUnidades !== unidadesPedidas && !newItems[index].ComentarioRecepcion) {
+    // Detectar si el comentario actual es automático (empieza con "Cantidad modificada")
+    const comentarioActual = newItems[index].ComentarioRecepcion || '';
+    const esComentarioAutomatico = comentarioActual.startsWith('Cantidad modificada:');
+    
+    // Si hay diferencia con lo pedido
+    if (nuevasUnidades !== unidadesPedidas) {
+      // Actualizar o crear comentario automático
       newItems[index].ComentarioRecepcion = `Cantidad modificada: recibidas ${nuevasUnidades} de ${unidadesPedidas} pedidas`;
+    } else if (esComentarioAutomatico) {
+      // Si ahora está completo y había comentario automático, cambiarlo a completo
+      newItems[index].ComentarioRecepcion = 'Todo recibido correctamente';
     }
+    // Si no hay diferencia y no es comentario automático, no hacemos nada (se mantiene el comentario existente)
     
     setReceptionItems(newItems);
   };
 
+  // 🔥 MEJORADO: Función para manejar cambios en comentarios
   const handleCommentChange = (index, value) => {
     const newItems = [...receptionItems];
+    
+    // Solo actualizar si el usuario está escribiendo manualmente
+    // No sobrescribir si es un comentario automático que el usuario está modificando
     newItems[index].ComentarioRecepcion = value;
+    
     setReceptionItems(newItems);
   };
 
@@ -196,8 +212,11 @@ const OrderReception = () => {
 
       console.log('🔄 Enviando confirmación para order:', orderId);
 
+      // 🔥 CORREGIDO: Incluir "Todo recibido correctamente" como comentario válido
       const itemsWithDifferences = receptionItems.filter(item => 
-        item.UnidadesRecibidas !== item.UnidadesPedidas && !item.ComentarioRecepcion.trim()
+        item.UnidadesRecibidas !== item.UnidadesPedidas && 
+        !item.ComentarioRecepcion.trim() &&
+        item.ComentarioRecepcion !== 'Todo recibido correctamente'
       );
       
       if (itemsWithDifferences.length > 0) {
@@ -404,7 +423,10 @@ const OrderReception = () => {
           <tbody>
             {receptionItems.map((item, index) => {
               const hasDifference = item.UnidadesRecibidas !== item.UnidadesPedidas;
-              const needsComment = hasDifference && !item.ComentarioRecepcion.trim();
+              // 🔥 CORREGIDO: Incluir "Todo recibido correctamente" como comentario válido
+              const needsComment = hasDifference && 
+                !item.ComentarioRecepcion.trim() && 
+                item.ComentarioRecepcion !== 'Todo recibido correctamente';
               const pendiente = (item.UnidadesPedidas || 0) - (item.UnidadesRecibidas || 0);
               
               return (
