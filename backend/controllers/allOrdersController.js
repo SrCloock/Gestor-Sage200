@@ -147,7 +147,7 @@ const getAllOrders = async (req, res) => {
   }
 };
 
-// Obtener detalles completos de un pedido específico
+// Obtener detalles completos de un pedido específico - CORREGIDO
 const getOrderDetails = async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -190,12 +190,12 @@ const getOrderDetails = async (req, res) => {
       });
     }
 
-    // Líneas del pedido
+    // Líneas del pedido - CORREGIDO: Usar DISTINCT y mejor JOIN para evitar duplicados
     const linesResult = await pool.request()
       .input('NumeroPedido', parseInt(orderId))
       .input('SeriePedido', 'WebCD')
       .query(`
-        SELECT 
+        SELECT DISTINCT
           l.Orden,
           l.CodigoArticulo,
           l.DescripcionArticulo,
@@ -206,7 +206,7 @@ const getOrderDetails = async (req, res) => {
           l.CodigoProveedor,
           l.ComentarioRecepcion,
           l.FechaRecepcion,
-          p.RazonSocial as NombreProveedor
+          COALESCE(p.RazonSocial, 'No especificado') as NombreProveedor
         FROM LineasPedidoCliente l
         LEFT JOIN Proveedores p ON l.CodigoProveedor = p.CodigoProveedor
         WHERE l.NumeroPedido = @NumeroPedido
@@ -216,11 +216,25 @@ const getOrderDetails = async (req, res) => {
 
     console.log(`Encontradas ${linesResult.recordset.length} líneas para el pedido ${orderId}`);
 
+    // Eliminar duplicados adicionales por clave única
+    const uniqueProducts = [];
+    const seenKeys = new Set();
+    
+    linesResult.recordset.forEach(item => {
+      const key = `${item.Orden}-${item.CodigoArticulo}-${item.CodigoProveedor || 'no-prov'}`;
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        uniqueProducts.push(item);
+      }
+    });
+
+    console.log(`Productos únicos después de filtrado: ${uniqueProducts.length}`);
+
     res.status(200).json({
       success: true,
       order: {
         ...orderResult.recordset[0],
-        productos: linesResult.recordset
+        productos: uniqueProducts
       }
     });
   } catch (error) {
@@ -233,7 +247,105 @@ const getOrderDetails = async (req, res) => {
   }
 };
 
+// Nueva función para detalles de pedidos para administradores
+const getAdminOrderDetails = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    if (!orderId || isNaN(parseInt(orderId))) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'ID de pedido inválido' 
+      });
+    }
+
+    const pool = await getPool();
+
+    console.log('Buscando detalles del pedido (admin):', orderId);
+
+    // Cabecera del pedido
+    const orderResult = await pool.request()
+      .input('NumeroPedido', parseInt(orderId))
+      .input('SeriePedido', 'WebCD')
+      .query(`
+        SELECT 
+          c.*,
+          CASE 
+            WHEN c.StatusAprobado = 0 THEN 'Pendiente'
+            WHEN c.StatusAprobado = -1 AND c.Estado = 0 THEN 'Preparando'
+            WHEN c.StatusAprobado = -1 AND c.Estado = 1 THEN 'Parcial'
+            WHEN c.StatusAprobado = -1 AND c.Estado = 2 THEN 'Servido'
+            ELSE 'Desconocido'
+          END as EstadoDescripcion
+        FROM CabeceraPedidoCliente c
+        WHERE c.NumeroPedido = @NumeroPedido
+        AND c.SeriePedido = @SeriePedido
+      `);
+
+    if (orderResult.recordset.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Pedido no encontrado' 
+      });
+    }
+
+    // Líneas del pedido - CORREGIDO: Usar DISTINCT para evitar duplicados
+    const linesResult = await pool.request()
+      .input('NumeroPedido', parseInt(orderId))
+      .input('SeriePedido', 'WebCD')
+      .query(`
+        SELECT DISTINCT
+          l.Orden,
+          l.CodigoArticulo,
+          l.DescripcionArticulo,
+          l.UnidadesPedidas,
+          l.UnidadesRecibidas,
+          l.UnidadesPendientes,
+          l.Precio,
+          l.CodigoProveedor,
+          l.ComentarioRecepcion,
+          l.FechaRecepcion,
+          COALESCE(p.RazonSocial, 'No especificado') as NombreProveedor
+        FROM LineasPedidoCliente l
+        LEFT JOIN Proveedores p ON l.CodigoProveedor = p.CodigoProveedor
+        WHERE l.NumeroPedido = @NumeroPedido
+        AND l.SeriePedido = @SeriePedido
+        ORDER BY l.Orden
+      `);
+
+    // Eliminar duplicados adicionales
+    const uniqueProducts = [];
+    const seenKeys = new Set();
+    
+    linesResult.recordset.forEach(item => {
+      const key = `${item.Orden}-${item.CodigoArticulo}-${item.CodigoProveedor || 'no-prov'}`;
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        uniqueProducts.push(item);
+      }
+    });
+
+    console.log(`Encontradas ${uniqueProducts.length} líneas únicas para el pedido ${orderId}`);
+
+    res.status(200).json({
+      success: true,
+      order: {
+        ...orderResult.recordset[0],
+        productos: uniqueProducts
+      }
+    });
+  } catch (error) {
+    console.error('Error al obtener detalle del pedido (admin):', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error al obtener el detalle del pedido',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 module.exports = {
   getAllOrders,
-  getOrderDetails
+  getOrderDetails,
+  getAdminOrderDetails
 };

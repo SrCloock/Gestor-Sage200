@@ -22,6 +22,9 @@ const AllOrders = () => {
     total: 0,
     totalPages: 0
   });
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [modalLoading, setModalLoading] = useState(false);
 
   const { user } = useContext(AuthContext);
 
@@ -50,7 +53,6 @@ const AllOrders = () => {
 
       console.log('Buscando todos los pedidos con params:', params);
 
-      // URL corregida
       const response = await api.get('/admin/all-orders', { params });
       
       if (response.data.success) {
@@ -68,6 +70,25 @@ const AllOrders = () => {
       setError('Error al cargar los pedidos');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleViewDetails = async (orderId) => {
+    try {
+      setModalLoading(true);
+      const response = await api.get(`/admin/all-orders/${orderId}/admin-details`);
+      
+      if (response.data.success) {
+        setSelectedOrder(response.data.order);
+        setShowOrderModal(true);
+      } else {
+        setError('Error al cargar los detalles del pedido');
+      }
+    } catch (error) {
+      console.error('Error fetching order details:', error);
+      setError('Error al cargar los detalles del pedido');
+    } finally {
+      setModalLoading(false);
     }
   };
 
@@ -97,7 +118,6 @@ const AllOrders = () => {
     return date.toLocaleDateString('es-ES');
   };
 
-  // CORREGIDO: Mostrar ImporteLiquido (con IVA) en lugar de BaseImponible
   const renderTableRows = () => {
     return orders.map(order => (
       <tr key={order.NumeroPedido} className="ao-order-row">
@@ -107,7 +127,6 @@ const AllOrders = () => {
         <td className="ao-order-cif">{order.CifDni}</td>
         <td className="ao-order-lines">{order.NumeroLineas}</td>
         <td className="ao-order-amount">
-          {/* CORREGIDO: Mostrar ImporteLiquido en lugar de BaseImponible */}
           {formatCurrency(order.ImporteLiquido)}
         </td>
         <td className="ao-order-status">
@@ -115,13 +134,19 @@ const AllOrders = () => {
             {getStatusText(order)}
           </span>
         </td>
+        <td className="ao-order-actions">
+          <button 
+            onClick={() => handleViewDetails(order.NumeroPedido)}
+            className="ao-view-btn"
+            title="Ver detalles"
+            disabled={modalLoading}
+          >
+            <FaEye />
+            {modalLoading ? 'Cargando...' : 'Ver'}
+          </button>
+        </td>
       </tr>
     ));
-  };
-
-  const handleViewDetails = (orderId) => {
-    // Navegar a los detalles del pedido
-    window.open(`/admin/orders/${orderId}`, '_blank');
   };
 
   const handleFilterChange = (e) => {
@@ -140,6 +165,21 @@ const AllOrders = () => {
       importeMax: '',
       estado: ''
     });
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const handleSort = (field) => {
+    setSorting(prev => ({
+      field,
+      direction: prev.field === field && prev.direction === 'ASC' ? 'DESC' : 'ASC'
+    }));
+  };
+
+  const renderSortIcon = (field) => {
+    if (sorting.field !== field) return <FaSort className="ao-sort-icon" />;
+    return sorting.direction === 'ASC' 
+      ? <FaSortUp className="ao-sort-icon" /> 
+      : <FaSortDown className="ao-sort-icon" />;
   };
 
   if (!user || !user.isAdmin) {
@@ -173,6 +213,9 @@ const AllOrders = () => {
         <div className="ao-error-message">
           <div className="ao-error-icon">⚠️</div>
           <p>{error}</p>
+          <button onClick={() => setError('')} className="ao-error-close">
+            <FaTimes />
+          </button>
         </div>
       )}
 
@@ -267,12 +310,20 @@ const AllOrders = () => {
               <table className="ao-orders-table">
                 <thead>
                   <tr>
-                    <th>Nº Pedido</th>
-                    <th>Fecha</th>
-                    <th>Cliente</th>
+                    <th onClick={() => handleSort('NumeroPedido')} className="ao-sortable-header">
+                      Nº Pedido {renderSortIcon('NumeroPedido')}
+                    </th>
+                    <th onClick={() => handleSort('FechaPedido')} className="ao-sortable-header">
+                      Fecha {renderSortIcon('FechaPedido')}
+                    </th>
+                    <th onClick={() => handleSort('RazonSocial')} className="ao-sortable-header">
+                      Cliente {renderSortIcon('RazonSocial')}
+                    </th>
                     <th>CIF/DNI</th>
                     <th>Líneas</th>
-                    <th>Importe</th>
+                    <th onClick={() => handleSort('ImporteLiquido')} className="ao-sortable-header">
+                      Importe {renderSortIcon('ImporteLiquido')}
+                    </th>
                     <th>Estado</th>
                     <th>Acciones</th>
                   </tr>
@@ -294,6 +345,7 @@ const AllOrders = () => {
                 <button 
                   onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
                   disabled={pagination.page === 1}
+                  className="ao-pagination-btn"
                 >
                   ‹ Anterior
                 </button>
@@ -303,6 +355,7 @@ const AllOrders = () => {
                 <button 
                   onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
                   disabled={pagination.page === pagination.totalPages}
+                  className="ao-pagination-btn"
                 >
                   Siguiente ›
                 </button>
@@ -310,6 +363,94 @@ const AllOrders = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* Modal para ver detalles del pedido */}
+      {showOrderModal && selectedOrder && (
+        <div className="ao-modal-overlay" onClick={() => setShowOrderModal(false)}>
+          <div className="ao-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ao-modal-header">
+              <h3>Detalles del Pedido #{selectedOrder.NumeroPedido}</h3>
+              <button onClick={() => setShowOrderModal(false)} className="ao-modal-close">
+                ×
+              </button>
+            </div>
+            
+            <div className="ao-modal-content">
+              <div className="ao-order-info">
+                <div className="ao-info-grid">
+                  <div className="ao-info-item">
+                    <strong>Cliente:</strong> {selectedOrder.RazonSocial}
+                  </div>
+                  <div className="ao-info-item">
+                    <strong>Fecha:</strong> {formatDate(selectedOrder.FechaPedido)}
+                  </div>
+                  <div className="ao-info-item">
+                    <strong>Estado:</strong> 
+                    <span className={`ao-status-badge ao-status-${selectedOrder.EstadoDescripcion?.toLowerCase()}`}>
+                      {selectedOrder.EstadoDescripcion}
+                    </span>
+                  </div>
+                  <div className="ao-info-item">
+                    <strong>Total:</strong> {formatCurrency(selectedOrder.ImporteLiquido)}
+                  </div>
+                  {selectedOrder.FechaNecesaria && (
+                    <div className="ao-info-item">
+                      <strong>Fecha Necesaria:</strong> {formatDate(selectedOrder.FechaNecesaria)}
+                    </div>
+                  )}
+                  {selectedOrder.ObservacionesPedido && (
+                    <div className="ao-info-item ao-full-width">
+                      <strong>Observaciones:</strong> {selectedOrder.ObservacionesPedido}
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="ao-products-list">
+                <h4>Productos ({selectedOrder.productos?.length || 0})</h4>
+                {selectedOrder.productos && selectedOrder.productos.length > 0 ? (
+                  <div className="ao-products-table-container">
+                    <table className="ao-products-table">
+                      <thead>
+                        <tr>
+                          <th>Código</th>
+                          <th>Descripción</th>
+                          <th>Cantidad</th>
+                          <th>Precio Unit.</th>
+                          <th>Total</th>
+                          <th>Proveedor</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedOrder.productos.map((product, index) => (
+                          <tr key={index}>
+                            <td className="ao-product-code">{product.CodigoArticulo}</td>
+                            <td className="ao-product-desc">{product.DescripcionArticulo}</td>
+                            <td className="ao-product-qty">{product.UnidadesPedidas}</td>
+                            <td className="ao-product-price">{formatCurrency(product.Precio)}</td>
+                            <td className="ao-product-total">
+                              {formatCurrency(product.Precio * product.UnidadesPedidas)}
+                            </td>
+                            <td className="ao-product-supplier">{product.NombreProveedor}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="ao-no-products">No hay productos en este pedido</p>
+                )}
+              </div>
+            </div>
+            
+            <div className="ao-modal-footer">
+              <button onClick={() => setShowOrderModal(false)} className="ao-close-btn">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
