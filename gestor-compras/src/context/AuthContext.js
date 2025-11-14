@@ -9,7 +9,7 @@ export const AuthProvider = ({ children }) => {
 
   const apiBase = window.location.hostname.includes('localhost')
     ? 'http://localhost:3000'
-    : 'http://217.18.162.40:3000';
+    : 'http://84.120.61.159:3000';
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');

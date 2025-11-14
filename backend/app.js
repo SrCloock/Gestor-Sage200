@@ -10,6 +10,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const receptionRoutes = require('./routes/receptionRoutes');
 const allOrdersRoutes = require('./routes/allOrders');
 const catalogRoutes = require('./routes/catalog');
+const purchaseDeliveryRoutes = require('./routes/purchaseDeliveryRoutes');
 
 const { connect } = require('./db/Sage200db');
 
@@ -72,6 +73,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/reception', receptionRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/all-orders', allOrdersRoutes);
+app.use('/api/purchase-delivery', purchaseDeliveryRoutes);
 app.use('/api/catalog', catalogRoutes);
 
 // Ruta de salud
@@ -112,7 +114,7 @@ app.use((err, req, res, next) => {
     return res.status(403).json({ 
       success: false, 
       message: 'Origen no permitido por CORS',
-      allowedOrigins: ['http://localhost:3001', 'http://localhost:3000', 'http://217.18.162.40:3000', 'http://217.18.162.40:3001'],
+      allowedOrigins: ['http://localhost:3001', 'http://localhost:3000', 'http://84.120.61.159:3000', 'http://84.120.61.159:3001'],
       receivedOrigin: req.headers.origin
     });
   }

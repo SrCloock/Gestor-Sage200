@@ -1,4 +1,5 @@
 const { getPool } = require('../db/Sage200db');
+const { generarAlbaranProveedor } = require('./purchaseDeliveryController');
 
 const getOrderReception = async (req, res) => {
   try {
@@ -23,7 +24,10 @@ const getOrderReception = async (req, res) => {
           l.UnidadesRecibidas,
           l.UnidadesPendientes,
           l.ComentarioRecepcion,
-          l.FechaRecepcion
+          l.FechaRecepcion,
+          l.Precio,
+          l.CodigoProveedor,
+          l.[%Iva] as PorcentajeIva
         FROM CabeceraPedidoCliente c
         JOIN LineasPedidoCliente l ON c.NumeroPedido = l.NumeroPedido AND c.SeriePedido = l.SeriePedido
         WHERE c.NumeroPedido = @NumeroPedido
@@ -66,7 +70,10 @@ const getOrderReception = async (req, res) => {
         UnidadesRecibidas: item.UnidadesRecibidas,
         UnidadesPendientes: item.UnidadesPendientes,
         ComentarioRecepcion: item.ComentarioRecepcion,
-        FechaRecepcion: item.FechaRecepcion
+        FechaRecepcion: item.FechaRecepcion,
+        Precio: item.Precio,
+        CodigoProveedor: item.CodigoProveedor,
+        PorcentajeIva: item.PorcentajeIva
       }))
     };
 
@@ -116,7 +123,8 @@ const confirmReception = async (req, res) => {
             Municipio,
             Provincia,
             Estado,
-            StatusAprobado
+            StatusAprobado,
+            NumeroPedido
           FROM CabeceraPedidoCliente
           WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
         `);
@@ -126,6 +134,7 @@ const confirmReception = async (req, res) => {
       }
 
       const orderInfo = orderResult.recordset[0];
+      const fechaActual = new Date(); // Declarar fechaActual aquí
 
       // 3. Actualizar líneas del pedido con cantidades recibidas y calcular pendientes
       for (const item of items) {
@@ -139,9 +148,9 @@ const confirmReception = async (req, res) => {
           .input('Orden', item.Orden)
           .input('UnidadesRecibidas', unidadesRecibidas)
           .input('UnidadesPendientes', unidadesPendientes)
-          .input('UnidadesServidas', unidadesRecibidas) // Actualizar unidades servidas
+          .input('UnidadesServidas', unidadesRecibidas)
           .input('ComentarioRecepcion', item.ComentarioRecepcion || '')
-          .input('FechaRecepcion', new Date())
+          .input('FechaRecepcion', fechaActual)
           .query(`
             UPDATE LineasPedidoCliente 
             SET 
@@ -269,6 +278,54 @@ const confirmReception = async (req, res) => {
           AND SeriePedido = @SeriePedido
         `);
 
+      // 10. GENERAR ALBARANES DE COMPRA (NUEVA FUNCIONALIDAD)
+      let albaranesCompraGenerados = [];
+      
+      // CORREGIDO: Consulta sin @FechaActual - contamos recepciones anteriores a esta
+      const recepcionesAnterioresResult = await transaction.request()
+        .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD')
+        .input('FechaActualRecepcion', fechaActual)
+        .query(`
+          SELECT COUNT(DISTINCT FechaRecepcion) as TotalRecepciones
+          FROM LineasPedidoCliente
+          WHERE NumeroPedido = @NumeroPedido 
+          AND SeriePedido = @SeriePedido
+          AND FechaRecepcion IS NOT NULL
+          AND FechaRecepcion < @FechaActualRecepcion
+        `);
+
+      const totalRecepcionesAnteriores = recepcionesAnterioresResult.recordset[0].TotalRecepciones || 0;
+      const esRecepcionParcial = totalRecepcionesAnteriores > 0;
+      const numeroParcial = totalRecepcionesAnteriores + 1;
+
+      // Filtrar items recepcionados en esta confirmación (solo los que tienen unidades recibidas)
+      const itemsRecepcionados = items.filter(item => 
+        (item.UnidadesRecibidas || 0) > 0
+      );
+
+      // Generar albaranes de compra si hay items recepcionados
+      if (itemsRecepcionados.length > 0) {
+        console.log(`Generando albaranes de compra para ${itemsRecepcionados.length} items recepcionados`);
+        
+        try {
+          albaranesCompraGenerados = await generarAlbaranProveedor(
+            transaction, 
+            orderInfo, 
+            itemsRecepcionados, 
+            orderInfo.CodigoEmpresa,
+            esRecepcionParcial,
+            numeroParcial
+          );
+
+          console.log(`✅ ${albaranesCompraGenerados.length} albarán(es) de compra generado(s)`);
+        } catch (error) {
+          console.error('❌ Error al generar albaranes de compra:', error);
+          // No hacemos throw aquí para no interrumpir el proceso completo
+          // Solo registramos el error y continuamos
+        }
+      }
+
       await transaction.commit();
 
       res.status(200).json({
@@ -280,7 +337,11 @@ const confirmReception = async (req, res) => {
           pedido: totalPedido,
           recibido: totalRecibido,
           pendiente: totalPendiente
-        }
+        },
+        albaranesCompraGenerados: albaranesCompraGenerados.length,
+        detallesAlbaranes: albaranesCompraGenerados,
+        esRecepcionParcial: esRecepcionParcial,
+        numeroParcial: numeroParcial
       });
 
     } catch (err) {

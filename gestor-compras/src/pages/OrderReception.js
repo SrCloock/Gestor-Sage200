@@ -14,6 +14,7 @@ const OrderReception = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [albaranesGenerados, setAlbaranesGenerados] = useState([]);
 
   // 🔥 CORREGIDO: Función mejorada para fetch con autenticación
   const fetchWithAuth = async (url, options = {}) => {
@@ -209,6 +210,7 @@ const OrderReception = () => {
       setSubmitting(true);
       setError('');
       setSuccess('');
+      setAlbaranesGenerados([]);
 
       console.log('🔄 Enviando confirmación para order:', orderId);
 
@@ -258,21 +260,38 @@ const OrderReception = () => {
       
       if (data.success) {
         setSuccess('Recepción confirmada correctamente');
+        setAlbaranesGenerados(data.detallesAlbaranes || []);
         
         setOrder(prev => ({
           ...prev,
           Estado: data.estado || 2
         }));
-        
+
+        // Actualizar las cantidades recibidas en el estado local
+        const updatedItems = [...receptionItems];
+        data.detallesAlbaranes?.forEach(albaran => {
+          albaran.items?.forEach(itemAlbaran => {
+            const itemIndex = updatedItems.findIndex(item => 
+              item.CodigoArticulo === itemAlbaran.CodigoArticulo && 
+              item.CodigoProveedor === albaran.proveedor
+            );
+            if (itemIndex !== -1) {
+              updatedItems[itemIndex].UnidadesRecibidas = itemAlbaran.UnidadesRecibidas;
+            }
+          });
+        });
+        setReceptionItems(updatedItems);
+
         setTimeout(() => {
           navigate(`/mis-pedidos/${orderId}`, { 
             state: { 
               refreshed: true,
               receptionConfirmed: true,
-              message: 'Recepción confirmada correctamente'
+              message: 'Recepción confirmada correctamente',
+              albaranesGenerados: data.detallesAlbaranes
             } 
           });
-        }, 1500);
+        }, 3000);
       } else {
         setError(data.message || 'Error al confirmar la recepción');
       }
@@ -367,7 +386,34 @@ const OrderReception = () => {
         <div className="orr-success-message">
           <div className="orr-success-icon">✅</div>
           <p>{success}</p>
+          {albaranesGenerados.length > 0 && (
+            <div className="orr-albaranes-info">
+              <p><strong>Albaranes de compra generados:</strong> {albaranesGenerados.length}</p>
+            </div>
+          )}
           <p>Redirigiendo al detalle del pedido...</p>
+        </div>
+      )}
+
+      {/* SECCIÓN NUEVA: Mostrar albaranes generados */}
+      {albaranesGenerados.length > 0 && (
+        <div className="orr-albaranes-generados">
+          <h3>📦 Albaranes de Compra Generados</h3>
+          <div className="orr-albaranes-grid">
+            {albaranesGenerados.map((albaran, index) => (
+              <div key={index} className="orr-albaran-card">
+                <div className="orr-albaran-header">
+                  <h4>Albarán #{albaran.numeroAlbaran}</h4>
+                  <span className="orr-albaran-proveedor">Proveedor: {albaran.proveedor}</span>
+                </div>
+                <div className="orr-albaran-details">
+                  <p><strong>Items:</strong> {albaran.items}</p>
+                  <p><strong>Total:</strong> {albaran.total?.toFixed(2)} €</p>
+                  <p><strong>Estado:</strong> {albaran.esParcial ? 'Recepción Parcial' : 'Completo'}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -406,6 +452,9 @@ const OrderReception = () => {
           <p className="orr-warning-text">
             ⚠️ <strong>Importante:</strong> Si la cantidad recibida es diferente a la pedida, debe agregar un comentario explicando la diferencia.
           </p>
+          <p className="orr-info-text">
+            💡 <strong>Nota:</strong> Al confirmar la recepción, se generarán automáticamente los albaranes de compra correspondientes.
+          </p>
         </div>
         
         <table className="orr-reception-table">
@@ -413,6 +462,7 @@ const OrderReception = () => {
             <tr>
               <th>Artículo</th>
               <th>Código</th>
+              <th>Proveedor</th>
               <th>Pedido</th>
               <th>Recibido</th>
               <th>Pendiente</th>
@@ -433,6 +483,7 @@ const OrderReception = () => {
                 <tr key={index} className={`${hasDifference ? 'orr-partial-reception' : ''} ${needsComment ? 'orr-needs-comment' : ''}`}>
                   <td className="orr-item-description">{item.DescripcionArticulo}</td>
                   <td className="orr-item-code">{item.CodigoArticulo}</td>
+                  <td className="orr-item-proveedor">{item.CodigoProveedor || 'No especificado'}</td>
                   <td className="orr-item-ordered">{item.UnidadesPedidas}</td>
                   <td className="orr-item-received">
                     <input
