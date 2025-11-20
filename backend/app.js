@@ -114,7 +114,7 @@ app.use((err, req, res, next) => {
     return res.status(403).json({ 
       success: false, 
       message: 'Origen no permitido por CORS',
-      allowedOrigins: ['http://localhost:3001', 'http://localhost:3000', 'http://84.120.61.159:3000', 'http://84.120.61.159:3001'],
+      allowedOrigins: ['http://localhost:3001', 'http://localhost:3000', 'http://217.18.162.40:3000', 'http://217.18.162.40:3001'],
       receivedOrigin: req.headers.origin
     });
   }

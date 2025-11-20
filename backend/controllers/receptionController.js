@@ -17,6 +17,9 @@ const getOrderReception = async (req, res) => {
           c.Estado,
           c.StatusAprobado,
           c.FechaNecesaria,
+          c.CodigoEmpresa,
+          c.EjercicioPedido,
+          c.SeriePedido,
           l.Orden,
           l.CodigoArticulo,
           l.DescripcionArticulo,
@@ -62,6 +65,9 @@ const getOrderReception = async (req, res) => {
       FechaNecesaria: result.recordset[0].FechaNecesaria,
       Estado: result.recordset[0].Estado,
       StatusAprobado: result.recordset[0].StatusAprobado,
+      CodigoEmpresa: result.recordset[0].CodigoEmpresa,
+      EjercicioPedido: result.recordset[0].EjercicioPedido,
+      SeriePedido: result.recordset[0].SeriePedido,
       Productos: uniqueProducts.map(item => ({
         Orden: item.Orden,
         CodigoArticulo: item.CodigoArticulo,
@@ -116,6 +122,7 @@ const confirmReception = async (req, res) => {
           SELECT 
             CodigoEmpresa, 
             EjercicioPedido,
+            SeriePedido,
             CodigoCliente,
             RazonSocial,
             Domicilio,
@@ -134,13 +141,17 @@ const confirmReception = async (req, res) => {
       }
 
       const orderInfo = orderResult.recordset[0];
-      const fechaActual = new Date(); // Declarar fechaActual aquí
+      const fechaActual = new Date();
+
+      console.log(`🔄 Iniciando recepción para pedido ${orderId}`);
 
       // 3. Actualizar líneas del pedido con cantidades recibidas y calcular pendientes
       for (const item of items) {
         const unidadesRecibidas = parseInt(item.UnidadesRecibidas) || 0;
         const unidadesPedidas = parseInt(item.UnidadesPedidas) || 0;
         const unidadesPendientes = unidadesPedidas - unidadesRecibidas;
+        
+        console.log(`📦 Actualizando artículo ${item.CodigoArticulo}: Recibidas ${unidadesRecibidas} de ${unidadesPedidas}`);
         
         await transaction.request()
           .input('NumeroPedido', orderId)
@@ -179,7 +190,7 @@ const confirmReception = async (req, res) => {
       if (albaranResult.recordset.length > 0) {
         const numeroAlbaran = albaranResult.recordset[0].NumeroAlbaran;
         
-        console.log(`Encontrado albarán ${numeroAlbaran} para el pedido ${orderId}`);
+        console.log(`📄 Encontrado albarán de cliente ${numeroAlbaran} para el pedido ${orderId}`);
         
         // 5. Actualizar las líneas del albarán de cliente con las unidades recibidas
         for (const item of items) {
@@ -231,9 +242,9 @@ const confirmReception = async (req, res) => {
             WHERE NumeroAlbaran = @NumeroAlbaran
           `);
 
-        console.log(`Albarán ${numeroAlbaran} actualizado con nuevas cantidades y comentarios`);
+        console.log(`✅ Albarán de cliente ${numeroAlbaran} actualizado con nuevas cantidades`);
       } else {
-        console.warn(`No se encontró albarán para el pedido ${orderId}`);
+        console.warn(`⚠️ No se encontró albarán de cliente para el pedido ${orderId}`);
       }
 
       // 8. Calcular el NUEVO ESTADO del pedido basado en las unidades recibidas
@@ -255,7 +266,7 @@ const confirmReception = async (req, res) => {
 
       let nuevoEstado;
       
-      // LÓGICA CORREGIDA para determinar el estado
+      // LÓGICA para determinar el estado
       if (totalRecibido === 0) {
         nuevoEstado = 0; // No se ha recibido nada -> Preparando
       } else if (totalPendiente === 0) {
@@ -264,7 +275,7 @@ const confirmReception = async (req, res) => {
         nuevoEstado = 1; // Hay unidades pendientes pero se recibió algo -> Parcial
       }
 
-      console.log(`Estado calculado: Pedido=${totalPedido}, Recibido=${totalRecibido}, Pendiente=${totalPendiente} -> Estado=${nuevoEstado}`);
+      console.log(`📊 Estado calculado: Pedido=${totalPedido}, Recibido=${totalRecibido}, Pendiente=${totalPendiente} -> Estado=${nuevoEstado}`);
 
       // 9. Actualizar estado del pedido en la cabecera
       await transaction.request()
@@ -278,40 +289,48 @@ const confirmReception = async (req, res) => {
           AND SeriePedido = @SeriePedido
         `);
 
-      // 10. GENERAR ALBARANES DE COMPRA (NUEVA FUNCIONALIDAD)
+      // 10. GENERAR ALBARANES DE COMPRA (FUNCIONALIDAD PRINCIPAL) - USANDO LA NUEVA FUNCIÓN MEJORADA
       let albaranesCompraGenerados = [];
       
-      // CORREGIDO: Consulta sin @FechaActual - contamos recepciones anteriores a esta
+      // Determinar si es recepción parcial
       const recepcionesAnterioresResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
-        .input('FechaActualRecepcion', fechaActual)
         .query(`
-          SELECT COUNT(DISTINCT FechaRecepcion) as TotalRecepciones
+          SELECT COUNT(DISTINCT CONVERT(DATE, FechaRecepcion)) as TotalRecepciones
           FROM LineasPedidoCliente
           WHERE NumeroPedido = @NumeroPedido 
           AND SeriePedido = @SeriePedido
           AND FechaRecepcion IS NOT NULL
-          AND FechaRecepcion < @FechaActualRecepcion
+          AND CONVERT(DATE, FechaRecepcion) < CONVERT(DATE, GETDATE())
         `);
 
       const totalRecepcionesAnteriores = recepcionesAnterioresResult.recordset[0].TotalRecepciones || 0;
       const esRecepcionParcial = totalRecepcionesAnteriores > 0;
       const numeroParcial = totalRecepcionesAnteriores + 1;
 
-      // Filtrar items recepcionados en esta confirmación (solo los que tienen unidades recibidas)
+      // Filtrar items recepcionados en esta confirmación (solo los que tienen unidades recibidas > 0)
       const itemsRecepcionados = items.filter(item => 
-        (item.UnidadesRecibidas || 0) > 0
+        (parseInt(item.UnidadesRecibidas) || 0) > 0
       );
+
+      console.log(`📦 Items recepcionados en esta confirmación: ${itemsRecepcionados.length}`);
+      console.log(`🔢 Recepción ${esRecepcionParcial ? 'PARCIAL' : 'COMPLETA'} - Número: ${numeroParcial}`);
 
       // Generar albaranes de compra si hay items recepcionados
       if (itemsRecepcionados.length > 0) {
-        console.log(`Generando albaranes de compra para ${itemsRecepcionados.length} items recepcionados`);
+        console.log(`🔄 Generando albaranes de compra para ${itemsRecepcionados.length} items recepcionados`);
         
         try {
+          // 🔥 USAR LA NUEVA FUNCIÓN MEJORADA que busca albaranes existentes no facturados
           albaranesCompraGenerados = await generarAlbaranProveedor(
             transaction, 
-            orderInfo, 
+            {
+              ...orderInfo,
+              EjercicioPedido: orderInfo.EjercicioPedido,
+              SeriePedido: orderInfo.SeriePedido,
+              NumeroPedido: orderInfo.NumeroPedido
+            }, 
             itemsRecepcionados, 
             orderInfo.CodigoEmpresa,
             esRecepcionParcial,
@@ -324,13 +343,17 @@ const confirmReception = async (req, res) => {
           // No hacemos throw aquí para no interrumpir el proceso completo
           // Solo registramos el error y continuamos
         }
+      } else {
+        console.log('ℹ️ No hay items recepcionados en esta confirmación para generar albaranes');
       }
 
       await transaction.commit();
 
+      console.log(`🎉 Recepción completada exitosamente para pedido ${orderId}`);
+
       res.status(200).json({
         success: true,
-        message: 'Recepción confirmada correctamente. Albarán actualizado con las cantidades recibidas y comentarios.',
+        message: 'Recepción confirmada correctamente. Albaranes de compra generados según las cantidades recepcionadas.',
         estado: nuevoEstado,
         estadoTexto: nuevoEstado === 2 ? 'Servido' : nuevoEstado === 1 ? 'Parcial' : 'Preparando',
         totales: {
@@ -346,7 +369,7 @@ const confirmReception = async (req, res) => {
 
     } catch (err) {
       await transaction.rollback();
-      console.error('Error en la transacción de recepción:', err);
+      console.error('❌ Error en la transacción de recepción:', err);
       res.status(500).json({ 
         success: false, 
         message: err.message || 'Error al confirmar la recepción',
@@ -354,7 +377,7 @@ const confirmReception = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Error al confirmar recepción:', error);
+    console.error('❌ Error al confirmar recepción:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Error al confirmar la recepción',
@@ -363,7 +386,228 @@ const confirmReception = async (req, res) => {
   }
 };
 
+// 🔥 NUEVA FUNCIÓN: Finalizar pedido (marcar como servido)
+const finalizeOrder = async (req, res) => {
+  const { orderId } = req.params;
+
+  try {
+    const pool = await getPool();
+    const transaction = pool.transaction();
+    await transaction.begin();
+
+    try {
+      // 1. Verificar que el pedido existe y obtener información actual
+      const orderResult = await transaction.request()
+        .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD')
+        .query(`
+          SELECT 
+            Estado, 
+            StatusAprobado,
+            CodigoEmpresa,
+            EjercicioPedido
+          FROM CabeceraPedidoCliente
+          WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
+        `);
+
+      if (orderResult.recordset.length === 0) {
+        throw new Error('Pedido no encontrado');
+      }
+
+      const pedido = orderResult.recordset[0];
+
+      // 2. Verificar que el pedido no esté ya servido
+      if (pedido.Estado === 2) {
+        throw new Error('El pedido ya está marcado como servido');
+      }
+
+      console.log(`🔚 Finalizando pedido ${orderId} - Estado actual: ${pedido.Estado}`);
+
+      // 3. Obtener unidades pendientes actuales
+      const pendientesResult = await transaction.request()
+        .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD')
+        .query(`
+          SELECT 
+            SUM(UnidadesPendientes) as TotalPendiente,
+            SUM(UnidadesRecibidas) as TotalRecibido
+          FROM LineasPedidoCliente
+          WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
+        `);
+
+      const totalPendiente = pendientesResult.recordset[0].TotalPendiente || 0;
+      const totalRecibido = pendientesResult.recordset[0].TotalRecibido || 0;
+
+      console.log(`📊 Unidades pendientes antes de finalizar: ${totalPendiente}`);
+
+      // 4. Actualizar estado del pedido a "Servido" (2)
+      await transaction.request()
+        .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD')
+        .input('Estado', 2) // Servido
+        .query(`
+          UPDATE CabeceraPedidoCliente 
+          SET Estado = @Estado
+          WHERE NumeroPedido = @NumeroPedido
+          AND SeriePedido = @SeriePedido
+        `);
+
+      // 5. Actualizar líneas para poner pendientes a 0 y marcar como recibidas las pendientes
+      await transaction.request()
+        .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD')
+        .input('FechaRecepcion', new Date())
+        .query(`
+          UPDATE LineasPedidoCliente 
+          SET 
+            UnidadesPendientes = 0,
+            UnidadesRecibidas = UnidadesPedidas,
+            UnidadesServidas = UnidadesPedidas,
+            ComentarioRecepcion = ISNULL(ComentarioRecepcion, '') + ' - Pedido finalizado manualmente',
+            FechaRecepcion = @FechaRecepcion
+          WHERE NumeroPedido = @NumeroPedido 
+          AND SeriePedido = @SeriePedido
+          AND UnidadesPendientes > 0
+        `);
+
+      // 6. Si existe albarán de cliente, actualizarlo también
+      const albaranResult = await transaction.request()
+        .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD')
+        .query(`
+          SELECT NumeroAlbaran 
+          FROM CabeceraAlbaranCliente 
+          WHERE NumeroPedido = @NumeroPedido
+          AND SeriePedido = @SeriePedido
+        `);
+
+      if (albaranResult.recordset.length > 0) {
+        const numeroAlbaran = albaranResult.recordset[0].NumeroAlbaran;
+        
+        console.log(`📄 Actualizando albarán de cliente ${numeroAlbaran}`);
+
+        // Actualizar líneas del albarán de cliente
+        await transaction.request()
+          .input('NumeroAlbaran', numeroAlbaran)
+          .query(`
+            UPDATE LineasAlbaranCliente 
+            SET 
+              Unidades = UnidadesServidas,
+              UnidadesServidas = UnidadesServidas
+            WHERE NumeroAlbaran = @NumeroAlbaran
+          `);
+
+        // Recalcular totales del albarán de cliente
+        const totalesResult = await transaction.request()
+          .input('NumeroAlbaran', numeroAlbaran)
+          .query(`
+            SELECT 
+              SUM(Unidades * Precio) AS BaseImponible,
+              SUM((Unidades * Precio) * ([%Iva] / 100.0)) AS TotalIVA
+            FROM LineasAlbaranCliente
+            WHERE NumeroAlbaran = @NumeroAlbaran
+          `);
+
+        const baseImponible = parseFloat(totalesResult.recordset[0].BaseImponible) || 0;
+        const totalIVA = parseFloat(totalesResult.recordset[0].TotalIVA) || 0;
+        const importeLiquido = baseImponible + totalIVA;
+
+        await transaction.request()
+          .input('NumeroAlbaran', numeroAlbaran)
+          .input('BaseImponible', baseImponible)
+          .input('TotalIVA', totalIVA)
+          .input('ImporteLiquido', importeLiquido)
+          .query(`
+            UPDATE CabeceraAlbaranCliente
+            SET 
+              BaseImponible = @BaseImponible,
+              TotalIVA = @TotalIVA,
+              ImporteLiquido = @ImporteLiquido
+            WHERE NumeroAlbaran = @NumeroAlbaran
+          `);
+
+        console.log(`✅ Albarán de cliente ${numeroAlbaran} actualizado`);
+      }
+
+      // 7. Generar albaranes de compra para las unidades que se estaban pendientes
+      const itemsPendientesResult = await transaction.request()
+        .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD')
+        .query(`
+          SELECT 
+            Orden,
+            CodigoArticulo,
+            DescripcionArticulo,
+            UnidadesPedidas as UnidadesRecibidas, -- Al finalizar, todas las pendientes se reciben
+            Precio,
+            CodigoProveedor,
+            [%Iva] as PorcentajeIva,
+            'Pedido finalizado manualmente' as ComentarioRecepcion
+          FROM LineasPedidoCliente
+          WHERE NumeroPedido = @NumeroPedido 
+          AND SeriePedido = @SeriePedido
+          AND UnidadesPendientes > 0
+        `);
+
+      let albaranesFinalizacionGenerados = [];
+      
+      if (itemsPendientesResult.recordset.length > 0) {
+        console.log(`📦 Generando albaranes de compra para ${itemsPendientesResult.recordset.length} items pendientes al finalizar`);
+        
+        try {
+          albaranesFinalizacionGenerados = await generarAlbaranProveedor(
+            transaction, 
+            {
+              EjercicioPedido: pedido.EjercicioPedido,
+              SeriePedido: 'WebCD',
+              NumeroPedido: orderId,
+              CodigoEmpresa: pedido.CodigoEmpresa
+            }, 
+            itemsPendientesResult.recordset, 
+            pedido.CodigoEmpresa,
+            true, // Siempre es parcial porque es finalización manual
+            999   // Número especial para finalización
+          );
+
+          console.log(`✅ ${albaranesFinalizacionGenerados.length} albarán(es) de compra generado(s) por finalización`);
+        } catch (error) {
+          console.error('❌ Error al generar albaranes de compra por finalización:', error);
+          // No interrumpimos el proceso por este error
+        }
+      }
+
+      await transaction.commit();
+
+      console.log(`🎉 Pedido ${orderId} finalizado exitosamente`);
+
+      res.status(200).json({
+        success: true,
+        message: 'Pedido marcado como servido correctamente. Las unidades pendientes se han establecido a 0 y se han generado los albaranes de compra correspondientes.',
+        estado: 2,
+        unidadesPendientesAnteriores: totalPendiente,
+        albaranesGenerados: albaranesFinalizacionGenerados.length,
+        detallesAlbaranes: albaranesFinalizacionGenerados
+      });
+
+    } catch (err) {
+      await transaction.rollback();
+      console.error('❌ Error al finalizar pedido:', err);
+      res.status(500).json({ 
+        success: false, 
+        message: err.message || 'Error al finalizar el pedido'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error al finalizar pedido:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error al finalizar el pedido'
+    });
+  }
+};
+
 module.exports = {
   getOrderReception,
-  confirmReception
+  confirmReception,
+  finalizeOrder
 };

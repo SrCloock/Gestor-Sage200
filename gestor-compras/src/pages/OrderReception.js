@@ -12,6 +12,7 @@ const OrderReception = () => {
   const [receptionItems, setReceptionItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [finalizing, setFinalizing] = useState(false); // 🔥 NUEVO ESTADO
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [albaranesGenerados, setAlbaranesGenerados] = useState([]);
@@ -198,6 +199,77 @@ const OrderReception = () => {
     setReceptionItems(newItems);
   };
 
+  // 🔥 NUEVA FUNCIÓN: Finalizar pedido (marcar como servido)
+  const handleFinalizeOrder = async () => {
+    const storedUser = JSON.parse(localStorage.getItem('user'));
+    if (!storedUser) {
+      setError('No hay sesión activa. Redirigiendo al login...');
+      setTimeout(() => navigate('/login'), 2000);
+      return;
+    }
+
+    try {
+      setFinalizing(true);
+      setError('');
+      setSuccess('');
+
+      console.log('🔚 Finalizando pedido:', orderId);
+
+      const response = await fetchWithAuth(`/api/reception/${orderId}/finalize`, {
+        method: 'POST',
+        body: {
+          usuario: storedUser.username,
+          codigoempresa: storedUser.codigoCliente
+        }
+      });
+
+      console.log('📡 Response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('❌ El servidor devolvió:', text.substring(0, 200));
+        throw new Error(`El servidor devolvió un formato inválido`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Respuesta del servidor:', data);
+      
+      if (data.success) {
+        setSuccess('Pedido marcado como servido correctamente');
+        setOrder(prev => ({ ...prev, Estado: 2 }));
+        
+        setTimeout(() => {
+          navigate(`/mis-pedidos/${orderId}`, { 
+            state: { 
+              message: 'Pedido finalizado y marcado como servido'
+            } 
+          });
+        }, 2000);
+      } else {
+        setError(data.message || 'Error al finalizar el pedido');
+      }
+    } catch (err) {
+      console.error('❌ Error finalizando pedido:', err);
+      
+      if (err.message.includes('Sesión expirada') || err.message.includes('Acceso denegado')) {
+        setError(err.message);
+        setTimeout(() => {
+          logout();
+          navigate('/login');
+        }, 2000);
+      } else {
+        setError(err.message || 'Error al finalizar el pedido');
+      }
+    } finally {
+      setFinalizing(false);
+    }
+  };
+
   const handleSubmit = async () => {
     const storedUser = JSON.parse(localStorage.getItem('user'));
     if (!storedUser) {
@@ -260,7 +332,11 @@ const OrderReception = () => {
       
       if (data.success) {
         setSuccess('Recepción confirmada correctamente');
-        setAlbaranesGenerados(data.detallesAlbaranes || []);
+        
+        // 🔥 CORRECCIÓN: Asegurar que albaranesGenerados sea siempre un array
+        const albaranesData = data.detallesAlbaranes || [];
+        const albaranesArray = Array.isArray(albaranesData) ? albaranesData : [];
+        setAlbaranesGenerados(albaranesArray);
         
         setOrder(prev => ({
           ...prev,
@@ -269,17 +345,23 @@ const OrderReception = () => {
 
         // Actualizar las cantidades recibidas en el estado local
         const updatedItems = [...receptionItems];
-        data.detallesAlbaranes?.forEach(albaran => {
-          albaran.items?.forEach(itemAlbaran => {
-            const itemIndex = updatedItems.findIndex(item => 
-              item.CodigoArticulo === itemAlbaran.CodigoArticulo && 
-              item.CodigoProveedor === albaran.proveedor
-            );
-            if (itemIndex !== -1) {
-              updatedItems[itemIndex].UnidadesRecibidas = itemAlbaran.UnidadesRecibidas;
+        
+        // 🔥 CORRECCIÓN: Verificar que albaranesArray es un array antes de mapear
+        if (Array.isArray(albaranesArray) && albaranesArray.length > 0) {
+          albaranesArray.forEach(albaran => {
+            if (albaran.itemsDetalle && Array.isArray(albaran.itemsDetalle)) {
+              albaran.itemsDetalle.forEach(itemAlbaran => {
+                const itemIndex = updatedItems.findIndex(item => 
+                  item.CodigoArticulo === itemAlbaran.CodigoArticulo && 
+                  item.CodigoProveedor === albaran.proveedor
+                );
+                if (itemIndex !== -1) {
+                  updatedItems[itemIndex].UnidadesRecibidas = itemAlbaran.UnidadesRecibidas;
+                }
+              });
             }
           });
-        });
+        }
         setReceptionItems(updatedItems);
 
         setTimeout(() => {
@@ -288,7 +370,7 @@ const OrderReception = () => {
               refreshed: true,
               receptionConfirmed: true,
               message: 'Recepción confirmada correctamente',
-              albaranesGenerados: data.detallesAlbaranes
+              albaranesGenerados: albaranesArray
             } 
           });
         }, 3000);
@@ -386,7 +468,7 @@ const OrderReception = () => {
         <div className="orr-success-message">
           <div className="orr-success-icon">✅</div>
           <p>{success}</p>
-          {albaranesGenerados.length > 0 && (
+          {albaranesGenerados && albaranesGenerados.length > 0 && (
             <div className="orr-albaranes-info">
               <p><strong>Albaranes de compra generados:</strong> {albaranesGenerados.length}</p>
             </div>
@@ -395,8 +477,8 @@ const OrderReception = () => {
         </div>
       )}
 
-      {/* SECCIÓN NUEVA: Mostrar albaranes generados */}
-      {albaranesGenerados.length > 0 && (
+      {/* 🔥 CORRECCIÓN: Verificar que albaranesGenerados es un array antes de mapear */}
+      {albaranesGenerados && Array.isArray(albaranesGenerados) && albaranesGenerados.length > 0 && (
         <div className="orr-albaranes-generados">
           <h3>📦 Albaranes de Compra Generados</h3>
           <div className="orr-albaranes-grid">
@@ -405,11 +487,24 @@ const OrderReception = () => {
                 <div className="orr-albaran-header">
                   <h4>Albarán #{albaran.numeroAlbaran}</h4>
                   <span className="orr-albaran-proveedor">Proveedor: {albaran.proveedor}</span>
+                  <span className={`orr-albaran-estado ${albaran.esNuevo ? 'orr-albaran-nuevo' : 'orr-albaran-actualizado'}`}>
+                    {albaran.esNuevo ? '🆕 Nuevo' : '✏️ Actualizado'}
+                  </span>
                 </div>
                 <div className="orr-albaran-details">
                   <p><strong>Items:</strong> {albaran.items}</p>
                   <p><strong>Total:</strong> {albaran.total?.toFixed(2)} €</p>
                   <p><strong>Estado:</strong> {albaran.esParcial ? 'Recepción Parcial' : 'Completo'}</p>
+                  {albaran.itemsDetalle && (
+                    <div className="orr-albaran-items">
+                      <strong>Detalle:</strong>
+                      <ul>
+                        {albaran.itemsDetalle.map((item, idx) => (
+                          <li key={idx}>{item.CodigoArticulo}: {item.UnidadesRecibidas} unidades</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -525,6 +620,37 @@ const OrderReception = () => {
           </tbody>
         </table>
       </div>
+
+      {/* 🔥 NUEVA SECCIÓN: Botón para finalizar pedido */}
+      {order?.Estado !== 2 && (
+        <div className="orr-finalize-section">
+          <div className="orr-finalize-header">
+            <h3>🔚 Finalizar Pedido</h3>
+            <div className="orr-finalize-info">
+              <p>
+                <strong>¿No va a recepcionar más unidades?</strong> Puede marcar el pedido como servido para eliminarlo de la lista de pendientes.
+              </p>
+              <p className="orr-finalize-warning">
+                ⚠️ Esta acción establecerá todas las unidades pendientes a 0 y marcará el pedido como completamente servido.
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={handleFinalizeOrder}
+            disabled={finalizing}
+            className="orr-button orr-finalize-button"
+          >
+            {finalizing ? (
+              <>
+                <div className="orr-button-spinner"></div>
+                Finalizando...
+              </>
+            ) : (
+              'Finalizar Pedido (Marcar como Servido)'
+            )}
+          </button>
+        </div>
+      )}
 
       <div className="orr-actions">
         <button 
