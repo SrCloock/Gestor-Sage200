@@ -10,7 +10,6 @@ const getCatalogProducts = async (req, res) => {
 
     const { search, proveedor, precioMin, precioMax, sortBy } = req.query;
 
-    // CAMBIO: Filtrar por empresa 1 en lugar de 9999
     let whereConditions = ["a.CodigoEmpresa = '9999'"];
     let inputParams = {};
 
@@ -54,7 +53,7 @@ const getCatalogProducts = async (req, res) => {
         a.RutaImagen,
         gi.CodigoIvasinRecargo as PorcentajeIva
       FROM Articulos a
-      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor AND p.CodigoEmpresa = '9999'  -- CAMBIO: Empresa 1
+      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor AND p.CodigoEmpresa = '9999'
       LEFT JOIN (
         SELECT GrupoIva, MAX(FechaInicio) as MaxFecha
         FROM GrupoIva 
@@ -77,7 +76,7 @@ const getCatalogProducts = async (req, res) => {
     const countQuery = `
       SELECT COUNT(*) as total
       FROM Articulos a
-      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor AND p.CodigoEmpresa = '9999'  -- CAMBIO: Empresa 1
+      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor AND p.CodigoEmpresa = '9999'
       ${whereClause}
     `;
 
@@ -90,7 +89,6 @@ const getCatalogProducts = async (req, res) => {
     const total = countResult.recordset[0].total;
     const totalPages = Math.ceil(total / limit);
 
-    // Lógica para asignar imagen por defecto y parsear precios e IVA
     const products = result.recordset.map(product => ({
       ...product,
       RutaImagen: product.RutaImagen || '/images/default-product.png',
@@ -105,7 +103,6 @@ const getCatalogProducts = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error al obtener productos del catálogo:', error);
     return res.status(500).json({
       success: false,
       message: 'Error al cargar el catálogo de productos',
@@ -134,7 +131,6 @@ const getProductFilters = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error al obtener filtros:', error);
     return res.status(500).json({
       success: false,
       message: 'Error al cargar los filtros',
@@ -143,13 +139,10 @@ const getProductFilters = async (req, res) => {
   }
 };
 
-// Función para sincronizar imágenes con la base de datos
 const syncImagesWithDB = async () => {
   try {
     const pool = await getPool();
-    console.log('✅ Sincronización de imágenes completada');
   } catch (error) {
-    console.error('❌ Error en sincronización de imágenes:', error);
   }
 };
 

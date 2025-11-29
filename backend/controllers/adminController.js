@@ -15,7 +15,6 @@ const getPendingOrders = async (req, res) => {
 
     const pool = await getPool();
     
-    // Construir condiciones WHERE dinámicamente
     let whereConditions = ["SeriePedido = 'WebCD'"];
     let inputParams = {};
     
@@ -28,7 +27,6 @@ const getPendingOrders = async (req, res) => {
       whereConditions.push('StatusAprobado = @estado');
       inputParams.estado = parseInt(estado);
     } else {
-      // Por defecto, solo pendientes (StatusAprobado = 0)
       whereConditions.push('StatusAprobado = 0');
     }
     
@@ -44,17 +42,14 @@ const getPendingOrders = async (req, res) => {
     
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
     
-    // Validar parámetros de ordenación
     const columnasPermitidas = ['NumeroPedido', 'FechaPedido', 'RazonSocial', 'CifDni', 'NumeroLineas', 'StatusAprobado', 'BaseImponible', 'FechaNecesaria'];
     const ordenPermitido = ['ASC', 'DESC'];
     
     const ordenarPorValido = columnasPermitidas.includes(ordenarPor) ? ordenarPor : 'FechaPedido';
     const ordenValido = ordenPermitido.includes(orden.toUpperCase()) ? orden.toUpperCase() : 'DESC';
     
-    // Calcular offset para paginación
     const offset = (page - 1) * limit;
     
-    // CONSULTA CORREGIDA: Usando ROW_NUMBER() para paginación compatible
     let query = `
       SELECT * FROM (
         SELECT 
@@ -80,14 +75,12 @@ const getPendingOrders = async (req, res) => {
     
     let request = pool.request();
     
-    // Agregar parámetros a la solicitud
     Object.keys(inputParams).forEach(key => {
       request = request.input(key, inputParams[key]);
     });
     
     const result = await request.query(query);
     
-    // Consulta para el total de registros (para paginación)
     let countQuery = `
       SELECT COUNT(*) as total
       FROM CabeceraPedidoCliente
@@ -103,8 +96,6 @@ const getPendingOrders = async (req, res) => {
     const total = countResult.recordset[0].total;
     const totalPaginas = Math.ceil(total / limit);
 
-    console.log('Pedidos encontrados:', result.recordset.length);
-
     res.status(200).json({
       success: true,
       orders: result.recordset,
@@ -116,7 +107,6 @@ const getPendingOrders = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error al obtener pedidos pendientes:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Error al obtener pedidos pendientes',
@@ -168,7 +158,6 @@ const getOrderForReview = async (req, res) => {
       });
     }
 
-    // CORREGIDO: Consulta actualizada para usar PrecioVentaconIVA1 de Articulos
     const linesResult = await pool.request()
       .input('NumeroPedido', orderId)
       .input('SeriePedido', 'WebCD')
@@ -178,21 +167,20 @@ const getOrderForReview = async (req, res) => {
           l.CodigoArticulo,
           l.DescripcionArticulo,
           l.UnidadesPedidas,
-          l.Precio,  -- Este es el precio con IVA que se guardó en LineasPedidoCliente
+          l.Precio,
           l.CodigoProveedor,
           l.CodigoIva,
           l.[%Iva] as PorcentajeIva,
-          a.PrecioVentaconIVA1,  -- NUEVO: Precio correcto con IVA desde Articulos
+          a.PrecioVentaconIVA1,
           COALESCE(p.RazonSocial, 'No especificado') as NombreProveedor
         FROM LineasPedidoCliente l
-        LEFT JOIN Articulos a ON l.CodigoArticulo = a.CodigoArticulo  -- NUEVO: JOIN con Articulos
+        LEFT JOIN Articulos a ON l.CodigoArticulo = a.CodigoArticulo
         LEFT JOIN Proveedores p ON l.CodigoProveedor = p.CodigoProveedor
         WHERE l.NumeroPedido = @NumeroPedido
         AND l.SeriePedido = @SeriePedido
         ORDER BY l.Orden
       `);
 
-    // Eliminar posibles duplicados
     const uniqueProducts = [];
     const seenKeys = new Set();
     
@@ -200,13 +188,10 @@ const getOrderForReview = async (req, res) => {
       const key = `${item.Orden}-${item.CodigoArticulo}-${item.CodigoProveedor || 'no-prov'}`;
       if (!seenKeys.has(key)) {
         seenKeys.add(key);
-        
-        // CORREGIDO: Usar PrecioVentaconIVA1 si está disponible, sino usar el Precio de la línea
         const precioFinal = item.PrecioVentaconIVA1 || item.Precio;
-        
         uniqueProducts.push({
           ...item,
-          Precio: precioFinal  // Aseguramos que el precio mostrado sea el correcto
+          Precio: precioFinal
         });
       }
     });
@@ -219,7 +204,6 @@ const getOrderForReview = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error al obtener pedido:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Error al obtener el pedido',
@@ -228,11 +212,9 @@ const getOrderForReview = async (req, res) => {
   }
 };
 
-// CORREGIDO: Función para generar albarán de cliente con cálculo correcto de precios
 const generarAlbaranCliente = async (transaction, orderHeader, items) => {
   const { CodigoEmpresa, EjercicioPedido, CodigoCliente, RazonSocial, Domicilio, Municipio, Provincia, NumeroPedido } = orderHeader;
 
-  // Obtener el próximo número de albarán
   const albaranResult = await transaction.request()
     .input('CodigoEmpresa', CodigoEmpresa)
     .input('EjercicioAlbaran', EjercicioPedido)
@@ -248,17 +230,13 @@ const generarAlbaranCliente = async (transaction, orderHeader, items) => {
   const numeroAlbaran = albaranResult.recordset[0].SiguienteNumero;
   const fechaActual = new Date();
 
-  // CORREGIDO: Calcular totales usando PrecioVentaconIVA1
   let baseImponibleTotal = 0;
   let totalIVATotal = 0;
 
   items.forEach(item => {
-    // Usar PrecioVentaconIVA1 si está disponible, sino usar Precio
     const precioConIva = item.PrecioVentaconIVA1 || item.Precio || 0;
     const unidades = item.UnidadesPedidas || 0;
     const porcentajeIva = item.PorcentajeIva || 21;
-
-    // CORREGIDO: Cálculo correcto - el precio ya incluye IVA, calcular base imponible
     const baseImponible = (precioConIva * unidades) / (1 + (porcentajeIva / 100));
     const ivaLinea = baseImponible * (porcentajeIva / 100);
 
@@ -268,7 +246,6 @@ const generarAlbaranCliente = async (transaction, orderHeader, items) => {
 
   const importeLiquidoTotal = baseImponibleTotal + totalIVATotal;
 
-  // Insertar cabecera del albarán
   await transaction.request()
     .input('CodigoEmpresa', CodigoEmpresa)
     .input('EjercicioAlbaran', EjercicioPedido)
@@ -300,14 +277,10 @@ const generarAlbaranCliente = async (transaction, orderHeader, items) => {
       )
     `);
 
-  // Insertar líneas del albarán
   for (const [index, item] of items.entries()) {
-    // CORREGIDO: Usar PrecioVentaconIVA1 si está disponible
     const precioConIva = item.PrecioVentaconIVA1 || item.Precio || 0;
     const unidades = item.UnidadesPedidas || 0;
     const porcentajeIva = item.PorcentajeIva || 21;
-
-    // CORREGIDO: Cálculo correcto - el precio ya incluye IVA
     const baseImponible = (precioConIva * unidades) / (1 + (porcentajeIva / 100));
     const ivaLinea = baseImponible * (porcentajeIva / 100);
     const importeLiquido = baseImponible + ivaLinea;
@@ -322,7 +295,7 @@ const generarAlbaranCliente = async (transaction, orderHeader, items) => {
       .input('DescripcionArticulo', item.DescripcionArticulo)
       .input('Unidades', unidades)
       .input('UnidadesServidas', 0)
-      .input('Precio', precioConIva)  // Precio con IVA
+      .input('Precio', precioConIva)
       .input('BaseImponible', baseImponible)
       .input('PorcentajeIva', porcentajeIva)
       .input('CuotaIva', ivaLinea)
@@ -344,7 +317,6 @@ const generarAlbaranCliente = async (transaction, orderHeader, items) => {
   return numeroAlbaran;
 };
 
-// CORREGIDO: Función principal de actualización y aprobación
 const updateOrderQuantitiesAndApprove = async (req, res) => {
   const { orderId } = req.params;
   const { items } = req.body;
@@ -355,7 +327,6 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
     await transaction.begin();
 
     try {
-      // 1. Obtener información completa del pedido
       const orderResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
@@ -384,10 +355,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
       const orderHeader = orderResult.recordset[0];
       const { CodigoEmpresa, EjercicioPedido, CodigoCliente, CifDni, RazonSocial, Domicilio, CodigoPostal, Municipio, Provincia, IdDelegacion, CodigoContable, NumeroPedido } = orderHeader;
 
-      // Si no hay items, eliminar el pedido completo
       if (!items || items.length === 0) {
-        console.log(`Eliminando pedido ${orderId} completo por falta de productos`);
-        
         await transaction.request()
           .input('NumeroPedido', orderId)
           .input('SeriePedido', 'WebCD')
@@ -412,7 +380,6 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
         });
       }
 
-      // 2. Obtener órdenes actuales para identificar líneas eliminadas
       const currentLinesResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
@@ -425,7 +392,6 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
       const currentOrders = currentLinesResult.recordset.map(row => row.Orden);
       const updatedOrders = items.map(item => item.Orden);
 
-      // 3. Eliminar líneas que ya no están en el array de items
       const ordersToDelete = currentOrders.filter(order => !updatedOrders.includes(order));
       
       for (const orderToDelete of ordersToDelete) {
@@ -441,7 +407,6 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           `);
       }
 
-      // 4. Actualizar cantidades en LineasPedidoCliente para las líneas existentes
       for (const item of items) {
         await transaction.request()
           .input('NumeroPedido', orderId)
@@ -464,7 +429,6 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           `);
       }
 
-      // 5. CORREGIDO: Recalcular totales del pedido usando BaseImponible y TotalIva directamente
       const totalesResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
@@ -481,7 +445,6 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
       const totalIVATotal = parseFloat(totalesResult.recordset[0].TotalIVA) || 0;
       const importeLiquidoTotal = baseImponibleTotal + totalIVATotal;
 
-      // 6. Actualizar cabecera con nuevos totales y estado
       await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
@@ -502,14 +465,10 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           AND SeriePedido = @SeriePedido
         `);
 
-      // 7. Generar albarán para el cliente
-      const numeroAlbaranCliente = await generarAlbaranCliente(transaction, orderHeader, items);
-      console.log(`Albarán de cliente generado: ${numeroAlbaranCliente}`);
+      await generarAlbaranCliente(transaction, orderHeader, items);
 
-      // 8. Crear pedidos a proveedores (agrupados por proveedor)
       const pedidosPorProveedor = {};
       
-      // Agrupar items por proveedor
       for (const item of items) {
         const proveedor = item.CodigoProveedor || 'DEFAULT';
         if (!pedidosPorProveedor[proveedor]) {
@@ -518,7 +477,6 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
         pedidosPorProveedor[proveedor].push(item);
       }
 
-      // Obtener el próximo número de pedido para proveedores
       let numeroPedidoProveedor = 1;
       
       const contadorResult = await transaction.request()
@@ -561,9 +519,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           `);
       }
 
-      // Crear un pedido por cada proveedor
       for (const [codigoProveedor, itemsProveedor] of Object.entries(pedidosPorProveedor)) {
-        // Obtener información básica del proveedor
         const proveedorResult = await transaction.request()
           .input('CodigoProveedor', codigoProveedor)
           .query(`
@@ -611,7 +567,6 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           CodigoContableANT_: CodigoContable || ''
         };
 
-        // Verificar si ya existe un pedido con este número
         const existePedido = await transaction.request()
           .input('CodigoEmpresa', CodigoEmpresa)
           .input('EjercicioPedido', EjercicioPedido)
@@ -662,10 +617,8 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           numeroPedidoProveedor = nuevoNumero;
         }
 
-        // Agregar observación con el formato "Pedido X de [Razón Social]"
         const observacionesPedido = `Pedido ${orderId} de ${RazonSocial}`;
 
-        // Insertar cabecera del pedido a proveedor
         await transaction.request()
           .input('CodigoEmpresa', CodigoEmpresa)
           .input('EjercicioPedido', EjercicioPedido)
@@ -723,17 +676,13 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
             )
           `);
 
-        // Insertar líneas del pedido a proveedor
         let baseImponibleProveedor = 0;
         let totalIVAProveedor = 0;
 
         for (const [index, item] of itemsProveedor.entries()) {
-          // CORREGIDO: Usar PrecioVentaconIVA1 si está disponible
           const precioConIva = item.PrecioVentaconIVA1 || item.Precio || 0;
           const unidades = item.UnidadesPedidas || 0;
           const porcentajeIva = item.PorcentajeIva || 21;
-
-          // CORREGIDO: Cálculo correcto - el precio ya incluye IVA
           const baseImponible = (precioConIva * unidades) / (1 + (porcentajeIva / 100));
           const ivaLinea = baseImponible * (porcentajeIva / 100);
           
@@ -749,8 +698,8 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
             .input('CodigoArticulo', item.CodigoArticulo)
             .input('DescripcionArticulo', item.DescripcionArticulo)
             .input('UnidadesPedidas', unidades)
-            .input('Precio', precioConIva)  // Precio con IVA
-            .input('CodigoIva', item.CodigoIva || porcentajeIva)  // El código de IVA es el porcentaje
+            .input('Precio', precioConIva)
+            .input('CodigoIva', item.CodigoIva || porcentajeIva)
             .input('PorcentajeIva', porcentajeIva)
             .input('ImporteBruto', baseImponible + ivaLinea)
             .input('BaseImponible', baseImponible)
@@ -774,7 +723,6 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
             `);
         }
 
-        // Actualizar totales del pedido a proveedor
         await transaction.request()
           .input('CodigoEmpresa', CodigoEmpresa)
           .input('EjercicioPedido', EjercicioPedido)
@@ -796,12 +744,9 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
               NumeroPedido = @NumeroPedido
           `);
 
-        console.log(`Pedido a proveedor ${codigoProveedor} generado: ${numeroPedidoProveedor}`);
-
         numeroPedidoProveedor++;
       }
 
-      // Actualizar el contador de pedidos a proveedor
       await transaction.request()
         .input('sysGrupo', CodigoEmpresa)
         .input('sysNombreContador', 'PEDIDOS_PRO')
@@ -824,7 +769,6 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
 
     } catch (err) {
       await transaction.rollback();
-      console.error('Error en la transacción:', err);
       
       let errorMessage = 'Error al procesar la transacción';
       if (err.number === 132) {
@@ -838,7 +782,6 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Error al actualizar pedido:', error);
     res.status(500).json({
       success: false,
       message: 'Error al procesar la actualización del pedido'

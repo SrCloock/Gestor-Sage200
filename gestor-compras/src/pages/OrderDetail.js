@@ -4,6 +4,15 @@ import { AuthContext } from '../context/AuthContext';
 import api from '../api';
 import '../styles/OrderDetail.css';
 
+// Constantes unificadas para estados
+const ORDER_STATUS = {
+  REVIEWING: { code: 0, text: 'Revisando', color: 'reviewing' },
+  APPROVED: { code: -1, text: 'Aprobado', color: 'approved' },
+  PREPARING: { code: 0, text: 'Preparando', color: 'preparing' },
+  PARTIAL: { code: 1, text: 'Parcial', color: 'partial' },
+  DELIVERED: { code: 2, text: 'Servido', color: 'delivered' }
+};
+
 const OrderDetail = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
@@ -63,35 +72,88 @@ const OrderDetail = () => {
     }
   }, [orderId, user]);
 
-  // Función para determinar si se puede confirmar recepción
+  // ✅ CORREGIDO: Función unificada para determinar si se puede confirmar recepción
   const canConfirmReception = () => {
     if (!order) return false;
-    return order.StatusAprobado === -1 && order.Estado !== 2;
+    
+    // Solo se puede confirmar recepción si está aprobado y no está completamente servido
+    return order.StatusAprobado === ORDER_STATUS.APPROVED.code && 
+           order.Estado !== ORDER_STATUS.DELIVERED.code;
   };
 
-  // FUNCIÓN CORREGIDA: Lógica para determinar el texto del Status
-  const getStatusText = () => {
-    if (!order) return 'Desconocido';
+  // ✅ CORREGIDO: Función unificada para texto del estado
+  const getStatusInfo = () => {
+    if (!order) return { text: 'Desconocido', color: 'unknown' };
     
-    if (order.StatusAprobado === 0) return 'Revisando';
-    if (order.StatusAprobado === -1) {
+    if (order.StatusAprobado === ORDER_STATUS.REVIEWING.code) {
+      return { 
+        text: ORDER_STATUS.REVIEWING.text, 
+        color: ORDER_STATUS.REVIEWING.color 
+      };
+    }
+    
+    if (order.StatusAprobado === ORDER_STATUS.APPROVED.code) {
       switch (order.Estado) {
-        case 0: return 'Preparando';
-        case 1: return 'Parcial';
-        case 2: return 'Servido';
-        default: return 'Preparando';
+        case ORDER_STATUS.PREPARING.code:
+          return { 
+            text: ORDER_STATUS.PREPARING.text, 
+            color: ORDER_STATUS.PREPARING.color 
+          };
+        case ORDER_STATUS.PARTIAL.code:
+          return { 
+            text: ORDER_STATUS.PARTIAL.text, 
+            color: ORDER_STATUS.PARTIAL.color 
+          };
+        case ORDER_STATUS.DELIVERED.code:
+          return { 
+            text: ORDER_STATUS.DELIVERED.text, 
+            color: ORDER_STATUS.DELIVERED.color 
+          };
+        default:
+          return { 
+            text: ORDER_STATUS.PREPARING.text, 
+            color: ORDER_STATUS.PREPARING.color 
+          };
       }
     }
-    return 'Desconocido';
+    
+    return { text: 'Desconocido', color: 'unknown' };
   };
 
-  // CORREGIDO: Navegación sin /api
+  // ✅ CORREGIDO: Navegación mejorada
   const handleConfirmReception = () => {
     navigate(`/mis-pedidos/${orderId}/recepcion`);
   };
 
-  const handleRefresh = () => {
-    window.location.reload();
+  const handleEditOrder = () => {
+    navigate(`/mis-pedidos/${orderId}/editar`);
+  };
+
+  const handleRefresh = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const response = await api.get(`/orders/${orderId}`, {
+        params: {
+          codigoCliente: user?.codigoCliente,
+          seriePedido: 'WebCD'
+        }
+      });
+      
+      if (response.data && response.data.order) {
+        setOrder(response.data.order);
+      }
+    } catch (err) {
+      console.error('Error al actualizar:', err);
+      setError('Error al actualizar los datos del pedido');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const canEditOrder = () => {
+    if (!order) return false;
+    return order.StatusAprobado === ORDER_STATUS.REVIEWING.code;
   };
 
   if (loading) return (
@@ -130,96 +192,131 @@ const OrderDetail = () => {
   // Asegurarse de que productos existe y es un array
   const productos = order.productos || order.Productos || [];
   const numeroLineas = productos.length;
+  const statusInfo = getStatusInfo();
 
   return (
     <div className="od-container">
-      <button onClick={() => navigate('/mis-pedidos')} className="od-back-button">
-        ← Volver al Historial
-      </button>
-      
-      <div className="od-header">
+      <div className="od-header-section">
+        <button onClick={() => navigate('/mis-pedidos')} className="od-back-button">
+          ← Volver al Historial
+        </button>
+        
         <div className="od-title-section">
-          <h2>Pedido #{order.NumeroPedido}</h2>
-          <span className={`od-status-badge od-status-${getStatusText().toLowerCase()}`}>
-            {getStatusText()}
-          </span>
+          <div className="od-title-main">
+            <h1>Pedido #{order.NumeroPedido}</h1>
+            <span className={`od-status-badge od-status-${statusInfo.color}`}>
+              {statusInfo.text}
+            </span>
+          </div>
+          <p className="od-order-date">
+            Realizado el {new Date(order.FechaPedido).toLocaleDateString('es-ES', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric'
+            })}
+          </p>
         </div>
-        <p className="od-order-date">
-          Realizado el {new Date(order.FechaPedido).toLocaleDateString()}
-        </p>
+
+        <div className="od-header-actions">
+          <button onClick={handleRefresh} className="od-refresh-button">
+            🔄 Actualizar
+          </button>
+        </div>
       </div>
       
       <div className="od-info-grid">
         <div className="od-info-card">
           <div className="od-card-header">
-            <h3>Información General</h3>
-            <div className="od-card-icon">📦</div>
+            <h3>📦 Información General</h3>
           </div>
-          <div className="od-info-row">
-            <span className="od-info-label">Fecha de Pedido:</span>
-            <span className="od-info-value">{new Date(order.FechaPedido).toLocaleDateString()}</span>
-          </div>
-          {order.FechaNecesaria && (
+          <div className="od-info-content">
             <div className="od-info-row">
-              <span className="od-info-label">Fecha Necesaria:</span>
-              <span className="od-info-value">{new Date(order.FechaNecesaria).toLocaleDateString()}</span>
+              <span className="od-info-label">Fecha de Pedido:</span>
+              <span className="od-info-value">
+                {new Date(order.FechaPedido).toLocaleDateString('es-ES')}
+              </span>
             </div>
-          )}
-          <div className="od-info-row">
-            <span className="od-info-label">Total Artículos:</span>
-            <span className="od-info-value">{numeroLineas}</span>
-          </div>
-          <div className="od-info-row">
-            <span className="od-info-label">Total del Pedido:</span>
-            <span className="od-info-value">
-              {order.ImporteLiquido ? `${order.ImporteLiquido.toFixed(2)} €` : '0.00 €'}
-            </span>
+            {order.FechaNecesaria && (
+              <div className="od-info-row">
+                <span className="od-info-label">Fecha Necesaria:</span>
+                <span className="od-info-value">
+                  {new Date(order.FechaNecesaria).toLocaleDateString('es-ES')}
+                </span>
+              </div>
+            )}
+            <div className="od-info-row">
+              <span className="od-info-label">Total Artículos:</span>
+              <span className="od-info-value">{numeroLineas}</span>
+            </div>
+            <div className="od-info-row">
+              <span className="od-info-label">Total del Pedido:</span>
+              <span className="od-info-value od-total-amount">
+                {order.ImporteLiquido ? `${order.ImporteLiquido.toFixed(2)} €` : '0.00 €'}
+              </span>
+            </div>
+            {order.ObservacionesPedido && (
+              <div className="od-info-row od-observations">
+                <span className="od-info-label">Observaciones:</span>
+                <span className="od-info-value">{order.ObservacionesPedido}</span>
+              </div>
+            )}
           </div>
         </div>
         
         <div className="od-info-card">
           <div className="od-card-header">
-            <h3>Información del Cliente</h3>
-            <div className="od-card-icon">👤</div>
+            <h3>👤 Información del Cliente</h3>
           </div>
-          <div className="od-info-row">
-            <span className="od-info-label">Razón Social:</span>
-            <span className="od-info-value">{order.RazonSocial}</span>
-          </div>
-          <div className="od-info-row">
-            <span className="od-info-label">CIF/DNI:</span>
-            <span className="od-info-value">{order.CifDni || 'No disponible'}</span>
-          </div>
-          <div className="od-info-row">
-            <span className="od-info-label">Dirección:</span>
-            <span className="od-info-value">
-              {order.Domicilio}, {order.CodigoPostal} {order.Municipio}, {order.Provincia}
-            </span>
+          <div className="od-info-content">
+            <div className="od-info-row">
+              <span className="od-info-label">Razón Social:</span>
+              <span className="od-info-value">{order.RazonSocial}</span>
+            </div>
+            <div className="od-info-row">
+              <span className="od-info-label">CIF/DNI:</span>
+              <span className="od-info-value">{order.CifDni || 'No disponible'}</span>
+            </div>
+            <div className="od-info-row">
+              <span className="od-info-label">Dirección:</span>
+              <span className="od-info-value">
+                {order.Domicilio}, {order.CodigoPostal} {order.Municipio}, {order.Provincia}
+              </span>
+            </div>
           </div>
         </div>
       </div>
       
-      <div className="od-actions">
+      <div className="od-actions-section">
+        {canEditOrder() && (
+          <button 
+            onClick={handleEditOrder}
+            className="od-action-button od-edit-button"
+          >
+            ✏️ Editar Pedido
+          </button>
+        )}
+        
         {canConfirmReception() && (
           <button 
             onClick={handleConfirmReception}
             className="od-action-button od-primary-button"
           >
-            Confirmar Recepción
+            📦 Confirmar Recepción
           </button>
         )}
       </div>
 
       <div className="od-products-section">
         <div className="od-section-header">
-          <h3>Artículos del Pedido</h3>
+          <h2>Artículos del Pedido</h2>
           <span className="od-items-count">{numeroLineas} productos</span>
         </div>
         
         {numeroLineas === 0 ? (
           <div className="od-empty-products">
             <div className="od-empty-icon">📦</div>
-            <p>No hay productos en este pedido</p>
+            <h3>No hay productos en este pedido</h3>
+            <p>Este pedido no contiene artículos</p>
           </div>
         ) : (
           <div className="od-table-container">
@@ -232,7 +329,7 @@ const OrderDetail = () => {
                   <th>Cantidad Recibida</th>
                   <th>Precio Unitario</th>
                   <th>Total</th>
-                  {order.Estado !== 0 && <th>Comentario Recepción</th>}
+                  {order.Estado !== ORDER_STATUS.PREPARING.code && <th>Comentario Recepción</th>}
                 </tr>
               </thead>
               <tbody>
@@ -241,14 +338,27 @@ const OrderDetail = () => {
                   const cantidadRecibida = product.UnidadesRecibidas || 0;
                   const precio = product.Precio || 0;
                   const total = product.ImporteLiquido || (precio * cantidadPedida);
+                  const tieneDiferencia = cantidadRecibida !== cantidadPedida;
                   
                   return (
-                    <tr key={index} className="od-product-row">
+                    <tr key={index} className={`od-product-row ${tieneDiferencia ? 'od-with-difference' : ''}`}>
                       <td className="od-product-code">{product.CodigoArticulo}</td>
-                      <td className="od-product-description">{product.DescripcionArticulo}</td>
+                      <td className="od-product-description">
+                        <div className="od-product-desc-content">
+                          <span className="od-product-name">{product.DescripcionArticulo}</span>
+                          {product.CodigoProveedor && (
+                            <span className="od-product-supplier">
+                              Proveedor: {product.CodigoProveedor}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="od-product-quantity">{cantidadPedida}</td>
-                      <td className={`od-product-quantity ${cantidadRecibida !== cantidadPedida ? 'od-quantity-modified' : ''}`}>
+                      <td className={`od-product-quantity ${tieneDiferencia ? 'od-quantity-modified' : ''}`}>
                         {cantidadRecibida}
+                        {tieneDiferencia && (
+                          <span className="od-difference-indicator">⚠️</span>
+                        )}
                       </td>
                       <td className="od-product-price">
                         {precio ? `${precio.toFixed(2)} €` : '0.00 €'}
@@ -256,7 +366,7 @@ const OrderDetail = () => {
                       <td className="od-product-total">
                         {total ? `${total.toFixed(2)} €` : '0.00 €'}
                       </td>
-                      {order.Estado !== 0 && (
+                      {order.Estado !== ORDER_STATUS.PREPARING.code && (
                         <td className="od-product-comment">
                           {product.ComentarioRecepcion || '-'}
                         </td>
@@ -266,6 +376,24 @@ const OrderDetail = () => {
                 })}
               </tbody>
             </table>
+            
+            {/* Resumen de totales */}
+            <div className="od-table-summary">
+              <div className="od-summary-row">
+                <span>Base Imponible:</span>
+                <span>{order.BaseImponible ? `${order.BaseImponible.toFixed(2)} €` : '0.00 €'}</span>
+              </div>
+              <div className="od-summary-row">
+                <span>IVA:</span>
+                <span>{order.TotalIVA ? `${order.TotalIVA.toFixed(2)} €` : '0.00 €'}</span>
+              </div>
+              <div className="od-summary-row od-total-row">
+                <span>Total:</span>
+                <span className="od-grand-total">
+                  {order.ImporteLiquido ? `${order.ImporteLiquido.toFixed(2)} €` : '0.00 €'}
+                </span>
+              </div>
+            </div>
           </div>
         )}
       </div>

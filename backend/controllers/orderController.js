@@ -18,7 +18,6 @@ const createOrder = async (req, res) => {
     await transaction.begin();
 
     try {
-      // Verificar que todos los items pertenecen al mismo cliente
       const clientesUnicos = [...new Set(items.map(item => item.CodigoCliente))];
       if (clientesUnicos.length !== 1) {
         throw new Error('Todos los artículos del pedido deben pertenecer al mismo cliente');
@@ -31,7 +30,6 @@ const createOrder = async (req, res) => {
         throw new Error('Datos de cliente incompletos en los items');
       }
 
-      // Obtener información del cliente
       const clienteResult = await transaction.request()
         .input('CodigoCliente', codigoCliente)
         .query(`
@@ -51,10 +49,8 @@ const createOrder = async (req, res) => {
       const cliente = clienteResult.recordset[0];
       const codigoEmpresa = cliente.CodigoEmpresa || '1';
 
-      // Declarar fechaActual aquí, antes de cualquier uso
       const fechaActual = new Date();
 
-      // Obtener información de dirección del cliente
       const cpResult = await transaction.request()
         .input('CifDni', cliente.CifDni)
         .input('SiglaNacion', cliente.SiglaNacion)
@@ -69,7 +65,6 @@ const createOrder = async (req, res) => {
 
       const cp = cpResult.recordset[0] || {};
 
-      // Función para obtener el valor preferente (cliente_proveedor o cliente)
       const getDatoPreferente = (cpDato, cDato) =>
         cpDato !== null && cpDato !== undefined && cpDato !== '' ? cpDato : cDato;
 
@@ -85,7 +80,6 @@ const createOrder = async (req, res) => {
       const codigoProvincia = getDatoPreferente(cp.CodigoProvincia, cliente.CodigoProvincia || '');
       const codigoMunicipio = getDatoPreferente(cp.CodigoMunicipio, cliente.CodigoMunicipio || '');
 
-      // Obtener condiciones de pago
       const clienteContaResult = await transaction.request()
         .input('CodigoCuenta', cliente.CodigoContable)
         .input('CodigoEmpresa', codigoEmpresa)
@@ -95,14 +89,12 @@ const createOrder = async (req, res) => {
           WHERE CodigoCuenta = @CodigoCuenta AND CodigoEmpresa = @CodigoEmpresa
         `);
 
-      // Valores predeterminados para condiciones de pago
       const condicionesPago = clienteContaResult.recordset[0] || {
         NumeroPlazos: 3,
         DiasPrimerPlazo: 30,
         DiasEntrePlazos: 30
       };
 
-      // Obtener el próximo número de pedido
       const contadorResult = await transaction.request()
         .input('sysGrupo', codigoEmpresa)
         .input('sysNombreContador', 'PEDIDOS_CLI')
@@ -158,7 +150,6 @@ const createOrder = async (req, res) => {
           `);
       }
 
-      // Verificar si el pedido ya existe
       const pedidoExistente = await transaction.request()
         .input('CodigoEmpresa', codigoEmpresa)
         .input('EjercicioPedido', fechaActual.getFullYear())
@@ -177,7 +168,6 @@ const createOrder = async (req, res) => {
         throw new Error(`El pedido ${SERIE_PEDIDO}-${numeroPedido} ya existe`);
       }
 
-      // Obtener almacenes por defecto
       const almacenesResult = await transaction.request()
         .input('sysGrupo', codigoEmpresa)
         .input('sysContenidoIni', 'cen')
@@ -205,7 +195,6 @@ const createOrder = async (req, res) => {
 
       const observacionesPedido = comment || '';
 
-      // Insertar cabecera del pedido
       await transaction.request()
         .input('CodigoEmpresa', codigoEmpresa)
         .input('EjercicioPedido', fechaActual.getFullYear())
@@ -275,9 +264,7 @@ const createOrder = async (req, res) => {
           )
         `);
 
-      // Insertar líneas del pedido
       for (const [index, item] of items.entries()) {
-        // Obtener información del artículo usando PrecioVenta directamente
         const articuloResult = await transaction.request()
           .input('CodigoArticulo', item.CodigoArticulo)
           .input('CodigoProveedor', item.CodigoProveedor || '')
@@ -286,7 +273,7 @@ const createOrder = async (req, res) => {
             SELECT 
               DescripcionArticulo, 
               DescripcionLinea,
-              PrecioVenta,  -- Usamos directamente PrecioVenta
+              PrecioVenta,
               GrupoIva
             FROM Articulos
             WHERE CodigoArticulo = @CodigoArticulo
@@ -301,7 +288,6 @@ const createOrder = async (req, res) => {
         const articulo = articuloResult.recordset[0];
         const descripcionLinea = articulo.DescripcionLinea || '';
 
-        // Obtener el porcentaje de IVA
         const grupoIvaResult = await transaction.request()
           .input('GrupoIva', articulo.GrupoIva)
           .query(`
@@ -316,16 +302,11 @@ const createOrder = async (req, res) => {
         
         const codigoIva = porcentajeIva;
         const unidadesPedidas = parseFloat(item.Cantidad) || 1;
-        
-        // USAMOS DIRECTAMENTE PrecioVenta SIN CÁLCULOS DE IVA
         const precio = parseFloat(articulo.PrecioVenta) || 0;
 
-        // Cálculos SIMPLES usando el precio directo
         const baseImponible = precio * unidadesPedidas;
         const cuotaIva = baseImponible * (porcentajeIva / 100);
         const importeLiquido = baseImponible + cuotaIva;
-
-        console.log(`📦 Línea pedido: ${item.CodigoArticulo}, Precio: ${precio}, Cantidad: ${unidadesPedidas}, Total: ${importeLiquido}`);
 
         await transaction.request()
           .input('CodigoEmpresa', codigoEmpresa)
@@ -340,7 +321,7 @@ const createOrder = async (req, res) => {
           .input('UnidadesPendientes', unidadesPedidas)
           .input('Unidades2_', unidadesPedidas)
           .input('UnidadesPendientesFabricar', unidadesPedidas)
-          .input('Precio', precio)  // PrecioVenta directo
+          .input('Precio', precio)
           .input('ImporteBruto', importeLiquido)
           .input('ImporteNeto', baseImponible)
           .input('ImporteParcial', baseImponible)
@@ -385,7 +366,6 @@ const createOrder = async (req, res) => {
           `);
       }
 
-      // Recalcular totales del pedido
       const totalesResult = await transaction.request()
         .input('CodigoEmpresa', codigoEmpresa)
         .input('EjercicioPedido', fechaActual.getFullYear())
@@ -409,9 +389,6 @@ const createOrder = async (req, res) => {
       const importeLiquidoTotal = parseFloat(totalesResult.recordset[0].ImporteLiquidoTotal) || 0;
       const numeroLineas = parseInt(totalesResult.recordset[0].NumeroLineas) || 0;
 
-      console.log(`💰 Totales calculados: Base=${baseImponibleTotal}, IVA=${totalIVATotal}, Total=${importeLiquidoTotal}`);
-
-      // Actualizar cabecera con totales
       await transaction.request()
         .input('CodigoEmpresa', codigoEmpresa)
         .input('EjercicioPedido', fechaActual.getFullYear())
@@ -452,11 +429,9 @@ const createOrder = async (req, res) => {
 
     } catch (err) {
       await transaction.rollback();
-      console.error('Error en la transacción:', err);
       throw err;
     }
   } catch (error) {
-    console.error('Error al crear pedido:', error);
     return res.status(500).json({ 
       success: false, 
       message: error.message || 'Error al procesar el pedido' 
@@ -548,7 +523,6 @@ const getOrders = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error al obtener pedidos:', error);
     return res.status(500).json({ 
       success: false, 
       message: error.message || 'Error al obtener los pedidos' 
@@ -568,8 +542,6 @@ const getOrderDetails = async (req, res) => {
         message: 'Parámetros incompletos (se requiere codigoCliente)' 
       });
     }
-
-    console.log('Buscando pedido:', { numeroPedido, codigoCliente, seriePedido });
 
     const orderResult = await pool.request()
       .input('NumeroPedido', numeroPedido)
@@ -632,8 +604,6 @@ const getOrderDetails = async (req, res) => {
         ORDER BY l.Orden
       `);
 
-    console.log(`Encontradas ${linesResult.recordset.length} líneas para el pedido ${numeroPedido}`);
-
     const uniqueProducts = [];
     const seenKeys = new Set();
     
@@ -654,7 +624,6 @@ const getOrderDetails = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error al obtener detalle del pedido:', error);
     return res.status(500).json({ 
       success: false, 
       message: 'Error al obtener el detalle del pedido',
@@ -673,7 +642,6 @@ const updateOrder = async (req, res) => {
     await transaction.begin();
 
     try {
-      // 1. Obtener información del pedido actual
       const orderResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', SERIE_PEDIDO)
@@ -689,7 +657,6 @@ const updateOrder = async (req, res) => {
 
       const { CodigoEmpresa, EjercicioPedido, CodigoCliente } = orderResult.recordset[0];
 
-      // 2. Eliminar todas las líneas existentes del pedido
       await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', SERIE_PEDIDO)
@@ -698,9 +665,7 @@ const updateOrder = async (req, res) => {
           WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
         `);
 
-      // 3. Insertar las nuevas líneas del pedido
       for (const [index, item] of items.entries()) {
-        // Obtener información del artículo usando PrecioVenta directamente
         const articuloResult = await transaction.request()
           .input('CodigoArticulo', item.CodigoArticulo)
           .input('CodigoEmpresa', CodigoEmpresa)
@@ -708,7 +673,7 @@ const updateOrder = async (req, res) => {
             SELECT 
               DescripcionArticulo, 
               DescripcionLinea,
-              PrecioVenta,  // Usamos directamente PrecioVenta
+              PrecioVenta,
               GrupoIva
             FROM Articulos
             WHERE CodigoArticulo = @CodigoArticulo
@@ -722,7 +687,6 @@ const updateOrder = async (req, res) => {
         const articulo = articuloResult.recordset[0];
         const descripcionLinea = articulo.DescripcionLinea || '';
 
-        // Obtener el porcentaje de IVA
         const grupoIvaResult = await transaction.request()
           .input('GrupoIva', articulo.GrupoIva)
           .query(`
@@ -737,11 +701,8 @@ const updateOrder = async (req, res) => {
         
         const codigoIva = porcentajeIva;
         const unidadesPedidas = parseFloat(item.Cantidad) || 1;
-        
-        // USAMOS DIRECTAMENTE PrecioVenta SIN CÁLCULOS DE IVA
         const precio = parseFloat(articulo.PrecioVenta) || 0;
 
-        // Cálculos SIMPLES usando el precio directo
         const baseImponible = precio * unidadesPedidas;
         const cuotaIva = baseImponible * (porcentajeIva / 100);
         const importeLiquido = baseImponible + cuotaIva;
@@ -759,7 +720,7 @@ const updateOrder = async (req, res) => {
           .input('UnidadesPendientes', unidadesPedidas)
           .input('Unidades2_', unidadesPedidas)
           .input('UnidadesPendientesFabricar', unidadesPedidas)
-          .input('Precio', precio)  // PrecioVenta directo
+          .input('Precio', precio)
           .input('ImporteBruto', importeLiquido)
           .input('ImporteNeto', baseImponible)
           .input('ImporteParcial', baseImponible)
@@ -804,7 +765,6 @@ const updateOrder = async (req, res) => {
           `);
       }
 
-      // 4. Actualizar fecha de entrega y comentario si se proporcionan
       if (deliveryDate || comment) {
         let updateQuery = 'UPDATE CabeceraPedidoCliente SET ';
         const updateParams = {};
@@ -820,7 +780,6 @@ const updateOrder = async (req, res) => {
           updateParams.ObservacionesPedido = comment;
         }
         
-        // Eliminar la última coma y espacio
         updateQuery = updateQuery.slice(0, -2);
         updateQuery += ' WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido';
         
@@ -835,7 +794,6 @@ const updateOrder = async (req, res) => {
         await updateRequest.query(updateQuery);
       }
 
-      // 5. Recalcular totales del pedido
       const totalesResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', SERIE_PEDIDO)
@@ -855,7 +813,6 @@ const updateOrder = async (req, res) => {
       const importeLiquidoTotal = parseFloat(totalesResult.recordset[0].ImporteLiquidoTotal) || 0;
       const numeroLineas = parseInt(totalesResult.recordset[0].NumeroLineas) || 0;
 
-      // 6. Actualizar cabecera con nuevos totales
       await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', SERIE_PEDIDO)
@@ -889,11 +846,9 @@ const updateOrder = async (req, res) => {
 
     } catch (err) {
       await transaction.rollback();
-      console.error('Error en la transacción de actualización:', err);
       throw err;
     }
   } catch (error) {
-    console.error('Error al actualizar pedido:', error);
     return res.status(500).json({ 
       success: false, 
       message: error.message || 'Error al actualizar el pedido' 

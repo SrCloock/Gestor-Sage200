@@ -1,4 +1,3 @@
-// controllers/allOrdersController.js
 const { getPool } = require('../db/Sage200db');
 
 const getAllOrders = async (req, res) => {
@@ -17,11 +16,8 @@ const getAllOrders = async (req, res) => {
       orden = 'DESC'
     } = req.query;
 
-    console.log('Parámetros recibidos en getAllOrders:', req.query);
-
     const pool = await getPool();
     
-    // Filtros base: EjercicioPedido = 2025 y SeriePedido = 'WebCD'
     let whereConditions = ["EjercicioPedido = '2025'", "SeriePedido = 'WebCD'"];
     let inputParams = {};
     
@@ -45,27 +41,23 @@ const getAllOrders = async (req, res) => {
       inputParams.fechaHasta = fechaHasta;
     }
 
-    // Nuevos filtros del frontend
     if (numeroPedido && numeroPedido.trim() !== '' && !isNaN(parseInt(numeroPedido))) {
       whereConditions.push('NumeroPedido = @numeroPedido');
       inputParams.numeroPedido = parseInt(numeroPedido);
     }
 
     if (importeMin && !isNaN(parseFloat(importeMin))) {
-      // CORREGIDO: Filtrar por ImporteLiquido (con IVA) en lugar de BaseImponible
       whereConditions.push('ImporteLiquido >= @importeMin');
       inputParams.importeMin = parseFloat(importeMin);
     }
 
     if (importeMax && !isNaN(parseFloat(importeMax))) {
-      // CORREGIDO: Filtrar por ImporteLiquido (con IVA) en lugar de BaseImponible
       whereConditions.push('ImporteLiquido <= @importeMax');
       inputParams.importeMax = parseFloat(importeMax);
     }
     
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
     
-    // Validar parámetros de ordenación
     const columnasPermitidas = ['NumeroPedido', 'FechaPedido', 'RazonSocial', 'BaseImponible', 'ImporteLiquido', 'FechaNecesaria', 'StatusAprobado'];
     const ordenPermitido = ['ASC', 'DESC'];
     
@@ -76,7 +68,6 @@ const getAllOrders = async (req, res) => {
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
     
-    // CONSULTA CORREGIDA: Usando ROW_NUMBER() para paginación compatible
     let query = `
       SELECT * FROM (
         SELECT 
@@ -90,7 +81,7 @@ const getAllOrders = async (req, res) => {
           Estado,
           BaseImponible,
           TotalIVA,
-          ImporteLiquido,  -- Este es el importe CON IVA que debe ver el admin
+          ImporteLiquido,
           FechaNecesaria,
           ObservacionesPedido,
           CodigoCliente,
@@ -104,9 +95,6 @@ const getAllOrders = async (req, res) => {
       WHERE RowNum > ${offset} AND RowNum <= ${offset + limitNum}
     `;
     
-    console.log('Consulta ejecutada:', query);
-    console.log('Parámetros:', inputParams);
-    
     let request = pool.request();
     Object.keys(inputParams).forEach(key => {
       request = request.input(key, inputParams[key]);
@@ -114,7 +102,6 @@ const getAllOrders = async (req, res) => {
     
     const result = await request.query(query);
     
-    // Consulta para el total
     let countQuery = `SELECT COUNT(*) as total FROM CabeceraPedidoCliente ${whereClause}`;
     let countRequest = pool.request();
     Object.keys(inputParams).forEach(key => {
@@ -124,8 +111,6 @@ const getAllOrders = async (req, res) => {
     const countResult = await countRequest.query(countQuery);
     const total = countResult.recordset[0].total;
     const totalPaginas = Math.ceil(total / limitNum);
-
-    console.log(`Resultados: ${result.recordset.length} pedidos de ${total} totales`);
 
     res.status(200).json({
       success: true,
@@ -138,7 +123,6 @@ const getAllOrders = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error al obtener todos los pedidos:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Error al obtener los pedidos',
@@ -147,12 +131,10 @@ const getAllOrders = async (req, res) => {
   }
 };
 
-// Obtener detalles completos de un pedido específico - CORREGIDO
 const getOrderDetails = async (req, res) => {
   try {
     const { orderId } = req.params;
     
-    // Validar que orderId sea un número y no sea "all"
     if (!orderId || orderId === 'all' || isNaN(parseInt(orderId))) {
       return res.status(400).json({ 
         success: false, 
@@ -162,9 +144,6 @@ const getOrderDetails = async (req, res) => {
 
     const pool = await getPool();
 
-    console.log('Buscando detalles del pedido:', orderId);
-
-    // Cabecera del pedido
     const orderResult = await pool.request()
       .input('NumeroPedido', parseInt(orderId))
       .input('SeriePedido', 'WebCD')
@@ -190,7 +169,6 @@ const getOrderDetails = async (req, res) => {
       });
     }
 
-    // Líneas del pedido - CORREGIDO: Usar DISTINCT y mejor JOIN para evitar duplicados
     const linesResult = await pool.request()
       .input('NumeroPedido', parseInt(orderId))
       .input('SeriePedido', 'WebCD')
@@ -214,9 +192,6 @@ const getOrderDetails = async (req, res) => {
         ORDER BY l.Orden
       `);
 
-    console.log(`Encontradas ${linesResult.recordset.length} líneas para el pedido ${orderId}`);
-
-    // Eliminar duplicados adicionales por clave única
     const uniqueProducts = [];
     const seenKeys = new Set();
     
@@ -228,8 +203,6 @@ const getOrderDetails = async (req, res) => {
       }
     });
 
-    console.log(`Productos únicos después de filtrado: ${uniqueProducts.length}`);
-
     res.status(200).json({
       success: true,
       order: {
@@ -238,7 +211,6 @@ const getOrderDetails = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error al obtener detalle del pedido:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Error al obtener el detalle del pedido',
@@ -247,7 +219,6 @@ const getOrderDetails = async (req, res) => {
   }
 };
 
-// Nueva función para detalles de pedidos para administradores
 const getAdminOrderDetails = async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -261,9 +232,6 @@ const getAdminOrderDetails = async (req, res) => {
 
     const pool = await getPool();
 
-    console.log('Buscando detalles del pedido (admin):', orderId);
-
-    // Cabecera del pedido
     const orderResult = await pool.request()
       .input('NumeroPedido', parseInt(orderId))
       .input('SeriePedido', 'WebCD')
@@ -289,7 +257,6 @@ const getAdminOrderDetails = async (req, res) => {
       });
     }
 
-    // Líneas del pedido - CORREGIDO: Usar DISTINCT para evitar duplicados
     const linesResult = await pool.request()
       .input('NumeroPedido', parseInt(orderId))
       .input('SeriePedido', 'WebCD')
@@ -313,7 +280,6 @@ const getAdminOrderDetails = async (req, res) => {
         ORDER BY l.Orden
       `);
 
-    // Eliminar duplicados adicionales
     const uniqueProducts = [];
     const seenKeys = new Set();
     
@@ -325,8 +291,6 @@ const getAdminOrderDetails = async (req, res) => {
       }
     });
 
-    console.log(`Encontradas ${uniqueProducts.length} líneas únicas para el pedido ${orderId}`);
-
     res.status(200).json({
       success: true,
       order: {
@@ -335,7 +299,6 @@ const getAdminOrderDetails = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error al obtener detalle del pedido (admin):', error);
     res.status(500).json({ 
       success: false, 
       message: 'Error al obtener el detalle del pedido',
