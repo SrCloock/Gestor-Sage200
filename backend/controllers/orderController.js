@@ -13,6 +13,13 @@ const createOrder = async (req, res) => {
   }
 
   try {
+    if (!req.user || !req.user.codigoEmpresa) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'No autenticado. Inicie sesión primero.' 
+      });
+    }
+
     const pool = await getPool();
     const transaction = pool.transaction();
     await transaction.begin();
@@ -29,6 +36,8 @@ const createOrder = async (req, res) => {
       if (!codigoCliente || !primerItem.CifDni) {
         throw new Error('Datos de cliente incompletos en los items');
       }
+
+      const codigoEmpresa = req.user.codigoEmpresa;
 
       const clienteResult = await transaction.request()
         .input('CodigoCliente', codigoCliente)
@@ -47,7 +56,6 @@ const createOrder = async (req, res) => {
       }
 
       const cliente = clienteResult.recordset[0];
-      const codigoEmpresa = cliente.CodigoEmpresa || '1';
 
       const fechaActual = new Date();
 
@@ -64,7 +72,7 @@ const createOrder = async (req, res) => {
         `);
 
       const cp = cpResult.recordset[0] || {};
-
+      
       const getDatoPreferente = (cpDato, cDato) =>
         cpDato !== null && cpDato !== undefined && cpDato !== '' ? cpDato : cDato;
 
@@ -265,24 +273,25 @@ const createOrder = async (req, res) => {
         `);
 
       for (const [index, item] of items.entries()) {
+        console.log(`🔍 Buscando artículo: ${item.CodigoArticulo} para empresa ${codigoEmpresa}`);
+
         const articuloResult = await transaction.request()
           .input('CodigoArticulo', item.CodigoArticulo)
-          .input('CodigoProveedor', item.CodigoProveedor || '')
           .input('CodigoEmpresa', codigoEmpresa)
           .query(`
             SELECT 
               DescripcionArticulo, 
               DescripcionLinea,
               PrecioVenta,
-              GrupoIva
+              GrupoIva,
+              CodigoProveedor
             FROM Articulos
             WHERE CodigoArticulo = @CodigoArticulo
-            AND (CodigoProveedor = @CodigoProveedor OR @CodigoProveedor = '')
             AND CodigoEmpresa = @CodigoEmpresa
           `);
 
         if (articuloResult.recordset.length === 0) {
-          throw new Error(`Artículo ${item.CodigoArticulo} no encontrado`);
+          throw new Error(`Artículo ${item.CodigoArticulo} no encontrado para la empresa ${codigoEmpresa}.`);
         }
 
         const articulo = articuloResult.recordset[0];
@@ -337,7 +346,7 @@ const createOrder = async (req, res) => {
           .input('CodigoAlmacenAnterior', codigoAlmacenAnterior)
           .input('FechaRegistro', `${fechaActual.toISOString().split('T')[0]} 00:00:00.000`)
           .input('CodigoDelCliente', '')
-          .input('CodigoProveedor', item.CodigoProveedor || '')
+          .input('CodigoProveedor', articulo.CodigoProveedor || '')
           .query(`
             INSERT INTO LineasPedidoCliente (
               CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido, Orden,
@@ -414,6 +423,8 @@ const createOrder = async (req, res) => {
 
       await transaction.commit();
 
+      console.log(`✅ Pedido ${SERIE_PEDIDO}-${numeroPedido} creado exitosamente`);
+
       return res.status(201).json({
         success: true,
         orderId: numeroPedido,
@@ -429,18 +440,27 @@ const createOrder = async (req, res) => {
 
     } catch (err) {
       await transaction.rollback();
+      console.error('❌ Error en transacción de createOrder:', err);
       throw err;
     }
   } catch (error) {
+    console.error('❌ Error en createOrder:', error);
     return res.status(500).json({ 
       success: false, 
-      message: error.message || 'Error al procesar el pedido' 
+      message: error.message || 'Error al procesar el pedido'
     });
   }
 };
 
 const getOrders = async (req, res) => {
   try {
+    if (!req.user || !req.user.codigoEmpresa) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'No autenticado. Inicie sesión primero.' 
+      });
+    }
+
     const pool = await getPool();
     const { codigoCliente } = req.query;
 
@@ -451,9 +471,12 @@ const getOrders = async (req, res) => {
       });
     }
 
+    const codigoEmpresa = req.user.codigoEmpresa;
+
     const ordersResult = await pool.request()
       .input('CodigoCliente', codigoCliente)
       .input('SeriePedido', SERIE_PEDIDO)
+      .input('CodigoEmpresa', codigoEmpresa)
       .query(`
         SELECT TOP 50
           c.NumeroPedido,
@@ -479,6 +502,7 @@ const getOrders = async (req, res) => {
         FROM CabeceraPedidoCliente c
         WHERE c.CodigoCliente = @CodigoCliente
         AND c.SeriePedido = @SeriePedido
+        AND c.CodigoEmpresa = @CodigoEmpresa
         ORDER BY c.FechaPedido DESC
       `);
 
@@ -487,6 +511,7 @@ const getOrders = async (req, res) => {
         const detailsResult = await pool.request()
           .input('NumeroPedido', order.NumeroPedido)
           .input('SeriePedido', order.SeriePedido)
+          .input('CodigoEmpresa', codigoEmpresa)
           .query(`
             SELECT 
               l.Orden,
@@ -504,6 +529,7 @@ const getOrders = async (req, res) => {
             FROM LineasPedidoCliente l
             WHERE l.NumeroPedido = @NumeroPedido
             AND l.SeriePedido = @SeriePedido
+            AND l.CodigoEmpresa = @CodigoEmpresa
             ORDER BY l.Orden
           `);
 
@@ -515,6 +541,8 @@ const getOrders = async (req, res) => {
       })
     );
 
+    console.log(`✅ Pedidos obtenidos: ${ordersWithDetails.length}`);
+
     return res.status(200).json({ 
       success: true, 
       orders: ordersWithDetails,
@@ -523,15 +551,23 @@ const getOrders = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('❌ Error en getOrders:', error);
     return res.status(500).json({ 
       success: false, 
-      message: error.message || 'Error al obtener los pedidos' 
+      message: error.message || 'Error al obtener los pedidos'
     });
   }
 };
 
 const getOrderDetails = async (req, res) => {
   try {
+    if (!req.user || !req.user.codigoEmpresa) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'No autenticado. Inicie sesión primero.' 
+      });
+    }
+
     const pool = await getPool();
     const { numeroPedido } = req.params;
     const { codigoCliente, seriePedido = 'WebCD' } = req.query;
@@ -543,10 +579,13 @@ const getOrderDetails = async (req, res) => {
       });
     }
 
+    const codigoEmpresa = req.user.codigoEmpresa;
+
     const orderResult = await pool.request()
       .input('NumeroPedido', numeroPedido)
       .input('CodigoCliente', codigoCliente)
       .input('SeriePedido', seriePedido)
+      .input('CodigoEmpresa', codigoEmpresa)
       .query(`
         SELECT 
           NumeroPedido, 
@@ -569,6 +608,7 @@ const getOrderDetails = async (req, res) => {
         WHERE NumeroPedido = @NumeroPedido
         AND CodigoCliente = @CodigoCliente
         AND SeriePedido = @SeriePedido
+        AND CodigoEmpresa = @CodigoEmpresa
       `);
 
     if (orderResult.recordset.length === 0) {
@@ -583,6 +623,7 @@ const getOrderDetails = async (req, res) => {
     const linesResult = await pool.request()
       .input('NumeroPedido', numeroPedido)
       .input('SeriePedido', seriePedido)
+      .input('CodigoEmpresa', codigoEmpresa)
       .query(`
         SELECT 
           l.Orden,
@@ -601,6 +642,7 @@ const getOrderDetails = async (req, res) => {
         FROM LineasPedidoCliente l
         WHERE l.NumeroPedido = @NumeroPedido
         AND l.SeriePedido = @SeriePedido
+        AND l.CodigoEmpresa = @CodigoEmpresa
         ORDER BY l.Orden
       `);
 
@@ -624,6 +666,7 @@ const getOrderDetails = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('❌ Error en getOrderDetails:', error);
     return res.status(500).json({ 
       success: false, 
       message: 'Error al obtener el detalle del pedido',
@@ -637,44 +680,98 @@ const updateOrder = async (req, res) => {
   const { items, deliveryDate, comment } = req.body;
 
   try {
+    if (!req.user || !req.user.codigoEmpresa) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'No autenticado. Inicie sesión primero.' 
+      });
+    }
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'El pedido debe contener al menos un item' 
+      });
+    }
+
     const pool = await getPool();
     const transaction = pool.transaction();
     await transaction.begin();
 
     try {
-      const orderResult = await transaction.request()
-        .input('NumeroPedido', orderId)
+      const codigoEmpresa = req.user.codigoEmpresa;
+      const fechaActual = new Date();
+      const SERIE_PEDIDO = 'WebCD';
+
+      // 1. Verificar que el pedido existe y está en estado editable
+      const pedidoExistente = await transaction.request()
+        .input('CodigoEmpresa', codigoEmpresa)
+        .input('EjercicioPedido', fechaActual.getFullYear())
         .input('SeriePedido', SERIE_PEDIDO)
+        .input('NumeroPedido', orderId)
         .query(`
-          SELECT CodigoEmpresa, EjercicioPedido, CodigoCliente
-          FROM CabeceraPedidoCliente
-          WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
+          SELECT 
+            c.NumeroPedido, c.CodigoCliente, c.StatusAprobado, c.Estado,
+            c.BaseImponible, c.TotalIva, c.ImporteLiquido,
+            COUNT(l.Orden) as LineasActuales
+          FROM CabeceraPedidoCliente c
+          LEFT JOIN LineasPedidoCliente l ON 
+            c.CodigoEmpresa = l.CodigoEmpresa AND
+            c.EjercicioPedido = l.EjercicioPedido AND
+            c.SeriePedido = l.SeriePedido AND
+            c.NumeroPedido = l.NumeroPedido
+          WHERE c.CodigoEmpresa = @CodigoEmpresa
+          AND c.EjercicioPedido = @EjercicioPedido
+          AND c.SeriePedido = @SeriePedido
+          AND c.NumeroPedido = @NumeroPedido
+          GROUP BY c.NumeroPedido, c.CodigoCliente, c.StatusAprobado, c.Estado,
+                   c.BaseImponible, c.TotalIva, c.ImporteLiquido
         `);
 
-      if (orderResult.recordset.length === 0) {
+      if (pedidoExistente.recordset.length === 0) {
         throw new Error('Pedido no encontrado');
       }
 
-      const { CodigoEmpresa, EjercicioPedido, CodigoCliente } = orderResult.recordset[0];
+      const pedido = pedidoExistente.recordset[0];
 
+      // Verificar que el pedido está en estado editable (StatusAprobado = 0)
+      if (pedido.StatusAprobado !== 0) {
+        throw new Error('No se puede editar un pedido que ya ha sido aprobado');
+      }
+
+      // 2. Verificar que todos los items pertenecen al mismo cliente del pedido
+      const clientesUnicos = [...new Set(items.map(item => item.CodigoCliente))];
+      if (clientesUnicos.length !== 1 || clientesUnicos[0] !== pedido.CodigoCliente) {
+        throw new Error('Todos los artículos deben pertenecer al cliente del pedido');
+      }
+
+      // 3. Eliminar todas las líneas existentes del pedido
       await transaction.request()
-        .input('NumeroPedido', orderId)
+        .input('CodigoEmpresa', codigoEmpresa)
+        .input('EjercicioPedido', fechaActual.getFullYear())
         .input('SeriePedido', SERIE_PEDIDO)
+        .input('NumeroPedido', orderId)
         .query(`
           DELETE FROM LineasPedidoCliente
-          WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
+          WHERE CodigoEmpresa = @CodigoEmpresa
+          AND EjercicioPedido = @EjercicioPedido
+          AND SeriePedido = @SeriePedido
+          AND NumeroPedido = @NumeroPedido
         `);
 
+      // 4. Insertar las nuevas líneas
       for (const [index, item] of items.entries()) {
+        // Obtener información del artículo
         const articuloResult = await transaction.request()
           .input('CodigoArticulo', item.CodigoArticulo)
-          .input('CodigoEmpresa', CodigoEmpresa)
+          .input('CodigoEmpresa', codigoEmpresa)
           .query(`
             SELECT 
               DescripcionArticulo, 
               DescripcionLinea,
               PrecioVenta,
-              GrupoIva
+              GrupoIva,
+              CodigoProveedor
             FROM Articulos
             WHERE CodigoArticulo = @CodigoArticulo
             AND CodigoEmpresa = @CodigoEmpresa
@@ -685,8 +782,8 @@ const updateOrder = async (req, res) => {
         }
 
         const articulo = articuloResult.recordset[0];
-        const descripcionLinea = articulo.DescripcionLinea || '';
 
+        // Obtener información del IVA
         const grupoIvaResult = await transaction.request()
           .input('GrupoIva', articulo.GrupoIva)
           .query(`
@@ -701,21 +798,43 @@ const updateOrder = async (req, res) => {
         
         const codigoIva = porcentajeIva;
         const unidadesPedidas = parseFloat(item.Cantidad) || 1;
-        const precio = parseFloat(articulo.PrecioVenta) || 0;
+        const precio = parseFloat(articulo.PrecioVenta) || parseFloat(item.PrecioVenta) || 0;
 
         const baseImponible = precio * unidadesPedidas;
         const cuotaIva = baseImponible * (porcentajeIva / 100);
         const importeLiquido = baseImponible + cuotaIva;
 
+        // Obtener almacenes (como en createOrder)
+        const almacenesResult = await transaction.request()
+          .input('sysGrupo', codigoEmpresa)
+          .input('sysContenidoIni', 'cen')
+          .query(`
+            SELECT sysItem, sysContenidoIni 
+            FROM lsysini 
+            WHERE sysGrupo = @sysGrupo
+            AND sysContenidoIni = @sysContenidoIni
+            AND sysSeccion IN ('GES', 'GPR')
+            AND sysItem IN ('AlmacenDefecto', 'AlmacenFabrica')
+          `);
+
+        const almacenes = {};
+        almacenesResult.recordset.forEach(row => {
+          almacenes[row.sysItem] = row.sysContenidoIni;
+        });
+
+        const codigoAlmacen = almacenes['AlmacenDefecto'] || 'CEN';
+        const codigoAlmacenAnterior = almacenes['AlmacenFabrica'] || 'CEN';
+
+        // Insertar nueva línea
         await transaction.request()
-          .input('CodigoEmpresa', CodigoEmpresa)
-          .input('EjercicioPedido', EjercicioPedido)
+          .input('CodigoEmpresa', codigoEmpresa)
+          .input('EjercicioPedido', fechaActual.getFullYear())
           .input('SeriePedido', SERIE_PEDIDO)
           .input('NumeroPedido', orderId)
           .input('Orden', index + 1)
           .input('CodigoArticulo', item.CodigoArticulo)
-          .input('DescripcionArticulo', articulo.DescripcionArticulo)
-          .input('DescripcionLinea', descripcionLinea)
+          .input('DescripcionArticulo', articulo.DescripcionArticulo || item.DescripcionArticulo)
+          .input('DescripcionLinea', articulo.DescripcionLinea || '')
           .input('UnidadesPedidas', unidadesPedidas)
           .input('UnidadesPendientes', unidadesPedidas)
           .input('Unidades2_', unidadesPedidas)
@@ -732,11 +851,11 @@ const updateOrder = async (req, res) => {
           .input('CodigoIva', codigoIva)
           .input('PorcentajeIva', porcentajeIva)
           .input('GrupoIva', articulo.GrupoIva)
-          .input('CodigoAlmacen', 'CEN')
-          .input('CodigoAlmacenAnterior', 'CEN')
-          .input('FechaRegistro', new Date())
+          .input('CodigoAlmacen', codigoAlmacen)
+          .input('CodigoAlmacenAnterior', codigoAlmacenAnterior)
+          .input('FechaRegistro', `${fechaActual.toISOString().split('T')[0]} 00:00:00.000`)
           .input('CodigoDelCliente', '')
-          .input('CodigoProveedor', item.CodigoProveedor || '')
+          .input('CodigoProveedor', articulo.CodigoProveedor || '')
           .query(`
             INSERT INTO LineasPedidoCliente (
               CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido, Orden,
@@ -765,38 +884,12 @@ const updateOrder = async (req, res) => {
           `);
       }
 
-      if (deliveryDate || comment) {
-        let updateQuery = 'UPDATE CabeceraPedidoCliente SET ';
-        const updateParams = {};
-        
-        if (deliveryDate) {
-          updateQuery += 'FechaNecesaria = @FechaNecesaria, FechaEntrega = @FechaEntrega, ';
-          updateParams.FechaNecesaria = `${deliveryDate} 00:00:00.000`;
-          updateParams.FechaEntrega = `${deliveryDate} 00:00:00.000`;
-        }
-        
-        if (comment) {
-          updateQuery += 'ObservacionesPedido = @ObservacionesPedido, ';
-          updateParams.ObservacionesPedido = comment;
-        }
-        
-        updateQuery = updateQuery.slice(0, -2);
-        updateQuery += ' WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido';
-        
-        updateParams.NumeroPedido = orderId;
-        updateParams.SeriePedido = SERIE_PEDIDO;
-        
-        const updateRequest = transaction.request();
-        Object.keys(updateParams).forEach(key => {
-          updateRequest.input(key, updateParams[key]);
-        });
-        
-        await updateRequest.query(updateQuery);
-      }
-
+      // 5. Recalcular totales
       const totalesResult = await transaction.request()
-        .input('NumeroPedido', orderId)
+        .input('CodigoEmpresa', codigoEmpresa)
+        .input('EjercicioPedido', fechaActual.getFullYear())
         .input('SeriePedido', SERIE_PEDIDO)
+        .input('NumeroPedido', orderId)
         .query(`
           SELECT 
             SUM(BaseImponible) AS BaseImponible,
@@ -804,8 +897,10 @@ const updateOrder = async (req, res) => {
             COUNT(*) AS NumeroLineas,
             SUM(ImporteLiquido) AS ImporteLiquidoTotal
           FROM LineasPedidoCliente
-          WHERE NumeroPedido = @NumeroPedido
+          WHERE CodigoEmpresa = @CodigoEmpresa
+          AND EjercicioPedido = @EjercicioPedido
           AND SeriePedido = @SeriePedido
+          AND NumeroPedido = @NumeroPedido
         `);
 
       const baseImponibleTotal = parseFloat(totalesResult.recordset[0].BaseImponible) || 0;
@@ -813,45 +908,69 @@ const updateOrder = async (req, res) => {
       const importeLiquidoTotal = parseFloat(totalesResult.recordset[0].ImporteLiquidoTotal) || 0;
       const numeroLineas = parseInt(totalesResult.recordset[0].NumeroLineas) || 0;
 
+      // 6. Actualizar cabecera del pedido
+      const fechaEntrega = deliveryDate 
+        ? `${deliveryDate} 00:00:00.000`
+        : pedido.FechaEntrega;
+
       await transaction.request()
-        .input('NumeroPedido', orderId)
+        .input('CodigoEmpresa', codigoEmpresa)
+        .input('EjercicioPedido', fechaActual.getFullYear())
         .input('SeriePedido', SERIE_PEDIDO)
+        .input('NumeroPedido', orderId)
         .input('BaseImponible', baseImponibleTotal)
         .input('TotalIVA', totalIVATotal)
         .input('ImporteLiquido', importeLiquidoTotal)
         .input('NumeroLineas', numeroLineas)
+        .input('FechaEntrega', fechaEntrega)
+        .input('FechaTope', fechaEntrega)
+        .input('FechaNecesaria', fechaEntrega)
+        .input('ObservacionesPedido', comment || '')
         .query(`
           UPDATE CabeceraPedidoCliente
           SET 
             BaseImponible = @BaseImponible,
             TotalIva = @TotalIVA,
             ImporteLiquido = @ImporteLiquido,
-            NumeroLineas = @NumeroLineas
+            NumeroLineas = @NumeroLineas,
+            FechaEntrega = @FechaEntrega,
+            FechaTope = @FechaTope,
+            FechaNecesaria = @FechaNecesaria,
+            ObservacionesPedido = @ObservacionesPedido
           WHERE 
-            NumeroPedido = @NumeroPedido AND
-            SeriePedido = @SeriePedido
+            CodigoEmpresa = @CodigoEmpresa AND
+            EjercicioPedido = @EjercicioPedido AND
+            SeriePedido = @SeriePedido AND
+            NumeroPedido = @NumeroPedido
         `);
 
       await transaction.commit();
+
+      console.log(`✅ Pedido ${SERIE_PEDIDO}-${orderId} actualizado exitosamente`);
 
       return res.status(200).json({
         success: true,
         message: 'Pedido actualizado correctamente',
         orderId: orderId,
+        itemsUpdated: items.length,
         baseImponible: baseImponibleTotal,
         totalIVA: totalIVATotal,
         importeLiquido: importeLiquidoTotal,
-        numeroLineas: numeroLineas
+        numeroLineas: numeroLineas,
+        deliveryDate: deliveryDate,
+        comment: comment
       });
 
     } catch (err) {
       await transaction.rollback();
+      console.error('❌ Error en transacción de updateOrder:', err);
       throw err;
     }
   } catch (error) {
-    return res.status(500).json({ 
-      success: false, 
-      message: error.message || 'Error al actualizar el pedido' 
+    console.error('❌ Error en updateOrder:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Error al actualizar el pedido'
     });
   }
 };

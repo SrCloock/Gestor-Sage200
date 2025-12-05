@@ -51,8 +51,6 @@ const AllOrders = () => {
         ...(filters.estado && { estado: filters.estado })
       };
 
-      console.log('Buscando todos los pedidos con params:', params);
-
       const response = await api.get('/admin/all-orders', { params });
       
       if (response.data.success) {
@@ -219,7 +217,6 @@ const AllOrders = () => {
         </div>
       )}
 
-      {/* Filtros */}
       <div className="ao-filters-panel">
         <div className="ao-filters-grid">
           <div className="ao-filter-group">
@@ -365,7 +362,6 @@ const AllOrders = () => {
         </>
       )}
 
-      {/* Modal para ver detalles del pedido */}
       {showOrderModal && selectedOrder && (
         <div className="ao-modal-overlay" onClick={() => setShowOrderModal(false)}>
           <div className="ao-modal" onClick={(e) => e.stopPropagation()}>

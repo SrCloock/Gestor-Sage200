@@ -66,7 +66,8 @@ const getPendingOrders = async (req, res) => {
           ImporteLiquido,
           FechaNecesaria,
           ObservacionesPedido,
-          CodigoCliente
+          CodigoCliente,
+          CodigoEmpresa
         FROM CabeceraPedidoCliente
         ${whereClause}
       ) AS Results
@@ -107,6 +108,7 @@ const getPendingOrders = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Error en getPendingOrders:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Error al obtener pedidos pendientes',
@@ -139,6 +141,7 @@ const getOrderForReview = async (req, res) => {
           c.FechaNecesaria,
           c.CodigoEmpresa,
           c.EjercicioPedido,
+          c.CodigoCliente,
           CASE 
             WHEN c.StatusAprobado = 0 THEN 'Pendiente'
             WHEN c.StatusAprobado = -1 AND (c.Estado IS NULL OR c.Estado = 0) THEN 'Preparación'
@@ -158,9 +161,13 @@ const getOrderForReview = async (req, res) => {
       });
     }
 
+    const order = orderResult.recordset[0];
+    const { CodigoEmpresa } = order;
+
     const linesResult = await pool.request()
       .input('NumeroPedido', orderId)
       .input('SeriePedido', 'WebCD')
+      .input('CodigoEmpresa', CodigoEmpresa)
       .query(`
         SELECT DISTINCT
           l.Orden,
@@ -171,39 +178,122 @@ const getOrderForReview = async (req, res) => {
           l.CodigoProveedor,
           l.CodigoIva,
           l.[%Iva] as PorcentajeIva,
-          a.PrecioVentaconIVA1,
-          COALESCE(p.RazonSocial, 'No especificado') as NombreProveedor
+          l.BaseImponible,
+          l.CuotaIva,
+          l.ImporteLiquido
         FROM LineasPedidoCliente l
-        LEFT JOIN Articulos a ON l.CodigoArticulo = a.CodigoArticulo
-        LEFT JOIN Proveedores p ON l.CodigoProveedor = p.CodigoProveedor
         WHERE l.NumeroPedido = @NumeroPedido
-        AND l.SeriePedido = @SeriePedido
+          AND l.SeriePedido = @SeriePedido
+          AND l.CodigoEmpresa = @CodigoEmpresa
         ORDER BY l.Orden
       `);
 
-    const uniqueProducts = [];
-    const seenKeys = new Set();
-    
-    linesResult.recordset.forEach(item => {
-      const key = `${item.Orden}-${item.CodigoArticulo}-${item.CodigoProveedor || 'no-prov'}`;
-      if (!seenKeys.has(key)) {
-        seenKeys.add(key);
-        const precioFinal = item.PrecioVentaconIVA1 || item.Precio;
-        uniqueProducts.push({
-          ...item,
-          Precio: precioFinal
+    if (!linesResult.recordset || linesResult.recordset.length === 0) {
+      return res.status(200).json({
+        success: true,
+        order: {
+          ...order,
+          Productos: []
+        }
+      });
+    }
+
+    const proveedoresMap = new Map();
+    const codigosProveedores = [...new Set(linesResult.recordset
+      .map(item => item.CodigoProveedor)
+      .filter(codigo => codigo && codigo.trim() !== ''))];
+
+    if (codigosProveedores.length > 0) {
+      const placeholders = codigosProveedores.map((_, i) => `@p${i}`).join(', ');
+      const proveedoresQuery = `
+        SELECT CodigoProveedor, RazonSocial 
+        FROM Proveedores 
+        WHERE CodigoProveedor IN (${placeholders})
+          AND CodigoEmpresa = @CodigoEmpresa
+      `;
+      
+      const proveedoresRequest = pool.request()
+        .input('CodigoEmpresa', CodigoEmpresa);
+      
+      codigosProveedores.forEach((codigo, index) => {
+        proveedoresRequest.input(`p${index}`, codigo);
+      });
+      
+      const proveedoresResult = await proveedoresRequest.query(proveedoresQuery);
+      proveedoresResult.recordset.forEach(prov => {
+        proveedoresMap.set(prov.CodigoProveedor, prov.RazonSocial);
+      });
+    }
+
+    const articulosMap = new Map();
+    const codigosArticulos = [...new Set(linesResult.recordset.map(item => item.CodigoArticulo))];
+
+    if (codigosArticulos.length > 0) {
+      const placeholders = codigosArticulos.map((_, i) => `@a${i}`).join(', ');
+      const articulosQuery = `
+        SELECT CodigoArticulo, PrecioVentaconIVA1, GrupoIva
+        FROM Articulos 
+        WHERE CodigoArticulo IN (${placeholders})
+          AND CodigoEmpresa = @CodigoEmpresa
+      `;
+      
+      const articulosRequest = pool.request()
+        .input('CodigoEmpresa', CodigoEmpresa);
+      
+      codigosArticulos.forEach((codigo, index) => {
+        articulosRequest.input(`a${index}`, codigo);
+      });
+      
+      const articulosResult = await articulosRequest.query(articulosQuery);
+      articulosResult.recordset.forEach(art => {
+        articulosMap.set(art.CodigoArticulo, {
+          PrecioVentaconIVA1: art.PrecioVentaconIVA1,
+          GrupoIva: art.GrupoIva
         });
+      });
+    }
+
+    const uniqueProducts = linesResult.recordset.map(item => {
+      const articuloInfo = articulosMap.get(item.CodigoArticulo) || {};
+      const proveedorNombre = proveedoresMap.get(item.CodigoProveedor) || 'No especificado';
+      
+      return {
+        Orden: item.Orden,
+        CodigoArticulo: item.CodigoArticulo,
+        DescripcionArticulo: item.DescripcionArticulo,
+        UnidadesPedidas: item.UnidadesPedidas,
+        Precio: articuloInfo.PrecioVentaconIVA1 || item.Precio,
+        CodigoProveedor: item.CodigoProveedor,
+        CodigoIva: item.CodigoIva,
+        PorcentajeIva: item.PorcentajeIva,
+        PrecioVentaconIVA1: articuloInfo.PrecioVentaconIVA1,
+        GrupoIva: articuloInfo.GrupoIva,
+        NombreProveedor: proveedorNombre,
+        BaseImponible: item.BaseImponible,
+        CuotaIva: item.CuotaIva,
+        ImporteLiquido: item.ImporteLiquido
+      };
+    });
+
+    const seenKeys = new Set();
+    const finalProducts = uniqueProducts.filter(product => {
+      const key = `${product.Orden}-${product.CodigoArticulo}`;
+      if (seenKeys.has(key)) {
+        return false;
       }
+      seenKeys.add(key);
+      return true;
     });
 
     res.status(200).json({
       success: true,
       order: {
-        ...orderResult.recordset[0],
-        Productos: uniqueProducts
+        ...order,
+        Productos: finalProducts
       }
     });
   } catch (error) {
+    console.error('Error en getOrderForReview:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Error al obtener el pedido',
@@ -626,6 +716,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           .input('NumeroPedido', numeroPedidoProveedor)
           .input('IdDelegacion', IdDelegacion || '')
           .input('CodigoProveedor', codigoProveedor)
+          .input('CodigoCliente', CodigoCliente)
           .input('SiglaNacion', 'ES')
           .input('CifDni', proveedor.CifDni)
           .input('CifEuropeo', proveedor.CifEuropeo || '')
@@ -658,7 +749,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           .query(`
             INSERT INTO CabeceraPedidoProveedor (
               CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido, IdDelegacion,
-              CodigoProveedor, SiglaNacion, CifDni, CifEuropeo, RazonSocial, Nombre,
+              CodigoProveedor, CodigoCliente, SiglaNacion, CifDni, CifEuropeo, RazonSocial, Nombre,
               Domicilio, CodigoPostal, CodigoMunicipio, Municipio, CodigoProvincia, Provincia,
               CodigoNacion, Nacion, CodigoCondiciones, FormadePago,
               CodigoContable, ObservacionesPedido, FechaPedido, FechaNecesaria, FechaRecepcion, FechaTope,
@@ -667,7 +758,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
             )
             VALUES (
               @CodigoEmpresa, @EjercicioPedido, @SeriePedido, @NumeroPedido, @IdDelegacion,
-              @CodigoProveedor, @SiglaNacion, @CifDni, @CifEuropeo, @RazonSocial, @Nombre,
+              @CodigoProveedor, @CodigoCliente, @SiglaNacion, @CifDni, @CifEuropeo, @RazonSocial, @Nombre,
               @Domicilio, @CodigoPostal, @CodigoMunicipio, @Municipio, @CodigoProvincia, @Provincia,
               @CodigoNacion, @Nacion, @CodigoCondiciones, @FormadePago,
               @CodigoContable, @ObservacionesPedido, @FechaPedido, @FechaNecesaria, @FechaRecepcion, @FechaTope,
@@ -689,6 +780,18 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
           baseImponibleProveedor += baseImponible;
           totalIVAProveedor += ivaLinea;
 
+          const articuloResult = await transaction.request()
+            .input('CodigoArticulo', item.CodigoArticulo)
+            .input('CodigoEmpresa', CodigoEmpresa)
+            .query(`
+              SELECT GrupoIva
+              FROM Articulos
+              WHERE CodigoArticulo = @CodigoArticulo
+              AND CodigoEmpresa = @CodigoEmpresa
+            `);
+
+          const grupoIva = articuloResult.recordset[0] ? articuloResult.recordset[0].GrupoIva : null;
+
           await transaction.request()
             .input('CodigoEmpresa', CodigoEmpresa)
             .input('EjercicioPedido', EjercicioPedido)
@@ -705,20 +808,23 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
             .input('BaseImponible', baseImponible)
             .input('CuotaIva', ivaLinea)
             .input('ImporteLiquido', baseImponible + ivaLinea)
+            .input('GrupoIva', grupoIva)
             .query(`
               INSERT INTO LineasPedidoProveedor (
                 CodigoEmpresa, EjercicioPedido, SeriePedido, NumeroPedido, Orden,
                 CodigoArticulo, DescripcionArticulo,
                 UnidadesPedidas, Precio,
                 CodigoIva, [%Iva],
-                ImporteBruto, BaseImponible, CuotaIva, ImporteLiquido
+                ImporteBruto, BaseImponible, CuotaIva, ImporteLiquido,
+                GrupoIva
               )
               VALUES (
                 @CodigoEmpresa, @EjercicioPedido, @SeriePedido, @NumeroPedido, @Orden,
                 @CodigoArticulo, @DescripcionArticulo,
                 @UnidadesPedidas, @Precio,
                 @CodigoIva, @PorcentajeIva,
-                @ImporteBruto, @BaseImponible, @CuotaIva, @ImporteLiquido
+                @ImporteBruto, @BaseImponible, @CuotaIva, @ImporteLiquido,
+                @GrupoIva
               )
             `);
         }
@@ -775,6 +881,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
         errorMessage = 'Error de duplicación en la base de datos';
       }
       
+      console.error('Error en updateOrderQuantitiesAndApprove:', err);
       res.status(500).json({
         success: false,
         message: errorMessage,
@@ -782,6 +889,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
       });
     }
   } catch (error) {
+    console.error('Error en updateOrderQuantitiesAndApprove:', error);
     res.status(500).json({
       success: false,
       message: 'Error al procesar la actualización del pedido'

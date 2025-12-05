@@ -4,7 +4,6 @@ import { AuthContext } from '../context/AuthContext';
 import api from '../api';
 import '../styles/OrderDetail.css';
 
-// Constantes unificadas para estados
 const ORDER_STATUS = {
   REVIEWING: { code: 0, text: 'Revisando', color: 'reviewing' },
   APPROVED: { code: -1, text: 'Aprobado', color: 'approved' },
@@ -26,15 +25,12 @@ const OrderDetail = () => {
       try {
         setLoading(true);
         setError('');
-        console.log('Obteniendo detalles del pedido:', orderId, 'para usuario:', user?.username);
         
         let response;
         
-        // Si es admin, usar endpoint de admin
         if (user?.isAdmin) {
           response = await api.get(`/admin/all-orders/${orderId}`);
         } else {
-          // Si es usuario normal, usar endpoint normal
           response = await api.get(`/orders/${orderId}`, {
             params: {
               codigoCliente: user?.codigoCliente,
@@ -43,21 +39,18 @@ const OrderDetail = () => {
           });
         }
         
-        console.log('Respuesta del API:', response.data);
-        
         if (response.data && response.data.order) {
           setOrder(response.data.order);
         } else {
           setError('No se encontraron datos del pedido');
         }
       } catch (err) {
-        console.error('Error detallado:', err);
         if (err.response?.status === 401) {
           setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
         } else if (err.response?.status === 404) {
           setError('El pedido solicitado no existe.');
         } else {
-          setError(err.response?.data?.message || 'Error al cargar los detalles del pedido');
+          setError('Error al cargar los detalles del pedido');
         }
       } finally {
         setLoading(false);
@@ -72,16 +65,12 @@ const OrderDetail = () => {
     }
   }, [orderId, user]);
 
-  // ✅ CORREGIDO: Función unificada para determinar si se puede confirmar recepción
   const canConfirmReception = () => {
     if (!order) return false;
-    
-    // Solo se puede confirmar recepción si está aprobado y no está completamente servido
     return order.StatusAprobado === ORDER_STATUS.APPROVED.code && 
            order.Estado !== ORDER_STATUS.DELIVERED.code;
   };
 
-  // ✅ CORREGIDO: Función unificada para texto del estado
   const getStatusInfo = () => {
     if (!order) return { text: 'Desconocido', color: 'unknown' };
     
@@ -120,7 +109,6 @@ const OrderDetail = () => {
     return { text: 'Desconocido', color: 'unknown' };
   };
 
-  // ✅ CORREGIDO: Navegación mejorada
   const handleConfirmReception = () => {
     navigate(`/mis-pedidos/${orderId}/recepcion`);
   };
@@ -144,7 +132,6 @@ const OrderDetail = () => {
         setOrder(response.data.order);
       }
     } catch (err) {
-      console.error('Error al actualizar:', err);
       setError('Error al actualizar los datos del pedido');
     } finally {
       setLoading(false);
@@ -189,7 +176,6 @@ const OrderDetail = () => {
     </div>
   );
 
-  // Asegurarse de que productos existe y es un array
   const productos = order.productos || order.Productos || [];
   const numeroLineas = productos.length;
   const statusInfo = getStatusInfo();
@@ -216,18 +202,12 @@ const OrderDetail = () => {
             })}
           </p>
         </div>
-
-        <div className="od-header-actions">
-          <button onClick={handleRefresh} className="od-refresh-button">
-            🔄 Actualizar
-          </button>
-        </div>
       </div>
       
       <div className="od-info-grid">
         <div className="od-info-card">
           <div className="od-card-header">
-            <h3>📦 Información General</h3>
+            <h3>Información General</h3>
           </div>
           <div className="od-info-content">
             <div className="od-info-row">
@@ -265,7 +245,7 @@ const OrderDetail = () => {
         
         <div className="od-info-card">
           <div className="od-card-header">
-            <h3>👤 Información del Cliente</h3>
+            <h3>Información del Cliente</h3>
           </div>
           <div className="od-info-content">
             <div className="od-info-row">
@@ -292,7 +272,7 @@ const OrderDetail = () => {
             onClick={handleEditOrder}
             className="od-action-button od-edit-button"
           >
-            ✏️ Editar Pedido
+            Editar Pedido
           </button>
         )}
         
@@ -301,7 +281,7 @@ const OrderDetail = () => {
             onClick={handleConfirmReception}
             className="od-action-button od-primary-button"
           >
-            📦 Confirmar Recepción
+            Confirmar Recepción
           </button>
         )}
       </div>
@@ -377,7 +357,6 @@ const OrderDetail = () => {
               </tbody>
             </table>
             
-            {/* Resumen de totales */}
             <div className="od-table-summary">
               <div className="od-summary-row">
                 <span>Base Imponible:</span>

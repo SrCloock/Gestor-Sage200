@@ -12,7 +12,6 @@ const AdminOrders = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const { user } = useContext(AuthContext);
   
-  // Estados para filtros y paginación
   const [filtros, setFiltros] = useState({
     cliente: '',
     estado: '',
@@ -71,7 +70,7 @@ const AdminOrders = () => {
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
-        throw new Error(`El servidor devolvió HTML en lugar de JSON: ${text.substring(0, 100)}...`);
+        throw new Error('El servidor devolvió un formato inválido');
       }
 
       const data = await response.json();

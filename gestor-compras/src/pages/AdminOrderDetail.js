@@ -13,7 +13,6 @@ const AdminOrderDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // 🔥 FUNCIÓN ESPECÍFICA PARA ADMIN
   const fetchWithAuth = async (url, options = {}) => {
     try {
       const storedUser = JSON.parse(localStorage.getItem('user'));
@@ -45,9 +44,6 @@ const AdminOrderDetail = () => {
         config.body = JSON.stringify(config.body);
       }
 
-      console.log('🔐 Admin - Headers enviados:', config.headers);
-      console.log('📤 Admin - URL:', url);
-
       const response = await fetch(url, config);
       
       if (response.status === 401) {
@@ -59,7 +55,7 @@ const AdminOrderDetail = () => {
       
       return response;
     } catch (error) {
-      console.error('❌ Error en fetchWithAuth (admin):', error);
+      console.error('Error en fetchWithAuth (admin):', error);
       throw error;
     }
   };
@@ -70,9 +66,6 @@ const AdminOrderDetail = () => {
         setLoading(true);
         setError('');
         
-        console.log('🔍 Admin - Fetching order details for:', orderId);
-
-        // 🔥 USAR ENDPOINT DE ADMIN
         const response = await fetchWithAuth(`/api/admin/orders/${orderId}`, {
           method: 'GET'
         });
@@ -88,7 +81,6 @@ const AdminOrderDetail = () => {
         }
 
         const data = await response.json();
-        console.log('✅ Admin - Datos recibidos:', data);
         
         if (data.success) {
           setOrder(data.order);
@@ -96,7 +88,7 @@ const AdminOrderDetail = () => {
           setError(data.message || 'Error al cargar el pedido');
         }
       } catch (err) {
-        console.error('❌ Error fetching admin order details:', err);
+        console.error('Error fetching admin order details:', err);
         setError(err.message || 'Error al cargar los detalles del pedido');
       } finally {
         setLoading(false);
@@ -201,7 +193,6 @@ const AdminOrderDetail = () => {
       </div>
 
       <div className="od-content">
-        {/* Información del cliente */}
         <div className="od-info-section">
           <h3>
             <FaUser className="od-section-icon" />
@@ -235,7 +226,6 @@ const AdminOrderDetail = () => {
           </div>
         </div>
 
-        {/* Productos del pedido */}
         <div className="od-products-section">
           <h3>
             <FaBox className="od-section-icon" />
@@ -278,7 +268,6 @@ const AdminOrderDetail = () => {
           )}
         </div>
 
-        {/* Resumen del pedido */}
         <div className="od-summary-section">
           <h3>
             <FaEuroSign className="od-section-icon" />

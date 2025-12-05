@@ -12,14 +12,12 @@ import {
   FaFilter, 
   FaTrash, 
   FaBox, 
-  FaSync, 
   FaTimes,
   FaComment,
   FaShoppingCart
 } from 'react-icons/fa';
 import '../styles/OrderCreate.css';
 
-// Componente ProductGrid unificado
 const ProductGrid = ({ products, onAddProduct, currentPage, totalPages, onPageChange, searchTerm, loading }) => {
   if (loading) {
     return (
@@ -78,7 +76,6 @@ const ProductGrid = ({ products, onAddProduct, currentPage, totalPages, onPageCh
   );
 };
 
-// Componente ResumenPedido mejorado
 const ResumenPedido = ({ 
   items, 
   deliveryDate, 
@@ -86,7 +83,8 @@ const ResumenPedido = ({
   onUpdateQuantity, 
   onRemoveItem, 
   onDeliveryDateChange, 
-  onCommentChange 
+  onCommentChange,
+  lastAddedItem
 }) => {
   const calcularTotal = () => {
     return items.reduce((total, item) => {
@@ -117,20 +115,20 @@ const ResumenPedido = ({
   return (
     <div className="oc-resumen-pedido">
       <div className="oc-resumen-header">
-        <h3>
-          <FaShoppingCart className="oc-header-icon" />
-          Resumen del Pedido
-        </h3>
-        <span className="oc-total-items">{items.length} productos</span>
+        <div className="oc-header-left">
+          <h3>
+            <FaShoppingCart className="oc-header-icon" />
+            Resumen del Pedido
+          </h3>
+        </div>
       </div>
 
-      {/* Sección de información del pedido */}
       <div className="oc-order-info-section">
         <div className="oc-delivery-section">
           <div className="oc-delivery-input">
             <FaCalendarAlt className="oc-input-icon" />
             <div className="oc-input-group">
-              <label htmlFor="deliveryDate">Fecha de entrega (opcional):</label>
+              <label htmlFor="deliveryDate">Fecha de entrega:</label>
               <input
                 type="date"
                 id="deliveryDate"
@@ -147,12 +145,12 @@ const ResumenPedido = ({
           <div className="oc-comment-input">
             <FaComment className="oc-input-icon" />
             <div className="oc-input-group">
-              <label>Comentarios del pedido:</label>
+              <label>Comentarios:</label>
               <textarea 
                 value={comment}
                 onChange={(e) => onCommentChange(e.target.value)}
                 rows="3"
-                placeholder="Agregue comentarios sobre el pedido, instrucciones especiales, etc..."
+                placeholder="Comentarios sobre el pedido..."
                 className="oc-comment-textarea"
               />
             </div>
@@ -160,17 +158,18 @@ const ResumenPedido = ({
         </div>
       </div>
 
-      {/* Lista de productos */}
       <div className="oc-items-list-container">
         <div className="oc-items-list-header">
           <span>Productos seleccionados</span>
-          <span>Cantidad</span>
+          <span>Total</span>
         </div>
         <div className="oc-items-list">
           {items.map((item, index) => {
-            const itemKey = `${item.CodigoArticulo}-${item.CodigoProveedor || 'NP'}-${index}`;
+            const itemKey = `${item.CodigoArticulo}-${item.CodigoProveedor || 'NP'}`;
+            const isNewItem = itemKey === lastAddedItem;
+            
             return (
-              <div key={itemKey} className="oc-order-item">
+              <div key={itemKey} className={`oc-order-item ${isNewItem ? 'new-item' : ''}`}>
                 <div className="oc-item-info">
                   <div className="oc-item-image">
                     <img 
@@ -181,53 +180,54 @@ const ResumenPedido = ({
                       }}
                     />
                   </div>
-                  <div className="oc-item-details">
-                    <h4 className="oc-item-description" title={item.DescripcionArticulo}>
-                      {item.DescripcionArticulo}
-                    </h4>
+                  <div className="oc-item-content">
+                    <div className="oc-item-main-info">
+                      <h4 className="oc-item-name" title={item.DescripcionArticulo}>
+                        {item.DescripcionArticulo}
+                      </h4>
+                      <div className="oc-item-quantity-control">
+                        <div className="oc-quantity-wrapper">
+                          <label className="oc-quantity-label">Cantidad:</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.Cantidad || 1}
+                            onChange={(e) => onUpdateQuantity(item, parseInt(e.target.value) || 1)}
+                            className="oc-quantity-input"
+                          />
+                        </div>
+                        <div className="oc-item-subtotal">
+                          {((item.PrecioVenta || 0) * (item.Cantidad || 1)).toFixed(2)} €
+                        </div>
+                      </div>
+                    </div>
+                    
                     <div className="oc-item-meta">
-                      <span className="oc-item-code">Código: {item.CodigoArticulo}</span>
-                      {item.NombreProveedor && (
-                        <span className="oc-item-supplier">Proveedor: {item.NombreProveedor}</span>
-                      )}
-                      <span className="oc-item-price">
-                        Precio: {(item.PrecioVenta || 0).toFixed(2)} €
+                      <span className="oc-item-code">
+                        Código: <strong>{item.CodigoArticulo}</strong>
                       </span>
+                      {item.NombreProveedor && (
+                        <span className="oc-item-supplier">
+                          Proveedor: <strong>{item.NombreProveedor}</strong>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
                 
-                <div className="oc-item-controls">
-                  <div className="oc-item-quantity">
-                    <label>Cantidad:</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={item.Cantidad || 1}
-                      onChange={(e) => onUpdateQuantity(item, parseInt(e.target.value) || 1)}
-                      className="oc-quantity-input"
-                    />
-                  </div>
-                  
-                  <div className="oc-item-subtotal">
-                    {((item.PrecioVenta || 0) * (item.Cantidad || 1)).toFixed(2)} €
-                  </div>
-                  
-                  <button 
-                    onClick={() => onRemoveItem(item)}
-                    className="oc-remove-item-btn"
-                    title="Eliminar producto"
-                  >
-                    <FaTrash />
-                  </button>
-                </div>
+                <button 
+                  onClick={() => onRemoveItem(item)}
+                  className="oc-remove-item-btn"
+                  title="Eliminar producto"
+                >
+                  <FaTrash />
+                </button>
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Total del pedido */}
       <div className="oc-order-total-section">
         <div className="oc-total-line">
           <span>Total del pedido:</span>
@@ -245,12 +245,11 @@ const ResumenPedido = ({
   );
 };
 
-// Componente principal OrderCreate
 const OrderCreate = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
-
+  
   const [orderItems, setOrderItems] = useState([]);
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
@@ -268,9 +267,9 @@ const OrderCreate = () => {
   const [reviewMode, setReviewMode] = useState(false);
   const [comment, setComment] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [lastAddedItem, setLastAddedItem] = useState(null);
   const productsPerPage = 12;
 
-  // Función para generar clave única
   const generateProductKey = (product) => {
     return `${product.CodigoArticulo}-${product.CodigoProveedor || 'NP'}`;
   };
@@ -281,23 +280,17 @@ const OrderCreate = () => {
         setLoading(prev => ({ ...prev, products: true }));
         setError('');
         
-        // OBTENER TODOS LOS PRODUCTOS SIN PAGINACIÓN
         const response = await api.get('/catalog/products', {
-          params: {
-            limit: 10000, // Número grande para obtener todos
-            page: 1
-          }
+          params: { limit: 10000, page: 1 }
         });
         
         if (response.data.success) {
           setProducts(response.data.products);
           setFilteredProducts(response.data.products);
-          console.log(`✅ Cargados ${response.data.products.length} productos`);
         } else {
           setError('Error al cargar los productos');
         }
       } catch (err) {
-        console.error('Error fetching products:', err);
         if (err.response?.status === 401) {
           setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
         } else {
@@ -310,23 +303,21 @@ const OrderCreate = () => {
 
     fetchProducts();
 
-    // Si viene de Catalog con un producto seleccionado
     if (location.state?.selectedProduct) {
       const selectedProduct = location.state.selectedProduct;
       setOrderItems([{
         ...selectedProduct,
         Cantidad: 1,
         CodigoCliente: user?.codigoCliente,
-        CifDni: user?.cifDni
+        CifDni: user?.cifDni,
+        addedAt: new Date().getTime()
       }]);
     }
   }, [location, user]);
 
-  // Aplicar filtros y búsqueda
   useEffect(() => {
     let result = [...products];
 
-    // Filtro de búsqueda
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(product => 
@@ -336,28 +327,24 @@ const OrderCreate = () => {
       );
     }
 
-    // Filtro por proveedor
     if (filters.proveedor) {
       result = result.filter(product => 
         product.CodigoProveedor === filters.proveedor
       );
     }
 
-    // Filtro por precio mínimo
     if (filters.precioMin) {
       result = result.filter(product => 
         product.PrecioVenta >= parseFloat(filters.precioMin)
       );
     }
 
-    // Filtro por precio máximo
     if (filters.precioMax) {
       result = result.filter(product => 
         product.PrecioVenta <= parseFloat(filters.precioMax)
       );
     }
 
-    // Ordenar
     result.sort((a, b) => {
       switch (sortBy) {
         case 'nombre':
@@ -389,29 +376,48 @@ const OrderCreate = () => {
   };
 
   const handleAddItem = (product) => {
+    const itemKey = generateProductKey(product);
+    setLastAddedItem(itemKey);
+    
     setOrderItems((prev) => {
       const existingItem = prev.find(item =>
-        generateProductKey(item) === generateProductKey(product)
+        generateProductKey(item) === itemKey
       );
 
       if (existingItem) {
-        return prev.map(item =>
-          generateProductKey(item) === generateProductKey(product)
-            ? { ...item, Cantidad: (item.Cantidad || 0) + 1 }
+        const updatedItems = prev.map(item => 
+          generateProductKey(item) === itemKey
+            ? { 
+                ...item, 
+                Cantidad: (item.Cantidad || 0) + 1,
+                addedAt: new Date().getTime() 
+              }
             : item
         );
+        
+        return updatedItems.sort((a, b) => {
+          const timeA = a.addedAt || 0;
+          const timeB = b.addedAt || 0;
+          return timeB - timeA;
+        });
       } else {
-        return [
-          ...prev,
-          {
-            ...product,
-            Cantidad: 1,
-            CodigoCliente: user?.codigoCliente,
-            CifDni: user?.cifDni
-          }
-        ];
+        const newItem = {
+          ...product,
+          Cantidad: 1,
+          CodigoCliente: user?.codigoCliente,
+          CifDni: user?.cifDni,
+          addedAt: new Date().getTime()
+        };
+        
+        return [newItem, ...prev].sort((a, b) => {
+          const timeA = a.addedAt || 0;
+          const timeB = b.addedAt || 0;
+          return timeB - timeA;
+        });
       }
     });
+    
+    setTimeout(() => setLastAddedItem(null), 1000);
   };
 
   const handleRemoveItem = (itemToRemove) => {
@@ -422,13 +428,19 @@ const OrderCreate = () => {
 
   const handleUpdateQuantity = (itemToUpdate, newQuantity) => {
     const quantity = Math.max(1, parseInt(newQuantity) || 1);
-    setOrderItems(prev => 
-      prev.map(item => 
+    setOrderItems(prev => {
+      const updatedItems = prev.map(item => 
         generateProductKey(item) === generateProductKey(itemToUpdate)
           ? { ...item, Cantidad: quantity }
           : item
-      )
-    );
+      );
+      
+      return updatedItems.sort((a, b) => {
+        const timeA = a.addedAt || 0;
+        const timeB = b.addedAt || 0;
+        return timeB - timeA;
+      });
+    });
   };
 
   const handleReviewOrder = () => {
@@ -443,6 +455,15 @@ const OrderCreate = () => {
     setReviewMode(false);
   };
 
+  const getSortedItems = () => {
+    const items = [...orderItems];
+    return items.sort((a, b) => {
+      const timeA = a.addedAt || 0;
+      const timeB = b.addedAt || 0;
+      return timeB - timeA;
+    });
+  };
+
   const handleSubmitOrder = async () => {
     try {
       setLoading(prev => ({ ...prev, submit: true }));
@@ -452,13 +473,11 @@ const OrderCreate = () => {
         CodigoArticulo: item.CodigoArticulo,
         DescripcionArticulo: item.DescripcionArticulo,
         Cantidad: Number(item.Cantidad),
-        PrecioVenta: item.PrecioVenta, // Enviamos PrecioVenta directamente
+        PrecioVenta: item.PrecioVenta,
         CodigoProveedor: item.CodigoProveedor || null,
         CodigoCliente: user.codigoCliente,
         CifDni: user.cifDni
       }));
-
-      console.log('📤 Enviando pedido con items:', itemsToSend);
 
       const response = await api.post('/orders', {
         items: itemsToSend,
@@ -481,9 +500,8 @@ const OrderCreate = () => {
         setError(response.data.message || 'Error al procesar el pedido');
       }
     } catch (err) {
-      console.error('Error al crear pedido:', err);
       if (err.response?.status === 401) {
-        setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
+        setError('Su sesión ha expirada. Por favor, inicie sesión nuevamente.');
       } else {
         setError(err.response?.data?.message || err.message || 'Error al procesar el pedido');
       }
@@ -500,6 +518,7 @@ const OrderCreate = () => {
   };
 
   const hasActiveFilters = filters.proveedor || filters.precioMin || filters.precioMax;
+  const sortedItems = getSortedItems();
 
   return (
     <div className="oc-container">
@@ -516,12 +535,6 @@ const OrderCreate = () => {
               <p className="oc-subtitle">Seleccione los productos y complete la información del pedido</p>
             </div>
           </div>
-        </div>
-        <div className="oc-header-actions">
-          <button onClick={() => window.location.reload()} className="oc-refresh-button">
-            <FaSync className="oc-refresh-icon" />
-            Actualizar
-          </button>
         </div>
       </div>
 
@@ -612,13 +625,14 @@ const OrderCreate = () => {
 
         <div className="oc-order-summary">
           <ResumenPedido
-            items={orderItems}
+            items={sortedItems}
             deliveryDate={deliveryDate}
             comment={comment}
             onUpdateQuantity={handleUpdateQuantity}
             onRemoveItem={handleRemoveItem}
             onDeliveryDateChange={setDeliveryDate}
             onCommentChange={setComment}
+            lastAddedItem={lastAddedItem}
           />
 
           {!reviewMode ? (

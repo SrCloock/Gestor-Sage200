@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useContext, useMemo } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api';
-import { FaSync } from "react-icons/fa";
 import '../styles/OrderList.css';
 
 const OrderList = () => {
@@ -17,8 +16,7 @@ const OrderList = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // FUNCIÓN CORREGIDA: Lógica para determinar el texto del Status
-  const getStatusText = useMemo(() => (order) => {
+  const getStatusText = (order) => {
     if (order.StatusAprobado === 0) return 'Revisando';
     if (order.StatusAprobado === -1) {
       switch (order.Estado) {
@@ -29,15 +27,11 @@ const OrderList = () => {
       }
     }
     return 'Desconocido';
-  }, []);
+  };
 
-  const canEditOrder = useMemo(() => (order) => {
+  const canEditOrder = (order) => {
     return order.StatusAprobado === 0;
-  }, []);
-
-  const canReceiveOrder = useMemo(() => (order) => {
-    return order.StatusAprobado === -1 && order.Estado !== 2;
-  }, []);
+  };
 
   useEffect(() => {
     if (location.state?.success) {
@@ -49,13 +43,10 @@ const OrderList = () => {
       try {
         setLoading(true);
         setError('');
-        console.log('Obteniendo pedidos para cliente:', user?.codigoCliente);
         
         const response = await api.get('/orders', {
           params: { codigoCliente: user?.codigoCliente }
         });
-        
-        console.log('Respuesta de pedidos:', response.data);
         
         if (response.data.success) {
           setOrders(response.data.orders || []);
@@ -63,13 +54,12 @@ const OrderList = () => {
           setError(response.data.message || 'Error al cargar pedidos');
         }
       } catch (err) {
-        console.error('Error fetching orders:', err);
         if (err.response?.status === 401) {
           setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
         } else if (err.code === 'NETWORK_ERROR') {
-          setError('Error de conexión con el servidor. Verifique que el servidor esté ejecutándose.');
+          setError('Error de conexión con el servidor.');
         } else {
-          setError('Error al cargar los pedidos: ' + (err.message || 'Error desconocido'));
+          setError('Error al cargar los pedidos');
         }
       } finally {
         setLoading(false);
@@ -84,42 +74,37 @@ const OrderList = () => {
     }
   }, [user, location.state]);
 
-  const filteredOrders = useMemo(() => {
-    let result = [...orders];
-    
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter(order => 
-        order.NumeroPedido.toString().includes(term)
-      );
-    }
-    
-    if (statusFilter) {
-      result = result.filter(order => {
-        const statusText = getStatusText(order).toLowerCase();
-        return statusText.includes(statusFilter.toLowerCase());
-      });
-    }
-    
-    result.sort((a, b) => {
-      const dateA = new Date(a.FechaPedido);
-      const dateB = new Date(b.FechaPedido);
-      
-      switch(sortBy) {
-        case 'recent': return dateB - dateA;
-        case 'oldest': return dateA - dateB;
-        case 'amount-asc': return (a.ImporteLiquido || 0) - (b.ImporteLiquido || 0);
-        case 'amount-desc': return (b.ImporteLiquido || 0) - (a.ImporteLiquido || 0);
-        case 'id-asc': return a.NumeroPedido - b.NumeroPedido;
-        case 'id-desc': return b.NumeroPedido - a.NumeroPedido;
-        default: return dateB - dateA;
-      }
+  let filteredOrders = [...orders];
+  
+  if (searchTerm) {
+    const term = searchTerm.toLowerCase();
+    filteredOrders = filteredOrders.filter(order => 
+      order.NumeroPedido.toString().includes(term)
+    );
+  }
+  
+  if (statusFilter) {
+    filteredOrders = filteredOrders.filter(order => {
+      const statusText = getStatusText(order).toLowerCase();
+      return statusText.includes(statusFilter.toLowerCase());
     });
-    
-    return result;
-  }, [searchTerm, statusFilter, sortBy, orders, getStatusText]);
+  }
 
-  // CORREGIDO: Rutas de navegación sin /api
+  filteredOrders.sort((a, b) => {
+    const dateA = new Date(a.FechaPedido);
+    const dateB = new Date(b.FechaPedido);
+    
+    switch(sortBy) {
+      case 'recent': return dateB - dateA;
+      case 'oldest': return dateA - dateB;
+      case 'amount-asc': return (a.ImporteLiquido || 0) - (b.ImporteLiquido || 0);
+      case 'amount-desc': return (b.ImporteLiquido || 0) - (a.ImporteLiquido || 0);
+      case 'id-asc': return a.NumeroPedido - b.NumeroPedido;
+      case 'id-desc': return b.NumeroPedido - a.NumeroPedido;
+      default: return dateB - dateA;
+    }
+  });
+
   const handleViewDetails = (orderId) => {
     navigate(`/mis-pedidos/${orderId}`);
   };
@@ -129,10 +114,6 @@ const OrderList = () => {
     if (order && canEditOrder(order)) {
       navigate(`/editar-pedido/${orderId}`);
     }
-  };
-
-  const handleRefresh = () => {
-    window.location.reload();
   };
 
   if (loading) return (
@@ -146,7 +127,7 @@ const OrderList = () => {
     <div className="ol-error-container">
       <div className="ol-error-icon">⚠️</div>
       <p>{error}</p>
-      <button onClick={handleRefresh} className="ol-retry-button">
+      <button onClick={() => window.location.reload()} className="ol-retry-button">
         Reintentar
       </button>
     </div>
@@ -154,20 +135,13 @@ const OrderList = () => {
 
   return (
     <div className="ol-container">
-      
-      {/* Encabezado */}
       <div className="ol-header">
         <div className="ol-title-section">
           <h2 className="ol-title">Historial de Pedidos</h2>
           <p className="ol-subtitle">Gestiona y revisa tus pedidos realizados</p>
         </div>
-        <button onClick={handleRefresh} className="ol-refresh-button">
-          <FaSync className="ol-refresh-icon" />
-          Actualizar
-        </button>
       </div>
 
-      {/* Panel de filtros y búsqueda */}
       <div className="ol-controls-panel">
         <div className="ol-search-container">
           <input
@@ -218,7 +192,6 @@ const OrderList = () => {
         </div>
       </div>
       
-      {/* Tabla o estado vacío */}
       {filteredOrders.length === 0 ? (
         <div className="ol-empty-state">
           <div className="ol-empty-icon">📭</div>
@@ -248,7 +221,6 @@ const OrderList = () => {
               {filteredOrders.map(order => {
                 const statusText = getStatusText(order);
                 const editable = canEditOrder(order);
-                const receivable = canReceiveOrder(order);
                 
                 return (
                   <tr key={order.NumeroPedido} className="ol-table-row">

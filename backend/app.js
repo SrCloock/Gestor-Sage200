@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const session = require('express-session'); // ← AÑADE ESTO
 
 const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/catalog');
@@ -16,6 +17,46 @@ const { connect } = require('./db/Sage200db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// =========================
+// MIDDLEWARE DE SESIÓN (CRÍTICO)
+// =========================
+app.use(session({
+  secret: 'gestor-sage200-secreto-seguro', // Cambia esto en producción
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: false, // Cambia a true si usas HTTPS
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 horas
+  }
+}));
+
+// Middleware para establecer req.user desde sesión
+app.use((req, res, next) => {
+  console.log('🔍 Session ID:', req.sessionID);
+  console.log('👤 Session user:', req.session.user);
+  
+  // Si hay usuario en sesión, establecer req.user
+  if (req.session && req.session.user) {
+    req.user = req.session.user;
+  }
+  
+  // También intentar desde localStorage (para peticiones AJAX)
+  const usuarioHeader = req.headers.usuario;
+  const codigoEmpresaHeader = req.headers.codigoempresa;
+  
+  if (usuarioHeader && codigoEmpresaHeader && !req.user) {
+    req.user = {
+      username: usuarioHeader,
+      codigoEmpresa: codigoEmpresaHeader,
+      // Puedes buscar en DB aquí si necesitas más datos
+    };
+  }
+  
+  console.log('✅ req.user establecido:', req.user);
+  next();
+});
 
 // Middleware para servir imágenes
 app.use('/images', express.static(path.join(__dirname, 'public', 'images')));
@@ -51,7 +92,7 @@ app.use((req, res, next) => {
     return res.status(200).end();
   }
   
-  console.log(`🌐 ${req.method} ${req.path} - Origin: ${origin}`);
+  console.log(`🌐 ${req.method} ${req.path} - User: ${req.user?.username || 'No auth'}`);
   next();
 });
 
@@ -83,6 +124,7 @@ app.get('/api/health', (req, res) => {
     message: 'Servidor funcionando correctamente',
     environment: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString(),
+    user: req.user || 'No autenticado',
     version: '1.0.0'
   });
 });
@@ -123,7 +165,8 @@ app.use((err, req, res, next) => {
     success: false,
     message: 'Error interno del servidor',
     error: process.env.NODE_ENV === 'development' ? err.message : undefined,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    user: req.user || 'No autenticado'
   });
 });
 
@@ -135,7 +178,8 @@ app.use('/api/*', (req, res) => {
   res.status(404).json({ 
     success: false, 
     message: `Ruta API no encontrada: ${req.originalUrl}`, 
-    timestamp: new Date().toISOString() 
+    timestamp: new Date().toISOString(),
+    user: req.user || 'No autenticado'
   });
 });
 
@@ -148,5 +192,6 @@ app.listen(PORT, HOST, () => {
   console.log(`📦 API Base: http://${HOST}:${PORT}/api`);
   console.log(`🔍 Health Check: http://${HOST}:${PORT}/api/health`);
   console.log(`🔐 CORS configurado para PERMITIR TODOS LOS ORÍGENES`);
+  console.log(`🔑 Session middleware activado`);
   console.log(`⚠️  ADVERTENCIA: Esta configuración es solo para desarrollo`);
 });

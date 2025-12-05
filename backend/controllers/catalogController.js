@@ -1,17 +1,29 @@
 const { getPool } = require('../db/Sage200db');
 
 const getCatalogProducts = async (req, res) => {
+  console.log('🔍 getCatalogProducts iniciado');
+  console.log('👤 req.user:', req.user);
+  
   try {
-    const pool = await getPool();
+    if (!req.user || !req.user.codigoEmpresa) {
+      console.error('❌ No hay usuario autenticado');
+      return res.status(401).json({ 
+        success: false, 
+        message: 'No autenticado. Inicie sesión primero.' 
+      });
+    }
 
+    const pool = await getPool();
+    const codigoEmpresa = req.user.codigoEmpresa;
+    
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
 
     const { search, proveedor, precioMin, precioMax, sortBy } = req.query;
 
-    let whereConditions = ["a.CodigoEmpresa = '9999'"];
-    let inputParams = {};
+    let whereConditions = ["a.CodigoEmpresa = @codigoEmpresa"];
+    let inputParams = { codigoEmpresa };
 
     if (search) {
       whereConditions.push(
@@ -53,7 +65,7 @@ const getCatalogProducts = async (req, res) => {
         a.RutaImagen,
         gi.CodigoIvasinRecargo as PorcentajeIva
       FROM Articulos a
-      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor AND p.CodigoEmpresa = '9999'
+      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor AND p.CodigoEmpresa = @codigoEmpresa
       LEFT JOIN (
         SELECT GrupoIva, MAX(FechaInicio) as MaxFecha
         FROM GrupoIva 
@@ -76,7 +88,7 @@ const getCatalogProducts = async (req, res) => {
     const countQuery = `
       SELECT COUNT(*) as total
       FROM Articulos a
-      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor AND p.CodigoEmpresa = '9999'
+      LEFT JOIN Proveedores p ON a.CodigoProveedor = p.CodigoProveedor AND p.CodigoEmpresa = @codigoEmpresa
       ${whereClause}
     `;
 
@@ -96,6 +108,8 @@ const getCatalogProducts = async (req, res) => {
       PorcentajeIva: parseFloat(product.PorcentajeIva) || 21
     }));
 
+    console.log(`✅ Productos obtenidos: ${products.length} para empresa ${codigoEmpresa}`);
+
     return res.status(200).json({
       success: true,
       products,
@@ -103,6 +117,7 @@ const getCatalogProducts = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('❌ Error en getCatalogProducts:', error);
     return res.status(500).json({
       success: false,
       message: 'Error al cargar el catálogo de productos',
@@ -113,17 +128,27 @@ const getCatalogProducts = async (req, res) => {
 
 const getProductFilters = async (req, res) => {
   try {
+    if (!req.user || !req.user.codigoEmpresa) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'No autenticado' 
+      });
+    }
+
     const pool = await getPool();
+    const codigoEmpresa = req.user.codigoEmpresa;
 
     const proveedoresQuery = `
       SELECT DISTINCT p.CodigoProveedor, p.Nombre as NombreProveedor
       FROM Proveedores p
       INNER JOIN Articulos a ON p.CodigoProveedor = a.CodigoProveedor
-      WHERE p.CodigoEmpresa = '9999'  
+      WHERE p.CodigoEmpresa = @codigoEmpresa
       ORDER BY p.Nombre
     `;
 
-    const proveedoresResult = await pool.request().query(proveedoresQuery);
+    const proveedoresResult = await pool.request()
+      .input('codigoEmpresa', codigoEmpresa)
+      .query(proveedoresQuery);
 
     return res.status(200).json({
       success: true,
@@ -131,6 +156,7 @@ const getProductFilters = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('❌ Error en getProductFilters:', error);
     return res.status(500).json({
       success: false,
       message: 'Error al cargar los filtros',
@@ -139,15 +165,7 @@ const getProductFilters = async (req, res) => {
   }
 };
 
-const syncImagesWithDB = async () => {
-  try {
-    const pool = await getPool();
-  } catch (error) {
-  }
-};
-
 module.exports = {
   getCatalogProducts,
-  getProductFilters,
-  syncImagesWithDB
+  getProductFilters
 };
