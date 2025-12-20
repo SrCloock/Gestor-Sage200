@@ -70,13 +70,39 @@ const AdminOrders = () => {
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
-        throw new Error('El servidor devolvió un formato inválido');
+        throw new Error(`El servidor devolvió HTML en lugar de JSON: ${text.substring(0, 100)}...`);
       }
 
       const data = await response.json();
       
       if (data.success) {
-        setOrders(data.orders || []);
+        // Calcular el ImporteLiquido correcto para cada pedido (PrecioVenta × Cantidad)
+        const ordersWithCorrectTotals = (data.orders || []).map(order => {
+          // Usar ImporteLiquido si está disponible (ya incluye IVA)
+          let importeTotal = 0;
+          
+          if (order.ImporteLiquido !== undefined && order.ImporteLiquido !== null) {
+            importeTotal = parseFloat(order.ImporteLiquido) || 0;
+          } 
+          // Si no, calcular con BaseImponible + IVA
+          else if (order.BaseImponible !== undefined && order.BaseImponible !== null) {
+            const base = parseFloat(order.BaseImponible) || 0;
+            const iva = parseFloat(order.TotalIVA) || 0;
+            importeTotal = base + iva;
+          }
+          // Si no hay datos, usar 0
+          else {
+            importeTotal = 0;
+          }
+          
+          return {
+            ...order,
+            // Guardar el importe total calculado
+            _importeTotal: importeTotal
+          };
+        });
+        
+        setOrders(ordersWithCorrectTotals);
         
         const paginationData = data.pagination || data.paginacion || {
           total: (data.orders || []).length,
@@ -116,12 +142,28 @@ const AdminOrders = () => {
       const data = await response.json();
       
       if (data.success) {
-        setSelectedOrder(data.order);
+        const order = data.order;
+        
+        // Calcular el importe total para este pedido (ImporteLiquido)
+        let importeTotal = 0;
+        if (order.ImporteLiquido !== undefined && order.ImporteLiquido !== null) {
+          importeTotal = parseFloat(order.ImporteLiquido) || 0;
+        } else if (order.BaseImponible !== undefined && order.BaseImponible !== null) {
+          const base = parseFloat(order.BaseImponible) || 0;
+          const iva = parseFloat(order.TotalIVA) || 0;
+          importeTotal = base + iva;
+        }
+        
+        setSelectedOrder({
+          ...order,
+          _importeTotal: importeTotal
+        });
+        
         setEditedOrder({
-          ...data.order,
-          Productos: (data.order.Productos || []).map(product => ({ 
+          ...order,
+          Productos: (order.Productos || []).map(product => ({ 
             ...product,
-            PrecioFinal: product.PrecioVentaconIVA1 || product.Precio || 0
+            PrecioFinal: product.Precio || product.PrecioVenta || 0 // Precio CON IVA
           }))
         });
       } else {
@@ -277,16 +319,19 @@ const AdminOrders = () => {
     }).format(amount || 0);
   };
 
+  // Obtener el precio del producto (CON IVA)
   const getProductPrice = (product) => {
-    return product.PrecioVentaconIVA1 || product.Precio || 0;
+    return product.Precio || product.PrecioVenta || 0; // Precio CON IVA
   };
 
+  // Calcular el total de un producto (CON IVA)
   const calculateProductTotal = (product) => {
     const precio = getProductPrice(product);
     const cantidad = product.UnidadesPedidas || 0;
     return precio * cantidad;
   };
 
+  // Calcular el total del pedido (CON IVA)
   const calculateOrderTotal = () => {
     if (!editedOrder || !editedOrder.Productos) return 0;
     return editedOrder.Productos.reduce((total, product) => {
@@ -294,13 +339,21 @@ const AdminOrders = () => {
     }, 0);
   };
 
-  const getOrderTotalWithIVA = (order) => {
-    if (order.ImporteLiquido !== undefined && order.ImporteLiquido !== null) {
-      return order.ImporteLiquido;
+  // Obtener el importe total del pedido (CON IVA)
+  const getOrderTotal = (order) => {
+    // Usar el importe total precalculado si existe
+    if (order._importeTotal !== undefined && order._importeTotal !== null) {
+      return order._importeTotal;
     }
     
+    // Si no, usar ImporteLiquido (CON IVA)
+    if (order.ImporteLiquido !== undefined && order.ImporteLiquido !== null) {
+      return parseFloat(order.ImporteLiquido) || 0;
+    }
+    
+    // Como último recurso, calcular con BaseImponible + IVA
     const base = order.BaseImponible || 0;
-    const iva = order.TotalIVA || (base * 0.21);
+    const iva = order.TotalIVA || 0;
     return base + iva;
   };
 
@@ -491,8 +544,8 @@ const AdminOrders = () => {
                       </div>
                     </th>
                     <th>
-                      <div className="ao-order-header" onClick={() => cambiarOrdenamiento('BaseImponible')}>
-                        Importe {renderSortIcon('BaseImponible')}
+                      <div className="ao-order-header" onClick={() => cambiarOrdenamiento('ImporteLiquido')}>
+                        Importe {renderSortIcon('ImporteLiquido')}
                       </div>
                     </th>
                     <th>
@@ -505,36 +558,40 @@ const AdminOrders = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map(order => (
-                    <tr key={order.NumeroPedido} className="ao-order-row">
-                      <td className="ao-order-id">{order.NumeroPedido}</td>
-                      <td className="ao-order-date">{formatDate(order.FechaPedido)}</td>
-                      <td className="ao-order-client">{order.RazonSocial}</td>
-                      <td className="ao-order-cif">{order.CifDni}</td>
-                      <td className="ao-order-lines">{order.NumeroLineas}</td>
-                      <td className="ao-order-amount">
-                        {formatCurrency(getOrderTotalWithIVA(order))}
-                      </td>
-                      <td className="ao-order-delivery">
-                        <span className={new Date(order.FechaNecesaria) < new Date() ? 'ao-urgent' : ''}>
-                          {formatDate(order.FechaNecesaria)}
-                        </span>
-                      </td>
-                      <td className="ao-order-status">
-                        {order.StatusAprobado === 0 ? 'Pendiente' : 
-                         order.StatusAprobado === -1 ? 'Aprobado' : 'Servido'}
-                      </td>
-                      <td className="ao-order-actions">
-                        <button 
-                          onClick={() => fetchOrderDetails(order.NumeroPedido)}
-                          className="ao-view-btn"
-                        >
-                          <FaEye />
-                          Ver detalles
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {orders.map(order => {
+                    const importeTotal = getOrderTotal(order);
+                    
+                    return (
+                      <tr key={order.NumeroPedido} className="ao-order-row">
+                        <td className="ao-order-id">{order.NumeroPedido}</td>
+                        <td className="ao-order-date">{formatDate(order.FechaPedido)}</td>
+                        <td className="ao-order-client">{order.RazonSocial}</td>
+                        <td className="ao-order-cif">{order.CifDni}</td>
+                        <td className="ao-order-lines">{order.NumeroLineas}</td>
+                        <td className="ao-order-amount">
+                          {formatCurrency(importeTotal)}
+                        </td>
+                        <td className="ao-order-delivery">
+                          <span className={new Date(order.FechaNecesaria) < new Date() ? 'ao-urgent' : ''}>
+                            {formatDate(order.FechaNecesaria)}
+                          </span>
+                        </td>
+                        <td className="ao-order-status">
+                          {order.StatusAprobado === 0 ? 'Pendiente' : 
+                           order.StatusAprobado === -1 ? 'Aprobado' : 'Servido'}
+                        </td>
+                        <td className="ao-order-actions">
+                          <button 
+                            onClick={() => fetchOrderDetails(order.NumeroPedido)}
+                            className="ao-view-btn"
+                          >
+                            <FaEye />
+                            Ver detalles
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -706,37 +763,42 @@ const AdminOrders = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {editedOrder.Productos.map((product, index) => (
-                          <tr key={generateProductKey(product, index)} className="ao-product-row">
-                            <td className="ao-product-code">{product.CodigoArticulo}</td>
-                            <td className="ao-product-desc">{product.DescripcionArticulo}</td>
-                            <td className="ao-product-quantity">
-                              <input
-                                type="number"
-                                value={product.UnidadesPedidas}
-                                onChange={(e) => handleQuantityChange(index, e.target.value)}
-                                min="0"
-                                className="ao-quantity-input"
-                              />
-                            </td>
-                            <td className="ao-product-price">
-                              {formatCurrency(getProductPrice(product))}
-                            </td>
-                            <td className="ao-product-total">
-                              {formatCurrency(calculateProductTotal(product))}
-                            </td>
-                            <td className="ao-product-supplier">{product.NombreProveedor || 'No especificado'}</td>
-                            <td className="ao-product-actions">
-                              <button
-                                onClick={() => handleRemoveProduct(index)}
-                                className="ao-remove-btn"
-                                title="Eliminar producto"
-                              >
-                                <FaTrash />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                        {editedOrder.Productos.map((product, index) => {
+                          const precio = getProductPrice(product);
+                          const totalProducto = calculateProductTotal(product);
+                          
+                          return (
+                            <tr key={generateProductKey(product, index)} className="ao-product-row">
+                              <td className="ao-product-code">{product.CodigoArticulo}</td>
+                              <td className="ao-product-desc">{product.DescripcionArticulo}</td>
+                              <td className="ao-product-quantity">
+                                <input
+                                  type="number"
+                                  value={product.UnidadesPedidas}
+                                  onChange={(e) => handleQuantityChange(index, e.target.value)}
+                                  min="0"
+                                  className="ao-quantity-input"
+                                />
+                              </td>
+                              <td className="ao-product-price">
+                                {formatCurrency(precio)}
+                              </td>
+                              <td className="ao-product-total">
+                                {formatCurrency(totalProducto)}
+                              </td>
+                              <td className="ao-product-supplier">{product.NombreProveedor || 'No especificado'}</td>
+                              <td className="ao-product-actions">
+                                <button
+                                  onClick={() => handleRemoveProduct(index)}
+                                  className="ao-remove-btn"
+                                  title="Eliminar producto"
+                                >
+                                  <FaTrash />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

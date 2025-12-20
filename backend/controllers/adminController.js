@@ -108,7 +108,7 @@ const getPendingOrders = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error en getPendingOrders:', error);
+    console.error('❌ Error en getPendingOrders:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Error al obtener pedidos pendientes',
@@ -122,6 +122,7 @@ const getOrderForReview = async (req, res) => {
     const { orderId } = req.params;
     const pool = await getPool();
 
+    // Primero, obtener la cabecera del pedido
     const orderResult = await pool.request()
       .input('NumeroPedido', orderId)
       .input('SeriePedido', 'WebCD')
@@ -164,6 +165,7 @@ const getOrderForReview = async (req, res) => {
     const order = orderResult.recordset[0];
     const { CodigoEmpresa } = order;
 
+    // Obtener las líneas del pedido SIN JOINs - solo de LineasPedidoCliente
     const linesResult = await pool.request()
       .input('NumeroPedido', orderId)
       .input('SeriePedido', 'WebCD')
@@ -188,6 +190,7 @@ const getOrderForReview = async (req, res) => {
         ORDER BY l.Orden
       `);
 
+    // Si no hay líneas, retornar pedido vacío
     if (!linesResult.recordset || linesResult.recordset.length === 0) {
       return res.status(200).json({
         success: true,
@@ -198,12 +201,14 @@ const getOrderForReview = async (req, res) => {
       });
     }
 
+    // Obtener información de proveedores solo para los códigos existentes
     const proveedoresMap = new Map();
     const codigosProveedores = [...new Set(linesResult.recordset
       .map(item => item.CodigoProveedor)
       .filter(codigo => codigo && codigo.trim() !== ''))];
 
     if (codigosProveedores.length > 0) {
+      // Crear lista de placeholders para la consulta
       const placeholders = codigosProveedores.map((_, i) => `@p${i}`).join(', ');
       const proveedoresQuery = `
         SELECT CodigoProveedor, RazonSocial 
@@ -225,6 +230,7 @@ const getOrderForReview = async (req, res) => {
       });
     }
 
+    // Obtener información de artículos
     const articulosMap = new Map();
     const codigosArticulos = [...new Set(linesResult.recordset.map(item => item.CodigoArticulo))];
 
@@ -253,6 +259,7 @@ const getOrderForReview = async (req, res) => {
       });
     }
 
+    // Combinar los datos - asegurarse de que solo tenemos las líneas reales del pedido
     const uniqueProducts = linesResult.recordset.map(item => {
       const articuloInfo = articulosMap.get(item.CodigoArticulo) || {};
       const proveedorNombre = proveedoresMap.get(item.CodigoProveedor) || 'No especificado';
@@ -275,6 +282,7 @@ const getOrderForReview = async (req, res) => {
       };
     });
 
+    // Filtrar productos duplicados por Orden y Código (por si acaso)
     const seenKeys = new Set();
     const finalProducts = uniqueProducts.filter(product => {
       const key = `${product.Orden}-${product.CodigoArticulo}`;
@@ -293,7 +301,7 @@ const getOrderForReview = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error en getOrderForReview:', error);
+    console.error('❌ Error en getOrderForReview:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Error al obtener el pedido',
@@ -881,7 +889,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
         errorMessage = 'Error de duplicación en la base de datos';
       }
       
-      console.error('Error en updateOrderQuantitiesAndApprove:', err);
+      console.error('❌ Error en updateOrderQuantitiesAndApprove:', err);
       res.status(500).json({
         success: false,
         message: errorMessage,
@@ -889,7 +897,7 @@ const updateOrderQuantitiesAndApprove = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Error en updateOrderQuantitiesAndApprove:', error);
+    console.error('❌ Error en updateOrderQuantitiesAndApprove:', error);
     res.status(500).json({
       success: false,
       message: 'Error al procesar la actualización del pedido'

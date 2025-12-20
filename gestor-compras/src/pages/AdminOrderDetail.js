@@ -55,7 +55,7 @@ const AdminOrderDetail = () => {
       
       return response;
     } catch (error) {
-      console.error('Error en fetchWithAuth (admin):', error);
+      console.error('❌ Error en fetchWithAuth (admin):', error);
       throw error;
     }
   };
@@ -88,7 +88,7 @@ const AdminOrderDetail = () => {
           setError(data.message || 'Error al cargar el pedido');
         }
       } catch (err) {
-        console.error('Error fetching admin order details:', err);
+        console.error('❌ Error fetching admin order details:', err);
         setError(err.message || 'Error al cargar los detalles del pedido');
       } finally {
         setLoading(false);
@@ -103,14 +103,13 @@ const AdminOrderDetail = () => {
     }
   }, [orderId, user]);
 
-  const getStatusText = (statusAprobado, estado) => {
+  const getStatusText = (statusAprobado, estado, esParcial) => {
     if (statusAprobado === 0) return 'Revisando';
     if (statusAprobado === -1) {
-      switch (estado) {
-        case 0: return 'Preparando';
-        case 1: return 'Parcial';
-        case 2: return 'Servido';
-        default: return 'Preparando';
+      if (estado === 2) return 'Servido';
+      if (estado === 0) {
+        // Si EsParcial es -1, entonces es Parcial
+        return esParcial === -1 ? 'Parcial' : 'Preparando';
       }
     }
     return 'Desconocido';
@@ -131,6 +130,21 @@ const AdminOrderDetail = () => {
       style: 'currency',
       currency: 'EUR'
     }).format(amount || 0);
+  };
+
+  // Función para calcular el total de un producto (PrecioVenta * Cantidad)
+  const calcularTotalProducto = (product) => {
+    const precio = parseFloat(product.Precio) || parseFloat(product.PrecioVenta) || 0;
+    const cantidad = parseFloat(product.UnidadesPedidas) || 0;
+    return precio * cantidad;
+  };
+
+  // Función para calcular el total del pedido (suma de todos los productos)
+  const calcularTotalPedido = () => {
+    if (!order || !order.Productos) return 0;
+    return order.Productos.reduce((sum, product) => {
+      return sum + calcularTotalProducto(product);
+    }, 0);
   };
 
   if (loading) {
@@ -168,6 +182,19 @@ const AdminOrderDetail = () => {
     );
   }
 
+  const getStatusBadgeClass = () => {
+    if (order.StatusAprobado === 0) return 'od-status-revisando';
+    if (order.StatusAprobado === -1) {
+      if (order.Estado === 2) return 'od-status-servido';
+      if (order.Estado === 0) {
+        return order.EsParcial === -1 ? 'od-status-parcial' : 'od-status-preparando';
+      }
+    }
+    return 'od-status-desconocido';
+  };
+
+  const totalPedido = calcularTotalPedido();
+
   return (
     <div className="od-container">
       <div className="od-header">
@@ -193,6 +220,7 @@ const AdminOrderDetail = () => {
       </div>
 
       <div className="od-content">
+        {/* Información del cliente */}
         <div className="od-info-section">
           <h3>
             <FaUser className="od-section-icon" />
@@ -219,13 +247,18 @@ const AdminOrderDetail = () => {
             )}
             <div className="od-info-item">
               <span className="od-info-label">Estado:</span>
-              <span className={`od-status od-status-${order.StatusAprobado === -1 ? order.Estado : 'pending'}`}>
-                {getStatusText(order.StatusAprobado, order.Estado)}
+              <span className={`od-status ${getStatusBadgeClass()}`}>
+                {getStatusText(order.StatusAprobado, order.Estado, order.EsParcial)}
               </span>
+            </div>
+            <div className="od-info-item">
+              <span className="od-info-label">Total Pedido:</span>
+              <span className="od-info-value od-total-amount">{formatCurrency(totalPedido)}</span>
             </div>
           </div>
         </div>
 
+        {/* Productos del pedido */}
         <div className="od-products-section">
           <h3>
             <FaBox className="od-section-icon" />
@@ -245,18 +278,24 @@ const AdminOrderDetail = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {order.Productos.map((product, index) => (
-                    <tr key={index} className="od-product-row">
-                      <td className="od-product-code">{product.CodigoArticulo}</td>
-                      <td className="od-product-desc">{product.DescripcionArticulo}</td>
-                      <td className="od-product-quantity">{product.UnidadesPedidas}</td>
-                      <td className="od-product-price">{formatCurrency(product.Precio)}</td>
-                      <td className="od-product-total">
-                        {formatCurrency(product.Precio * product.UnidadesPedidas)}
-                      </td>
-                      <td className="od-product-supplier">{product.NombreProveedor || 'No especificado'}</td>
-                    </tr>
-                  ))}
+                  {order.Productos.map((product, index) => {
+                    const totalProducto = calcularTotalProducto(product);
+                    
+                    return (
+                      <tr key={index} className="od-product-row">
+                        <td className="od-product-code">{product.CodigoArticulo}</td>
+                        <td className="od-product-desc">{product.DescripcionArticulo}</td>
+                        <td className="od-product-quantity">{product.UnidadesPedidas}</td>
+                        <td className="od-product-price">
+                          {formatCurrency(product.Precio || product.PrecioVenta || 0)}
+                        </td>
+                        <td className="od-product-total">
+                          {formatCurrency(totalProducto)}
+                        </td>
+                        <td className="od-product-supplier">{product.NombreProveedor || 'No especificado'}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -268,6 +307,7 @@ const AdminOrderDetail = () => {
           )}
         </div>
 
+        {/* Resumen del pedido - SOLO muestra el total (PrecioVenta * Cantidad) */}
         <div className="od-summary-section">
           <h3>
             <FaEuroSign className="od-section-icon" />
@@ -279,16 +319,12 @@ const AdminOrderDetail = () => {
               <span>{order.Productos ? order.Productos.length : 0}</span>
             </div>
             <div className="od-summary-item">
-              <span>Base Imponible:</span>
-              <span>{formatCurrency(order.BaseImponible)}</span>
-            </div>
-            <div className="od-summary-item">
-              <span>Total IVA:</span>
-              <span>{formatCurrency(order.TotalIVA)}</span>
+              <span>Importe Total:</span>
+              <span>{formatCurrency(totalPedido)}</span>
             </div>
             <div className="od-summary-total">
-              <span>Importe Total:</span>
-              <span className="od-total-amount">{formatCurrency(order.ImporteLiquido)}</span>
+              <span>Total del Pedido:</span>
+              <span className="od-total-amount">{formatCurrency(totalPedido)}</span>
             </div>
           </div>
         </div>

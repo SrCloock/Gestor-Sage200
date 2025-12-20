@@ -20,6 +20,7 @@ const getOrderReception = async (req, res) => {
           c.CodigoEmpresa,
           c.EjercicioPedido,
           c.SeriePedido,
+          c.EsParcial,
           l.Orden,
           l.CodigoArticulo,
           l.DescripcionArticulo,
@@ -30,7 +31,8 @@ const getOrderReception = async (req, res) => {
           l.FechaRecepcion,
           l.Precio,
           l.CodigoProveedor,
-          l.[%Iva] as PorcentajeIva
+          l.[%Iva] as PorcentajeIva,
+          l.GrupoIva
         FROM CabeceraPedidoCliente c
         JOIN LineasPedidoCliente l ON c.NumeroPedido = l.NumeroPedido AND c.SeriePedido = l.SeriePedido
         WHERE c.NumeroPedido = @NumeroPedido
@@ -47,11 +49,15 @@ const getOrderReception = async (req, res) => {
 
     const uniqueProducts = [];
     const seenKeys = new Set();
+    const seenArticuloOrden = new Set();
     
     result.recordset.forEach(item => {
       const key = `${item.Orden}-${item.CodigoArticulo}`;
-      if (!seenKeys.has(key)) {
+      const articuloOrdenKey = `${item.CodigoArticulo}-${item.Orden}`;
+      
+      if (!seenKeys.has(key) && !seenArticuloOrden.has(articuloOrdenKey)) {
         seenKeys.add(key);
+        seenArticuloOrden.add(articuloOrdenKey);
         uniqueProducts.push(item);
       }
     });
@@ -66,6 +72,7 @@ const getOrderReception = async (req, res) => {
       CodigoEmpresa: result.recordset[0].CodigoEmpresa,
       EjercicioPedido: result.recordset[0].EjercicioPedido,
       SeriePedido: result.recordset[0].SeriePedido,
+      EsParcial: result.recordset[0].EsParcial,
       Productos: uniqueProducts.map(item => ({
         Orden: item.Orden,
         CodigoArticulo: item.CodigoArticulo,
@@ -77,7 +84,8 @@ const getOrderReception = async (req, res) => {
         FechaRecepcion: item.FechaRecepcion,
         Precio: item.Precio,
         CodigoProveedor: item.CodigoProveedor,
-        PorcentajeIva: item.PorcentajeIva
+        PorcentajeIva: item.PorcentajeIva,
+        GrupoIva: item.GrupoIva
       }))
     };
 
@@ -104,48 +112,136 @@ const confirmReception = async (req, res) => {
     await transaction.begin();
 
     try {
-      for (const item of items) {
-        if (item.UnidadesRecibidas !== item.UnidadesPedidas && !item.ComentarioRecepcion) {
-          throw new Error(`Debe agregar un comentario para el artículo ${item.CodigoArticulo} ya que la cantidad recibida difiere de la pedida`);
-        }
-      }
-
+      // Obtener información completa del pedido
       const orderResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
         .query(`
           SELECT 
-            CodigoEmpresa, 
-            EjercicioPedido,
-            SeriePedido,
-            CodigoCliente,
-            RazonSocial,
-            Estado,
-            StatusAprobado,
-            NumeroPedido
-          FROM CabeceraPedidoCliente
-          WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
+            c.CodigoEmpresa, 
+            c.EjercicioPedido,
+            c.SeriePedido,
+            c.CodigoCliente,
+            c.RazonSocial,
+            c.Estado,
+            c.StatusAprobado,
+            c.NumeroPedido,
+            c.EsParcial,
+            l.Orden,
+            l.CodigoArticulo,
+            l.DescripcionArticulo,
+            l.UnidadesPedidas,
+            l.UnidadesRecibidas as UnidadesRecibidasActuales,
+            l.UnidadesPendientes,
+            l.Precio,
+            l.CodigoProveedor,
+            l.[%Iva] as PorcentajeIva,
+            l.GrupoIva
+          FROM CabeceraPedidoCliente c
+          JOIN LineasPedidoCliente l ON c.NumeroPedido = l.NumeroPedido AND c.SeriePedido = l.SeriePedido
+          WHERE c.NumeroPedido = @NumeroPedido AND c.SeriePedido = @SeriePedido
+          ORDER BY l.Orden
         `);
 
       if (orderResult.recordset.length === 0) {
         throw new Error('Pedido no encontrado');
       }
 
-      const orderInfo = orderResult.recordset[0];
+      const orderInfo = {
+        CodigoEmpresa: orderResult.recordset[0].CodigoEmpresa,
+        EjercicioPedido: orderResult.recordset[0].EjercicioPedido,
+        SeriePedido: orderResult.recordset[0].SeriePedido,
+        CodigoCliente: orderResult.recordset[0].CodigoCliente,
+        RazonSocial: orderResult.recordset[0].RazonSocial,
+        Estado: orderResult.recordset[0].Estado,
+        StatusAprobado: orderResult.recordset[0].StatusAprobado,
+        NumeroPedido: orderResult.recordset[0].NumeroPedido,
+        EsParcial: orderResult.recordset[0].EsParcial
+      };
+
+      // Crear mapa del estado actual
+      const estadoActualMap = new Map();
+      orderResult.recordset.forEach(item => {
+        const key = `${item.Orden}-${item.CodigoArticulo}`;
+        estadoActualMap.set(key, {
+          Orden: item.Orden,
+          CodigoArticulo: item.CodigoArticulo,
+          DescripcionArticulo: item.DescripcionArticulo,
+          UnidadesPedidas: item.UnidadesPedidas,
+          UnidadesRecibidasActuales: item.UnidadesRecibidasActuales || 0,
+          UnidadesPendientes: item.UnidadesPendientes,
+          Precio: item.Precio,
+          CodigoProveedor: item.CodigoProveedor,
+          PorcentajeIva: item.PorcentajeIva,
+          GrupoIva: item.GrupoIva
+        });
+      });
+
+      // Validar y enriquecer items del frontend
+      const itemsEnriquecidos = [];
+      const errores = [];
+
+      items.forEach(item => {
+        const key = `${item.Orden}-${item.CodigoArticulo}`;
+        const estadoActual = estadoActualMap.get(key);
+
+        if (!estadoActual) {
+          errores.push(`Artículo ${item.CodigoArticulo} no encontrado en el pedido`);
+          return;
+        }
+
+        // El usuario introduce el TOTAL que debe quedar registrado
+        const nuevoTotalRecibido = parseInt(item.UnidadesRecibidas) || 0;
+        const unidadesRecibidasPreviamente = estadoActual.UnidadesRecibidasActuales || 0;
+
+        // Validaciones
+        if (nuevoTotalRecibido > estadoActual.UnidadesPedidas) {
+          errores.push(`La cantidad recibida (${nuevoTotalRecibido}) excede lo pedido (${estadoActual.UnidadesPedidas}) para ${item.CodigoArticulo}`);
+          return;
+        }
+
+        // Si hay diferencia con lo pedido, requerir comentario
+        if (nuevoTotalRecibido !== estadoActual.UnidadesPedidas && !item.ComentarioRecepcion?.trim()) {
+          errores.push(`Debe agregar un comentario para ${item.CodigoArticulo} (recibido: ${nuevoTotalRecibido}, pedido: ${estadoActual.UnidadesPedidas})`);
+          return;
+        }
+
+        // Calcular delta (lo que se recibe en esta recepción)
+        const deltaRecepcion = nuevoTotalRecibido - unidadesRecibidasPreviamente;
+
+        itemsEnriquecidos.push({
+          ...item,
+          DescripcionArticulo: estadoActual.DescripcionArticulo,
+          UnidadesPedidas: estadoActual.UnidadesPedidas,
+          UnidadesRecibidasPreviamente: unidadesRecibidasPreviamente,
+          UnidadesRecibidasNuevas: nuevoTotalRecibido, // TOTAL acumulado
+          DeltaRecepcion: deltaRecepcion, // Incremento en esta recepción
+          Precio: estadoActual.Precio,
+          CodigoProveedor: estadoActual.CodigoProveedor,
+          PorcentajeIva: estadoActual.PorcentajeIva,
+          GrupoIva: estadoActual.GrupoIva
+        });
+      });
+
+      if (errores.length > 0) {
+        throw new Error(errores.join('; '));
+      }
+
       const fechaActual = new Date();
 
-      for (const item of items) {
-        const unidadesRecibidas = parseInt(item.UnidadesRecibidas) || 0;
-        const unidadesPedidas = parseInt(item.UnidadesPedidas) || 0;
-        const unidadesPendientes = unidadesPedidas - unidadesRecibidas;
+      // ACTUALIZAR las líneas del pedido con el NUEVO TOTAL
+      for (const item of itemsEnriquecidos) {
+        const nuevoTotalRecibido = item.UnidadesRecibidasNuevas;
+        const unidadesPedidas = item.UnidadesPedidas;
+        const unidadesPendientes = unidadesPedidas - nuevoTotalRecibido;
         
         await transaction.request()
           .input('NumeroPedido', orderId)
           .input('SeriePedido', 'WebCD')
           .input('Orden', item.Orden)
-          .input('UnidadesRecibidas', unidadesRecibidas)
+          .input('UnidadesRecibidas', nuevoTotalRecibido)
           .input('UnidadesPendientes', unidadesPendientes)
-          .input('UnidadesServidas', unidadesRecibidas)
+          .input('UnidadesServidas', nuevoTotalRecibido)
           .input('ComentarioRecepcion', item.ComentarioRecepcion || '')
           .input('FechaRecepcion', fechaActual)
           .query(`
@@ -162,6 +258,7 @@ const confirmReception = async (req, res) => {
           `);
       }
 
+      // Calcular totales del pedido
       const estadoResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
@@ -178,107 +275,72 @@ const confirmReception = async (req, res) => {
       const totalRecibido = estadoResult.recordset[0].TotalRecibido || 0;
       const totalPendiente = estadoResult.recordset[0].TotalPendiente || 0;
 
+      // Determinar nuevo estado y parcialidad
       let nuevoEstado;
+      let esParcial = 0;
+
       if (totalRecibido === 0) {
         nuevoEstado = 0;
+        esParcial = 0;
       } else if (totalPendiente === 0) {
         nuevoEstado = 2;
+        esParcial = 0;
       } else {
-        nuevoEstado = 1;
+        nuevoEstado = 0;
+        esParcial = -1;
       }
 
+      // Actualizar cabecera del pedido
       await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
         .input('Estado', nuevoEstado)
+        .input('EsParcial', esParcial)
         .query(`
           UPDATE CabeceraPedidoCliente 
-          SET Estado = @Estado
+          SET Estado = @Estado,
+              EsParcial = @EsParcial
           WHERE NumeroPedido = @NumeroPedido
           AND SeriePedido = @SeriePedido
         `);
 
-      let albaranesCompraGenerados = [];
-      const esRecepcionParcial = totalPendiente > 0;
-      const itemsRecepcionados = items.filter(item => 
-        (parseInt(item.UnidadesRecibidas) || 0) > 0
-      );
+      // Preparar items para albaranes - SOLO los que tienen delta positivo
+      const itemsParaAlbaranes = itemsEnriquecidos
+        .filter(item => item.DeltaRecepcion > 0)
+        .map(item => ({
+          Orden: item.Orden,
+          CodigoArticulo: item.CodigoArticulo,
+          DescripcionArticulo: item.DescripcionArticulo,
+          UnidadesRecibidas: item.UnidadesRecibidasNuevas, // Enviamos el TOTAL acumulado
+          UnidadesPedidas: item.UnidadesPedidas,
+          Precio: item.Precio,
+          CodigoProveedor: item.CodigoProveedor,
+          PorcentajeIva: item.PorcentajeIva,
+          GrupoIva: item.GrupoIva,
+          ComentarioRecepcion: item.ComentarioRecepcion || ''
+        }));
 
-      if (itemsRecepcionados.length > 0) {
+      // Generar albaranes de compra
+      let albaranesCompraGenerados = [];
+      if (itemsParaAlbaranes.length > 0) {
         try {
           albaranesCompraGenerados = await generarAlbaranProveedorAutomatico(
             transaction, 
             orderInfo, 
-            itemsRecepcionados, 
+            itemsParaAlbaranes, 
             orderInfo.CodigoEmpresa,
-            esRecepcionParcial
+            totalPendiente > 0 // esRecepcionParcial
           );
-
-          for (const albaranInfo of albaranesCompraGenerados) {
-            if (albaranInfo.NumeroPedidoProveedor) {
-              const pedidoProveedorResult = await transaction.request()
-                .input('NumeroPedido', albaranInfo.NumeroPedidoProveedor)
-                .input('SeriePedido', 'WebCD')
-                .input('CodigoEmpresa', orderInfo.CodigoEmpresa)
-                .query(`
-                  SELECT 
-                    SUM(l.UnidadesPedidas) as TotalPedido,
-                    SUM(l.UnidadesRecibidas) as TotalRecibido,
-                    SUM(l.UnidadesPendientes) as TotalPendiente,
-                    c.Estado
-                  FROM LineasPedidoProveedor l
-                  INNER JOIN CabeceraPedidoProveedor c ON 
-                    l.NumeroPedido = c.NumeroPedido AND 
-                    l.SeriePedido = c.SeriePedido AND
-                    l.CodigoEmpresa = c.CodigoEmpresa
-                  WHERE l.NumeroPedido = @NumeroPedido
-                  AND l.SeriePedido = @SeriePedido
-                  AND l.CodigoEmpresa = @CodigoEmpresa
-                  GROUP BY c.Estado
-                `);
-
-              if (pedidoProveedorResult.recordset.length > 0) {
-                const pedidoProveedor = pedidoProveedorResult.recordset[0];
-                const totalPendienteProveedor = pedidoProveedor.TotalPendiente || 0;
-                const estadoActualProveedor = pedidoProveedor.Estado || 0;
-
-                if (totalPendienteProveedor === 0 && estadoActualProveedor !== 2) {
-                  await transaction.request()
-                    .input('NumeroPedido', albaranInfo.NumeroPedidoProveedor)
-                    .input('SeriePedido', 'WebCD')
-                    .input('CodigoEmpresa', orderInfo.CodigoEmpresa)
-                    .input('Estado', 2)
-                    .query(`
-                      UPDATE CabeceraPedidoProveedor 
-                      SET Estado = @Estado
-                      WHERE NumeroPedido = @NumeroPedido
-                      AND SeriePedido = @SeriePedido
-                      AND CodigoEmpresa = @CodigoEmpresa
-                    `);
-
-                  await transaction.request()
-                    .input('NumeroPedido', albaranInfo.NumeroPedidoProveedor)
-                    .input('SeriePedido', 'WebCD')
-                    .input('CodigoEmpresa', orderInfo.CodigoEmpresa)
-                    .query(`
-                      UPDATE LineasPedidoProveedor 
-                      SET 
-                        UnidadesRecibidas = UnidadesPedidas,
-                        UnidadesPendientes = 0
-                      WHERE NumeroPedido = @NumeroPedido
-                      AND SeriePedido = @SeriePedido
-                      AND CodigoEmpresa = @CodigoEmpresa
-                    `);
-                }
-              }
-            }
-          }
         } catch (error) {
+          console.error('Error al generar albaranes:', error);
+          // No lanzamos error para no revertir la recepción del pedido
         }
       }
 
+      // Confirmar transacción
       await transaction.commit();
 
+      // Preparar respuesta
       const nuevos = albaranesCompraGenerados.filter(a => a.esNuevo).length;
       const actualizados = albaranesCompraGenerados.filter(a => !a.esNuevo).length;
       
@@ -286,7 +348,8 @@ const confirmReception = async (req, res) => {
         success: true,
         message: `Recepción confirmada correctamente. ${nuevos} albarán(es) nuevo(s) creado(s), ${actualizados} actualizado(s).`,
         estado: nuevoEstado,
-        estadoTexto: nuevoEstado === 2 ? 'Servido' : nuevoEstado === 1 ? 'Parcial' : 'Preparando',
+        esParcial: esParcial,
+        estadoTexto: nuevoEstado === 2 ? 'Servido' : esParcial === -1 ? 'Pendiente (Parcial)' : 'Pendiente',
         totales: {
           pedido: totalPedido,
           recibido: totalRecibido,
@@ -294,7 +357,7 @@ const confirmReception = async (req, res) => {
         },
         albaranesCompraGenerados: albaranesCompraGenerados.length,
         detallesAlbaranes: albaranesCompraGenerados,
-        esRecepcionParcial: esRecepcionParcial,
+        esRecepcionParcial: totalPendiente > 0,
         resumen: {
           nuevos: nuevos,
           actualizados: actualizados
@@ -337,7 +400,9 @@ const finalizeOrder = async (req, res) => {
             Estado, 
             StatusAprobado,
             CodigoEmpresa,
-            EjercicioPedido
+            EjercicioPedido,
+            SeriePedido,
+            EsParcial
           FROM CabeceraPedidoCliente
           WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
         `);
@@ -366,17 +431,82 @@ const finalizeOrder = async (req, res) => {
       const totalPendiente = pendientesResult.recordset[0].TotalPendiente || 0;
       const totalRecibido = pendientesResult.recordset[0].TotalRecibido || 0;
 
+      // Actualizar estado del pedido a "Servido" y marcar como no parcial
       await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
         .input('Estado', 2)
+        .input('EsParcial', 0)
         .query(`
           UPDATE CabeceraPedidoCliente 
-          SET Estado = @Estado
+          SET Estado = @Estado,
+              EsParcial = @EsParcial
           WHERE NumeroPedido = @NumeroPedido
           AND SeriePedido = @SeriePedido
         `);
 
+      // Obtener items pendientes para generar albaranes de compra
+      const itemsPendientesResult = await transaction.request()
+        .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD')
+        .query(`
+          SELECT 
+            Orden,
+            CodigoArticulo,
+            DescripcionArticulo,
+            (UnidadesPedidas - UnidadesRecibidas) as UnidadesRecibidas,
+            Precio,
+            CodigoProveedor,
+            [%Iva] as PorcentajeIva,
+            GrupoIva,
+            'Pedido finalizado manualmente' as ComentarioRecepcion
+          FROM LineasPedidoCliente
+          WHERE NumeroPedido = @NumeroPedido 
+          AND SeriePedido = @SeriePedido
+          AND UnidadesPendientes > 0
+        `);
+
+      let albaranesFinalizacionGenerados = [];
+      
+      // Generar albaranes de compra para items pendientes
+      if (itemsPendientesResult.recordset.length > 0) {
+        try {
+          // Agrupar por proveedor y artículo
+          const itemsAgrupados = {};
+          itemsPendientesResult.recordset.forEach(item => {
+            const claveUnica = `${item.CodigoProveedor}-${item.CodigoArticulo}`;
+            
+            if (!itemsAgrupados[claveUnica]) {
+              itemsAgrupados[claveUnica] = { 
+                ...item,
+                UnidadesRecibidasTotal: item.UnidadesRecibidas
+              };
+            } else {
+              itemsAgrupados[claveUnica].UnidadesRecibidas += item.UnidadesRecibidas;
+              itemsAgrupados[claveUnica].UnidadesRecibidasTotal += item.UnidadesRecibidas;
+            }
+          });
+
+          const itemsParaGenerar = Object.values(itemsAgrupados);
+
+          albaranesFinalizacionGenerados = await generarAlbaranProveedorAutomatico(
+            transaction, 
+            {
+              EjercicioPedido: pedido.EjercicioPedido,
+              SeriePedido: 'WebCD',
+              NumeroPedido: orderId,
+              CodigoEmpresa: pedido.CodigoEmpresa
+            }, 
+            itemsParaGenerar, 
+            pedido.CodigoEmpresa,
+            true // Es finalización manual
+          );
+        } catch (error) {
+          console.error('Error al generar albaranes en finalización:', error);
+        }
+      }
+
+      // Actualizar todas las líneas como completadas
       await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
@@ -391,99 +521,7 @@ const finalizeOrder = async (req, res) => {
             FechaRecepcion = @FechaRecepcion
           WHERE NumeroPedido = @NumeroPedido 
           AND SeriePedido = @SeriePedido
-          AND UnidadesPendientes > 0
         `);
-
-      const albaranResult = await transaction.request()
-        .input('NumeroPedido', orderId)
-        .input('SeriePedido', 'WebCD')
-        .query(`
-          SELECT NumeroAlbaran 
-          FROM CabeceraAlbaranCliente 
-          WHERE NumeroPedido = @NumeroPedido
-          AND SeriePedido = @SeriePedido
-        `);
-
-      if (albaranResult.recordset.length > 0) {
-        const numeroAlbaran = albaranResult.recordset[0].NumeroAlbaran;
-        
-        await transaction.request()
-          .input('NumeroAlbaran', numeroAlbaran)
-          .query(`
-            UPDATE LineasAlbaranCliente 
-            SET 
-              Unidades = UnidadesServidas,
-              UnidadesServidas = UnidadesServidas
-            WHERE NumeroAlbaran = @NumeroAlbaran
-          `);
-
-        const totalesResult = await transaction.request()
-          .input('NumeroAlbaran', numeroAlbaran)
-          .query(`
-            SELECT 
-              SUM(Unidades * Precio) AS BaseImponible,
-              SUM((Unidades * Precio) * ([%Iva] / 100.0)) AS TotalIVA
-            FROM LineasAlbaranCliente
-            WHERE NumeroAlbaran = @NumeroAlbaran
-          `);
-
-        const baseImponible = parseFloat(totalesResult.recordset[0].BaseImponible) || 0;
-        const totalIVA = parseFloat(totalesResult.recordset[0].TotalIVA) || 0;
-        const importeLiquido = baseImponible + totalIVA;
-
-        await transaction.request()
-          .input('NumeroAlbaran', numeroAlbaran)
-          .input('BaseImponible', baseImponible)
-          .input('TotalIVA', totalIVA)
-          .input('ImporteLiquido', importeLiquido)
-          .query(`
-            UPDATE CabeceraAlbaranCliente
-            SET 
-              BaseImponible = @BaseImponible,
-              TotalIVA = @TotalIVA,
-              ImporteLiquido = @ImporteLiquido
-            WHERE NumeroAlbaran = @NumeroAlbaran
-          `);
-      }
-
-      const itemsPendientesResult = await transaction.request()
-        .input('NumeroPedido', orderId)
-        .input('SeriePedido', 'WebCD')
-        .query(`
-          SELECT 
-            Orden,
-            CodigoArticulo,
-            DescripcionArticulo,
-            UnidadesPedidas as UnidadesRecibidas,
-            Precio,
-            CodigoProveedor,
-            [%Iva] as PorcentajeIva,
-            'Pedido finalizado manualmente' as ComentarioRecepcion
-          FROM LineasPedidoCliente
-          WHERE NumeroPedido = @NumeroPedido 
-          AND SeriePedido = @SeriePedido
-          AND UnidadesPendientes > 0
-        `);
-
-      let albaranesFinalizacionGenerados = [];
-      
-      if (itemsPendientesResult.recordset.length > 0) {
-        try {
-          albaranesFinalizacionGenerados = await generarAlbaranProveedorAutomatico(
-            transaction, 
-            {
-              EjercicioPedido: pedido.EjercicioPedido,
-              SeriePedido: 'WebCD',
-              NumeroPedido: orderId,
-              CodigoEmpresa: pedido.CodigoEmpresa
-            }, 
-            itemsPendientesResult.recordset, 
-            pedido.CodigoEmpresa,
-            true
-          );
-        } catch (error) {
-        }
-      }
 
       await transaction.commit();
 
@@ -491,6 +529,7 @@ const finalizeOrder = async (req, res) => {
         success: true,
         message: 'Pedido marcado como servido correctamente. Las unidades pendientes se han establecido a 0 y se han generado los albaranes de compra correspondientes.',
         estado: 2,
+        esParcial: 0,
         unidadesPendientesAnteriores: totalPendiente,
         albaranesGenerados: albaranesFinalizacionGenerados.length,
         detallesAlbaranes: albaranesFinalizacionGenerados

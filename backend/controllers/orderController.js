@@ -311,11 +311,20 @@ const createOrder = async (req, res) => {
         
         const codigoIva = porcentajeIva;
         const unidadesPedidas = parseFloat(item.Cantidad) || 1;
-        const precio = parseFloat(articulo.PrecioVenta) || 0;
+        const precio = parseFloat(articulo.PrecioVenta) || 0; // Precio VENTA con IVA incluido
 
-        const baseImponible = precio * unidadesPedidas;
-        const cuotaIva = baseImponible * (porcentajeIva / 100);
-        const importeLiquido = baseImponible + cuotaIva;
+        // CALCULAR CORRECTAMENTE - PrecioVenta YA incluye IVA
+        // ImporteBruto = PrecioVenta * Cantidad (total con IVA)
+        const importeBruto = precio * unidadesPedidas;
+        
+        // BaseImponible = ImporteBruto / (1 + (IVA/100)) (total sin IVA)
+        const baseImponible = importeBruto / (1 + (porcentajeIva / 100));
+        
+        // CuotaIva = ImporteBruto - BaseImponible
+        const cuotaIva = importeBruto - baseImponible;
+        
+        // ImporteLiquido = ImporteBruto (mismo valor)
+        const importeLiquido = importeBruto;
 
         await transaction.request()
           .input('CodigoEmpresa', codigoEmpresa)
@@ -331,7 +340,7 @@ const createOrder = async (req, res) => {
           .input('Unidades2_', unidadesPedidas)
           .input('UnidadesPendientesFabricar', unidadesPedidas)
           .input('Precio', precio)
-          .input('ImporteBruto', importeLiquido)
+          .input('ImporteBruto', importeBruto)
           .input('ImporteNeto', baseImponible)
           .input('ImporteParcial', baseImponible)
           .input('BaseImponible', baseImponible)
@@ -487,6 +496,7 @@ const getOrders = async (req, res) => {
           c.NumeroLineas,
           c.StatusAprobado,
           c.Estado,
+          c.EsParcial,  -- AGREGAR ESTE CAMPO
           c.SeriePedido,
           c.BaseImponible,
           c.TotalIVA,
@@ -594,6 +604,7 @@ const getOrderDetails = async (req, res) => {
           CifDni,
           StatusAprobado,
           Estado,
+          EsParcial,  -- AGREGAR ESTE CAMPO
           SeriePedido,
           BaseImponible,
           TotalIVA,
@@ -798,11 +809,20 @@ const updateOrder = async (req, res) => {
         
         const codigoIva = porcentajeIva;
         const unidadesPedidas = parseFloat(item.Cantidad) || 1;
-        const precio = parseFloat(articulo.PrecioVenta) || parseFloat(item.PrecioVenta) || 0;
+        const precio = parseFloat(articulo.PrecioVenta) || parseFloat(item.PrecioVenta) || 0; // Precio VENTA con IVA incluido
 
-        const baseImponible = precio * unidadesPedidas;
-        const cuotaIva = baseImponible * (porcentajeIva / 100);
-        const importeLiquido = baseImponible + cuotaIva;
+        // CALCULAR CORRECTAMENTE - PrecioVenta YA incluye IVA
+        // ImporteBruto = PrecioVenta * Cantidad (total con IVA)
+        const importeBruto = precio * unidadesPedidas;
+        
+        // BaseImponible = ImporteBruto / (1 + (IVA/100)) (total sin IVA)
+        const baseImponible = importeBruto / (1 + (porcentajeIva / 100));
+        
+        // CuotaIva = ImporteBruto - BaseImponible
+        const cuotaIva = importeBruto - baseImponible;
+        
+        // ImporteLiquido = ImporteBruto (mismo valor)
+        const importeLiquido = importeBruto;
 
         // Obtener almacenes (como en createOrder)
         const almacenesResult = await transaction.request()
@@ -840,7 +860,7 @@ const updateOrder = async (req, res) => {
           .input('Unidades2_', unidadesPedidas)
           .input('UnidadesPendientesFabricar', unidadesPedidas)
           .input('Precio', precio)
-          .input('ImporteBruto', importeLiquido)
+          .input('ImporteBruto', importeBruto)
           .input('ImporteNeto', baseImponible)
           .input('ImporteParcial', baseImponible)
           .input('BaseImponible', baseImponible)

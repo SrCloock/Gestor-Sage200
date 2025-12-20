@@ -16,6 +16,8 @@ const OrderReception = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [albaranesGenerados, setAlbaranesGenerados] = useState([]);
+  const [totalRecibido, setTotalRecibido] = useState(0);
+  const [totalPedido, setTotalPedido] = useState(0);
 
   const fetchWithAuth = async (url, options = {}) => {
     try {
@@ -92,7 +94,7 @@ const OrderReception = () => {
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
           const text = await response.text();
-          throw new Error('El servidor devolvió un formato inválido');
+          throw new Error(`El servidor devolvió un formato inválido`);
         }
 
         const data = await response.json();
@@ -102,9 +104,17 @@ const OrderReception = () => {
           const items = data.order.Productos.map(product => ({
             ...product,
             UnidadesRecibidas: product.UnidadesRecibidas || 0,
-            ComentarioRecepcion: product.ComentarioRecepcion || ''
+            ComentarioRecepcion: product.ComentarioRecepcion || '',
+            // Guardar el valor original para comparar cambios
+            UnidadesRecibidasOriginal: product.UnidadesRecibidas || 0
           }));
           setReceptionItems(items);
+          
+          // Calcular totales
+          const totalPed = items.reduce((sum, item) => sum + (item.UnidadesPedidas || 0), 0);
+          const totalRec = items.reduce((sum, item) => sum + (item.UnidadesRecibidas || 0), 0);
+          setTotalPedido(totalPed);
+          setTotalRecibido(totalRec);
         } else {
           setError(data.message || 'Error al cargar el pedido');
         }
@@ -130,17 +140,38 @@ const OrderReception = () => {
   const handleQuantityChange = (index, value) => {
     const newItems = [...receptionItems];
     const unidadesPedidas = newItems[index].UnidadesPedidas;
-    const nuevasUnidades = Math.max(0, Math.min(parseInt(value) || 0, unidadesPedidas));
+    let nuevasUnidades = parseInt(value) || 0;
     
+    // Validar límites
+    if (nuevasUnidades < 0) nuevasUnidades = 0;
+    if (nuevasUnidades > unidadesPedidas) nuevasUnidades = unidadesPedidas;
+    
+    // Calcular delta de cambio
+    const deltaCambio = nuevasUnidades - (newItems[index].UnidadesRecibidas || 0);
+    newItems[index].deltaCambio = deltaCambio;
+    
+    // IMPORTANTE: El usuario introduce el TOTAL acumulado que debe quedar registrado
     newItems[index].UnidadesRecibidas = nuevasUnidades;
     
+    // Si hay diferencia con lo pedido, sugerir comentario
     if (nuevasUnidades !== unidadesPedidas) {
-      newItems[index].ComentarioRecepcion = `Recibidas ${nuevasUnidades} de ${unidadesPedidas}`;
-    } else if (newItems[index].ComentarioRecepcion?.startsWith('Recibidas')) {
-      newItems[index].ComentarioRecepcion = 'Completo';
+      if (!newItems[index].ComentarioRecepcion || 
+          newItems[index].ComentarioRecepcion === 'Todo recibido correctamente') {
+        newItems[index].ComentarioRecepcion = `Recibidas ${nuevasUnidades} de ${unidadesPedidas}`;
+      }
+    } else {
+      // Si es completo, establecer comentario por defecto
+      if (!newItems[index].ComentarioRecepcion || 
+          newItems[index].ComentarioRecepcion.startsWith('Recibidas')) {
+        newItems[index].ComentarioRecepcion = 'Todo recibido correctamente';
+      }
     }
     
     setReceptionItems(newItems);
+    
+    // Actualizar total recibido
+    const totalRec = newItems.reduce((sum, item) => sum + (item.UnidadesRecibidas || 0), 0);
+    setTotalRecibido(totalRec);
   };
 
   const handleCommentChange = (index, value) => {
@@ -176,7 +207,7 @@ const OrderReception = () => {
 
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('El servidor devolvió un formato inválido');
+        throw new Error(`El servidor devolvió un formato inválido`);
       }
 
       const data = await response.json();
@@ -184,6 +215,15 @@ const OrderReception = () => {
       if (data.success) {
         setSuccess('Pedido marcado como servido correctamente');
         setOrder(prev => ({ ...prev, Estado: 2 }));
+        
+        // Actualizar items localmente
+        const updatedItems = receptionItems.map(item => ({
+          ...item,
+          UnidadesRecibidas: item.UnidadesPedidas,
+          UnidadesPendientes: 0
+        }));
+        setReceptionItems(updatedItems);
+        setTotalRecibido(totalPedido);
         
         setTimeout(() => {
           navigate(`/mis-pedidos/${orderId}`, { 
@@ -224,11 +264,13 @@ const OrderReception = () => {
       setSuccess('');
       setAlbaranesGenerados([]);
 
-      const itemsWithDifferences = receptionItems.filter(item => 
-        item.UnidadesRecibidas !== item.UnidadesPedidas && 
-        !item.ComentarioRecepcion.trim() &&
-        item.ComentarioRecepcion !== 'Todo recibido correctamente'
-      );
+      // Validar que todos los items con diferencia tengan comentario
+      const itemsWithDifferences = receptionItems.filter(item => {
+        const tieneDiferencia = item.UnidadesRecibidas !== item.UnidadesPedidas;
+        const comentarioValido = item.ComentarioRecepcion?.trim() && 
+                              item.ComentarioRecepcion !== 'Todo recibido correctamente';
+        return tieneDiferencia && !comentarioValido;
+      });
       
       if (itemsWithDifferences.length > 0) {
         const itemCodes = itemsWithDifferences.map(item => item.CodigoArticulo).join(', ');
@@ -237,8 +279,14 @@ const OrderReception = () => {
         return;
       }
 
+      // IMPORTANTE: Enviar el TOTAL acumulado que debe quedar registrado
       const requestBody = {
-        items: receptionItems,
+        items: receptionItems.map(item => ({
+          Orden: item.Orden,
+          CodigoArticulo: item.CodigoArticulo,
+          UnidadesRecibidas: item.UnidadesRecibidas, // TOTAL acumulado que el usuario introduce
+          ComentarioRecepcion: item.ComentarioRecepcion || ''
+        })),
         usuario: storedUser.username,
         codigoempresa: storedUser.codigoCliente,
         timestamp: new Date().toISOString()
@@ -255,7 +303,7 @@ const OrderReception = () => {
 
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('El servidor devolvió un formato inválido');
+        throw new Error(`El servidor devolvió un formato inválido`);
       }
 
       const data = await response.json();
@@ -271,25 +319,6 @@ const OrderReception = () => {
           ...prev,
           Estado: data.estado || 2
         }));
-
-        const updatedItems = [...receptionItems];
-        
-        if (Array.isArray(albaranesArray) && albaranesArray.length > 0) {
-          albaranesArray.forEach(albaran => {
-            if (albaran.itemsDetalle && Array.isArray(albaran.itemsDetalle)) {
-              albaran.itemsDetalle.forEach(itemAlbaran => {
-                const itemIndex = updatedItems.findIndex(item => 
-                  item.CodigoArticulo === itemAlbaran.CodigoArticulo && 
-                  item.CodigoProveedor === albaran.proveedor
-                );
-                if (itemIndex !== -1) {
-                  updatedItems[itemIndex].UnidadesRecibidas = itemAlbaran.UnidadesRecibidas;
-                }
-              });
-            }
-          });
-        }
-        setReceptionItems(updatedItems);
 
         setTimeout(() => {
           navigate(`/mis-pedidos/${orderId}`, { 
@@ -331,15 +360,16 @@ const OrderReception = () => {
   const calculateCurrentStatus = () => {
     if (!receptionItems.length) return 0;
     
-    const totalPedido = receptionItems.reduce((sum, item) => sum + (item.UnidadesPedidas || 0), 0);
-    const totalRecibido = receptionItems.reduce((sum, item) => sum + (item.UnidadesRecibidas || 0), 0);
+    const totalPedidoCalc = receptionItems.reduce((sum, item) => sum + (item.UnidadesPedidas || 0), 0);
+    const totalRecibidoCalc = receptionItems.reduce((sum, item) => sum + (item.UnidadesRecibidas || 0), 0);
     
-    if (totalRecibido === 0) return 0;
-    if (totalRecibido === totalPedido) return 2;
+    if (totalRecibidoCalc === 0) return 0;
+    if (totalRecibidoCalc === totalPedidoCalc) return 2;
     return 1;
   };
 
   const currentStatus = calculateCurrentStatus();
+  const totalPendiente = totalPedido - totalRecibido;
 
   if (loading) {
     return (
@@ -367,10 +397,17 @@ const OrderReception = () => {
       <div className="orr-header">
         <div className="orr-title-section">
           <h2>Confirmar Recepción del Pedido #{order?.NumeroPedido}</h2>
-          <div className="orr-status">
-            Estado actual: <span className={`orr-status-badge orr-status-${currentStatus}`}>
-              {getStatusText(currentStatus)}
-            </span>
+          <div className="orr-status-info">
+            <div className="orr-status">
+              Estado: <span className={`orr-status-badge orr-status-${currentStatus}`}>
+                {getStatusText(currentStatus)}
+              </span>
+            </div>
+            <div className="orr-totals">
+              <span className="orr-total-item">Pedido: <strong>{totalPedido}</strong></span>
+              <span className="orr-total-item">Recibido: <strong>{totalRecibido}</strong></span>
+              <span className="orr-total-item">Pendiente: <strong>{totalPendiente}</strong></span>
+            </div>
           </div>
         </div>
         <button onClick={() => navigate(`/mis-pedidos/${orderId}`)} className="orr-back-button">
@@ -466,10 +503,12 @@ const OrderReception = () => {
       <div className="orr-table-container">
         <div className="orr-table-header">
           <h3>Artículos del Pedido</h3>
-          <p>Confirme las cantidades recibidas y agregue comentarios si es necesario</p>
-          <p className="orr-warning-text">
-            Si la cantidad recibida es diferente a la pedida, debe agregar un comentario explicando la diferencia.
-          </p>
+          <div className="orr-instructions">
+            <p><strong>Importante:</strong> Introduzca el <strong>total acumulado</strong> de unidades recibidas hasta el momento.</p>
+            <p className="orr-warning-text">
+              Si la cantidad recibida es diferente a la pedida, debe agregar un comentario explicando la diferencia.
+            </p>
+          </div>
         </div>
         
         <table className="orr-reception-table">
@@ -479,7 +518,7 @@ const OrderReception = () => {
               <th>Código</th>
               <th>Proveedor</th>
               <th>Pedido</th>
-              <th>Recibido</th>
+              <th>Total Recibido</th>
               <th>Pendiente</th>
               <th>Comentarios</th>
               <th>Estado</th>
@@ -488,10 +527,10 @@ const OrderReception = () => {
           <tbody>
             {receptionItems.map((item, index) => {
               const hasDifference = item.UnidadesRecibidas !== item.UnidadesPedidas;
-              const needsComment = hasDifference && 
-                !item.ComentarioRecepcion.trim() && 
-                item.ComentarioRecepcion !== 'Todo recibido correctamente';
               const pendiente = (item.UnidadesPedidas || 0) - (item.UnidadesRecibidas || 0);
+              const comentarioValido = item.ComentarioRecepcion?.trim() && 
+                                    item.ComentarioRecepcion !== 'Todo recibido correctamente';
+              const needsComment = hasDifference && !comentarioValido;
               
               return (
                 <tr key={index} className={`${hasDifference ? 'orr-partial-reception' : ''} ${needsComment ? 'orr-needs-comment' : ''}`}>
@@ -500,15 +539,23 @@ const OrderReception = () => {
                   <td className="orr-item-proveedor">{item.CodigoProveedor || 'No especificado'}</td>
                   <td className="orr-item-ordered">{item.UnidadesPedidas}</td>
                   <td className="orr-item-received">
-                    <input
-                      type="number"
-                      min="0"
-                      max={item.UnidadesPedidas}
-                      value={item.UnidadesRecibidas}
-                      onChange={(e) => handleQuantityChange(index, e.target.value)}
-                      disabled={order?.Estado === 2}
-                      className="orr-quantity-input"
-                    />
+                    <div className="orr-quantity-input-container">
+                      <input
+                        type="number"
+                        min="0"
+                        max={item.UnidadesPedidas}
+                        value={item.UnidadesRecibidas}
+                        onChange={(e) => handleQuantityChange(index, e.target.value)}
+                        disabled={order?.Estado === 2}
+                        className="orr-quantity-input"
+                        title={`Total acumulado de unidades recibidas${item.deltaCambio ? ` (Cambio: ${item.deltaCambio > 0 ? '+' : ''}${item.deltaCambio})` : ''}`}
+                      />
+                      {item.deltaCambio !== undefined && item.deltaCambio !== 0 && (
+                        <span className={`orr-change-indicator ${item.deltaCambio > 0 ? 'orr-change-up' : 'orr-change-down'}`}>
+                          {item.deltaCambio > 0 ? `+${item.deltaCambio}` : item.deltaCambio}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="orr-item-pending">{pendiente}</td>
                   <td className="orr-item-comments">
@@ -547,6 +594,9 @@ const OrderReception = () => {
             <div className="orr-finalize-info">
               <p>
                 ¿No va a recepcionar más unidades? Puede marcar el pedido como servido para eliminarlo de la lista de pendientes.
+              </p>
+              <p className="orr-warning-text">
+                <strong>Advertencia:</strong> Esto marcará todas las unidades pendientes como recibidas y generará los albaranes de compra correspondientes.
               </p>
             </div>
           </div>

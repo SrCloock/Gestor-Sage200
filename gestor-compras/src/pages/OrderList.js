@@ -19,11 +19,10 @@ const OrderList = () => {
   const getStatusText = (order) => {
     if (order.StatusAprobado === 0) return 'Revisando';
     if (order.StatusAprobado === -1) {
-      switch (order.Estado) {
-        case 0: return 'Preparando';
-        case 1: return 'Parcial';
-        case 2: return 'Servido';
-        default: return 'Preparando';
+      if (order.Estado === 2) return 'Servido';
+      if (order.Estado === 0) {
+        // Si EsParcial es -1, entonces es Parcial
+        return order.EsParcial === -1 ? 'Parcial' : 'Preparando';
       }
     }
     return 'Desconocido';
@@ -48,12 +47,26 @@ const OrderList = () => {
           params: { codigoCliente: user?.codigoCliente }
         });
         
+        console.log('📦 Datos recibidos de /orders:', response.data);
+        
         if (response.data.success) {
           setOrders(response.data.orders || []);
+          
+          // Log para debug: mostrar el primer pedido con sus campos
+          if (response.data.orders && response.data.orders.length > 0) {
+            console.log('📊 Primer pedido:', {
+              NumeroPedido: response.data.orders[0].NumeroPedido,
+              StatusAprobado: response.data.orders[0].StatusAprobado,
+              Estado: response.data.orders[0].Estado,
+              EsParcial: response.data.orders[0].EsParcial,
+              StatusText: getStatusText(response.data.orders[0])
+            });
+          }
         } else {
           setError(response.data.message || 'Error al cargar pedidos');
         }
       } catch (err) {
+        console.error('❌ Error en fetchOrders:', err);
         if (err.response?.status === 401) {
           setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
         } else if (err.code === 'NETWORK_ERROR') {
@@ -114,6 +127,16 @@ const OrderList = () => {
     if (order && canEditOrder(order)) {
       navigate(`/editar-pedido/${orderId}`);
     }
+  };
+
+  // Función para calcular el subtotal de un pedido
+  const calcularSubtotal = (order) => {
+    const productos = order.Productos || [];
+    return productos.reduce((sum, product) => {
+      const precio = product.Precio || product.PrecioVenta || 0;
+      const cantidad = product.UnidadesPedidas || 0;
+      return sum + (precio * cantidad);
+    }, 0);
   };
 
   if (loading) return (
@@ -221,6 +244,7 @@ const OrderList = () => {
               {filteredOrders.map(order => {
                 const statusText = getStatusText(order);
                 const editable = canEditOrder(order);
+                const subtotal = calcularSubtotal(order);
                 
                 return (
                   <tr key={order.NumeroPedido} className="ol-table-row">
@@ -230,7 +254,7 @@ const OrderList = () => {
                     </td>
                     <td className="ol-items-count">{order.NumeroLineas}</td>
                     <td className="ol-order-amount">
-                      {order.ImporteLiquido ? `${order.ImporteLiquido.toFixed(2)} €` : '0.00 €'}
+                      {subtotal.toFixed(2)} €
                     </td>
                     <td>
                       <span className={`ol-status-badge ol-status-${statusText.toLowerCase()}`}>

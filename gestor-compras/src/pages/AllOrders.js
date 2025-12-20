@@ -51,6 +51,8 @@ const AllOrders = () => {
         ...(filters.estado && { estado: filters.estado })
       };
 
+      console.log('Buscando todos los pedidos con params:', params);
+
       const response = await api.get('/admin/all-orders', { params });
       
       if (response.data.success) {
@@ -98,16 +100,20 @@ const AllOrders = () => {
   };
 
   const getStatusText = (order) => {
-    if (order.StatusAprobado === 0) return 'Pendiente';
+    if (order.StatusAprobado === 0) return 'Revisando';
     if (order.StatusAprobado === -1) {
-      switch (order.Estado) {
-        case 0: return 'Preparando';
-        case 1: return 'Parcial';
-        case 2: return 'Servido';
-        default: return 'Preparando';
+      if (order.Estado === 2) return 'Servido';
+      if (order.Estado === 0) {
+        return order.EsParcial === -1 ? 'Parcial' : 'Preparando';
       }
     }
     return 'Desconocido';
+  };
+
+  // Obtener el ImporteLiquido (con IVA) para mostrar
+  const getOrderTotal = (order) => {
+    // Usar ImporteLiquido (con IVA) como el total a mostrar
+    return parseFloat(order.ImporteLiquido) || 0;
   };
 
   const formatDate = (dateString) => {
@@ -117,34 +123,47 @@ const AllOrders = () => {
   };
 
   const renderTableRows = () => {
-    return orders.map(order => (
-      <tr key={order.NumeroPedido} className="ao-order-row">
-        <td className="ao-order-id">{order.NumeroPedido}</td>
-        <td className="ao-order-date">{formatDate(order.FechaPedido)}</td>
-        <td className="ao-order-client">{order.RazonSocial}</td>
-        <td className="ao-order-cif">{order.CifDni}</td>
-        <td className="ao-order-lines">{order.NumeroLineas}</td>
-        <td className="ao-order-amount">
-          {formatCurrency(order.ImporteLiquido)}
-        </td>
-        <td className="ao-order-status">
-          <span className={`ao-status-badge ao-status-${getStatusText(order).toLowerCase()}`}>
-            {getStatusText(order)}
-          </span>
-        </td>
-        <td className="ao-order-actions">
-          <button 
-            onClick={() => handleViewDetails(order.NumeroPedido)}
-            className="ao-view-btn"
-            title="Ver detalles"
-            disabled={modalLoading}
-          >
-            <FaEye />
-            {modalLoading ? 'Cargando...' : 'Ver'}
-          </button>
-        </td>
-      </tr>
-    ));
+    return orders.map(order => {
+      const total = getOrderTotal(order);
+      
+      return (
+        <tr key={order.NumeroPedido} className="ao-order-row">
+          <td className="ao-order-id">{order.NumeroPedido}</td>
+          <td className="ao-order-date">{formatDate(order.FechaPedido)}</td>
+          <td className="ao-order-client">{order.RazonSocial}</td>
+          <td className="ao-order-cif">{order.CifDni}</td>
+          <td className="ao-order-lines">{order.NumeroLineas}</td>
+          <td className="ao-order-amount">
+            {formatCurrency(total)}
+          </td>
+          <td className="ao-order-status">
+            <span className={`ao-status-badge ${getStatusBadgeClass(order)}`}>
+              {getStatusText(order)}
+            </span>
+          </td>
+          <td className="ao-order-actions">
+            <button 
+              onClick={() => handleViewDetails(order.NumeroPedido)}
+              className="ao-view-btn"
+              title="Ver detalles"
+              disabled={modalLoading}
+            >
+              <FaEye />
+              {modalLoading ? 'Cargando...' : 'Ver'}
+            </button>
+          </td>
+        </tr>
+      );
+    });
+  };
+
+  const getStatusBadgeClass = (order) => {
+    const statusText = getStatusText(order);
+    if (statusText === 'Servido') return 'ao-status-servido';
+    if (statusText === 'Parcial') return 'ao-status-parcial';
+    if (statusText === 'Preparando') return 'ao-status-preparando';
+    if (statusText === 'Revisando') return 'ao-status-revisando';
+    return 'ao-status-desconocido';
   };
 
   const handleFilterChange = (e) => {
@@ -217,6 +236,7 @@ const AllOrders = () => {
         </div>
       )}
 
+      {/* Filtros */}
       <div className="ao-filters-panel">
         <div className="ao-filters-grid">
           <div className="ao-filter-group">
@@ -273,8 +293,10 @@ const AllOrders = () => {
               onChange={handleFilterChange}
             >
               <option value="">Todos</option>
-              <option value="0">Pendiente</option>
-              <option value="-1">Aprobado</option>
+              <option value="Revisando">Revisando</option>
+              <option value="Preparando">Preparando</option>
+              <option value="Parcial">Parcial</option>
+              <option value="Servido">Servido</option>
             </select>
           </div>
         </div>
@@ -362,6 +384,7 @@ const AllOrders = () => {
         </>
       )}
 
+      {/* Modal para ver detalles del pedido */}
       {showOrderModal && selectedOrder && (
         <div className="ao-modal-overlay" onClick={() => setShowOrderModal(false)}>
           <div className="ao-modal" onClick={(e) => e.stopPropagation()}>
@@ -383,7 +406,7 @@ const AllOrders = () => {
                   </div>
                   <div className="ao-info-item">
                     <strong>Estado:</strong> 
-                    <span className={`ao-status-badge ao-status-${selectedOrder.EstadoDescripcion?.toLowerCase()}`}>
+                    <span className={`ao-status-badge ${getStatusBadgeClass(selectedOrder)}`}>
                       {selectedOrder.EstadoDescripcion}
                     </span>
                   </div>
@@ -419,18 +442,24 @@ const AllOrders = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {selectedOrder.productos.map((product, index) => (
-                          <tr key={index}>
-                            <td className="ao-product-code">{product.CodigoArticulo}</td>
-                            <td className="ao-product-desc">{product.DescripcionArticulo}</td>
-                            <td className="ao-product-qty">{product.UnidadesPedidas}</td>
-                            <td className="ao-product-price">{formatCurrency(product.Precio)}</td>
-                            <td className="ao-product-total">
-                              {formatCurrency(product.Precio * product.UnidadesPedidas)}
-                            </td>
-                            <td className="ao-product-supplier">{product.NombreProveedor}</td>
-                          </tr>
-                        ))}
+                        {selectedOrder.productos.map((product, index) => {
+                          const precio = parseFloat(product.Precio) || parseFloat(product.PrecioVenta) || 0;
+                          const cantidad = parseFloat(product.UnidadesPedidas) || 0;
+                          const totalLinea = precio * cantidad;
+                          
+                          return (
+                            <tr key={index}>
+                              <td className="ao-product-code">{product.CodigoArticulo}</td>
+                              <td className="ao-product-desc">{product.DescripcionArticulo}</td>
+                              <td className="ao-product-qty">{product.UnidadesPedidas}</td>
+                              <td className="ao-product-price">{formatCurrency(precio)}</td>
+                              <td className="ao-product-total">
+                                {formatCurrency(totalLinea)}
+                              </td>
+                              <td className="ao-product-supplier">{product.NombreProveedor}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

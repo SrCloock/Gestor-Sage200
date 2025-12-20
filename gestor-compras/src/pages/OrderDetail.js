@@ -4,14 +4,6 @@ import { AuthContext } from '../context/AuthContext';
 import api from '../api';
 import '../styles/OrderDetail.css';
 
-const ORDER_STATUS = {
-  REVIEWING: { code: 0, text: 'Revisando', color: 'reviewing' },
-  APPROVED: { code: -1, text: 'Aprobado', color: 'approved' },
-  PREPARING: { code: 0, text: 'Preparando', color: 'preparing' },
-  PARTIAL: { code: 1, text: 'Parcial', color: 'partial' },
-  DELIVERED: { code: 2, text: 'Servido', color: 'delivered' }
-};
-
 const OrderDetail = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
@@ -40,11 +32,14 @@ const OrderDetail = () => {
         }
         
         if (response.data && response.data.order) {
+          console.log('📊 Datos del pedido:', response.data.order);
+          console.log('📊 Productos del pedido:', response.data.order.productos || response.data.order.Productos);
           setOrder(response.data.order);
         } else {
           setError('No se encontraron datos del pedido');
         }
       } catch (err) {
+        console.error('❌ Error al cargar detalles del pedido:', err);
         if (err.response?.status === 401) {
           setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
         } else if (err.response?.status === 404) {
@@ -67,42 +62,37 @@ const OrderDetail = () => {
 
   const canConfirmReception = () => {
     if (!order) return false;
-    return order.StatusAprobado === ORDER_STATUS.APPROVED.code && 
-           order.Estado !== ORDER_STATUS.DELIVERED.code;
+    return order.StatusAprobado === -1 && order.Estado !== 2;
   };
 
   const getStatusInfo = () => {
     if (!order) return { text: 'Desconocido', color: 'unknown' };
     
-    if (order.StatusAprobado === ORDER_STATUS.REVIEWING.code) {
+    if (order.StatusAprobado === 0) {
       return { 
-        text: ORDER_STATUS.REVIEWING.text, 
-        color: ORDER_STATUS.REVIEWING.color 
+        text: 'Revisando', 
+        color: 'reviewing' 
       };
     }
     
-    if (order.StatusAprobado === ORDER_STATUS.APPROVED.code) {
-      switch (order.Estado) {
-        case ORDER_STATUS.PREPARING.code:
+    if (order.StatusAprobado === -1) {
+      if (order.Estado === 2) {
+        return { 
+          text: 'Servido', 
+          color: 'delivered' 
+        };
+      } else if (order.Estado === 0) {
+        if (order.EsParcial === -1) {
           return { 
-            text: ORDER_STATUS.PREPARING.text, 
-            color: ORDER_STATUS.PREPARING.color 
+            text: 'Parcial', 
+            color: 'partial' 
           };
-        case ORDER_STATUS.PARTIAL.code:
+        } else {
           return { 
-            text: ORDER_STATUS.PARTIAL.text, 
-            color: ORDER_STATUS.PARTIAL.color 
+            text: 'Preparando', 
+            color: 'preparing' 
           };
-        case ORDER_STATUS.DELIVERED.code:
-          return { 
-            text: ORDER_STATUS.DELIVERED.text, 
-            color: ORDER_STATUS.DELIVERED.color 
-          };
-        default:
-          return { 
-            text: ORDER_STATUS.PREPARING.text, 
-            color: ORDER_STATUS.PREPARING.color 
-          };
+        }
       }
     }
     
@@ -140,7 +130,14 @@ const OrderDetail = () => {
 
   const canEditOrder = () => {
     if (!order) return false;
-    return order.StatusAprobado === ORDER_STATUS.REVIEWING.code;
+    return order.StatusAprobado === 0;
+  };
+
+  // Función para calcular el total de un producto (SOLO PrecioVenta * Cantidad)
+  const calcularTotalProducto = (product) => {
+    const precio = parseFloat(product.PrecioVenta) || parseFloat(product.Precio) || 0;
+    const cantidad = parseFloat(product.UnidadesPedidas) || parseFloat(product.Cantidad) || 0;
+    return precio * cantidad;
   };
 
   if (loading) return (
@@ -180,6 +177,14 @@ const OrderDetail = () => {
   const numeroLineas = productos.length;
   const statusInfo = getStatusInfo();
 
+  // Calcular total del pedido (solo PrecioVenta * Cantidad, sin IVA)
+  const totalPedido = productos.reduce((sum, product) => {
+    return sum + calcularTotalProducto(product);
+  }, 0);
+
+  // Calcular IVA si no viene de la API
+  const totalIVA = order.TotalIVA || 0;
+
   return (
     <div className="od-container">
       <div className="od-header-section">
@@ -193,6 +198,9 @@ const OrderDetail = () => {
             <span className={`od-status-badge od-status-${statusInfo.color}`}>
               {statusInfo.text}
             </span>
+            {order.EsParcial === -1 && order.Estado === 0 && (
+              <span className="od-parcial-indicator">⚠️ Recepción parcial</span>
+            )}
           </div>
           <p className="od-order-date">
             Realizado el {new Date(order.FechaPedido).toLocaleDateString('es-ES', {
@@ -231,7 +239,7 @@ const OrderDetail = () => {
             <div className="od-info-row">
               <span className="od-info-label">Total del Pedido:</span>
               <span className="od-info-value od-total-amount">
-                {order.ImporteLiquido ? `${order.ImporteLiquido.toFixed(2)} €` : '0.00 €'}
+                {totalPedido.toFixed(2)} €
               </span>
             </div>
             {order.ObservacionesPedido && (
@@ -272,7 +280,7 @@ const OrderDetail = () => {
             onClick={handleEditOrder}
             className="od-action-button od-edit-button"
           >
-            Editar Pedido
+            ✏️ Editar Pedido
           </button>
         )}
         
@@ -281,7 +289,7 @@ const OrderDetail = () => {
             onClick={handleConfirmReception}
             className="od-action-button od-primary-button"
           >
-            Confirmar Recepción
+            📦 Confirmar Recepción
           </button>
         )}
       </div>
@@ -309,15 +317,15 @@ const OrderDetail = () => {
                   <th>Cantidad Recibida</th>
                   <th>Precio Unitario</th>
                   <th>Total</th>
-                  {order.Estado !== ORDER_STATUS.PREPARING.code && <th>Comentario Recepción</th>}
+                  {order.Estado !== 0 && <th>Comentario Recepción</th>}
                 </tr>
               </thead>
               <tbody>
                 {productos.map((product, index) => {
-                  const cantidadPedida = product.UnidadesPedidas || product.Cantidad || 0;
-                  const cantidadRecibida = product.UnidadesRecibidas || 0;
-                  const precio = product.Precio || 0;
-                  const total = product.ImporteLiquido || (precio * cantidadPedida);
+                  const cantidadPedida = parseFloat(product.UnidadesPedidas) || parseFloat(product.Cantidad) || 0;
+                  const cantidadRecibida = parseFloat(product.UnidadesRecibidas) || 0;
+                  const precio = parseFloat(product.Precio) || parseFloat(product.PrecioVenta) || 0;
+                  const totalProducto = calcularTotalProducto(product);
                   const tieneDiferencia = cantidadRecibida !== cantidadPedida;
                   
                   return (
@@ -341,12 +349,12 @@ const OrderDetail = () => {
                         )}
                       </td>
                       <td className="od-product-price">
-                        {precio ? `${precio.toFixed(2)} €` : '0.00 €'}
+                        {precio.toFixed(2)} €
                       </td>
                       <td className="od-product-total">
-                        {total ? `${total.toFixed(2)} €` : '0.00 €'}
+                        {totalProducto.toFixed(2)} €
                       </td>
-                      {order.Estado !== ORDER_STATUS.PREPARING.code && (
+                      {order.Estado !== 0 && (
                         <td className="od-product-comment">
                           {product.ComentarioRecepcion || '-'}
                         </td>
@@ -360,16 +368,16 @@ const OrderDetail = () => {
             <div className="od-table-summary">
               <div className="od-summary-row">
                 <span>Base Imponible:</span>
-                <span>{order.BaseImponible ? `${order.BaseImponible.toFixed(2)} €` : '0.00 €'}</span>
+                <span>{totalPedido.toFixed(2)} €</span>
               </div>
               <div className="od-summary-row">
                 <span>IVA:</span>
-                <span>{order.TotalIVA ? `${order.TotalIVA.toFixed(2)} €` : '0.00 €'}</span>
+                <span>{totalIVA.toFixed(2)} €</span>
               </div>
               <div className="od-summary-row od-total-row">
                 <span>Total:</span>
                 <span className="od-grand-total">
-                  {order.ImporteLiquido ? `${order.ImporteLiquido.toFixed(2)} €` : '0.00 €'}
+                  {totalPedido.toFixed(2)} €
                 </span>
               </div>
             </div>

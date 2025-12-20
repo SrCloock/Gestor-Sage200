@@ -79,6 +79,7 @@ const getAllOrders = async (req, res) => {
           NumeroLineas,
           StatusAprobado,
           Estado,
+          EsParcial,
           BaseImponible,
           TotalIVA,
           ImporteLiquido,
@@ -152,8 +153,8 @@ const getOrderDetails = async (req, res) => {
           c.*,
           CASE 
             WHEN c.StatusAprobado = 0 THEN 'Pendiente'
-            WHEN c.StatusAprobado = -1 AND c.Estado = 0 THEN 'Preparando'
-            WHEN c.StatusAprobado = -1 AND c.Estado = 1 THEN 'Parcial'
+            WHEN c.StatusAprobado = -1 AND c.Estado = 0 AND c.EsParcial = 0 THEN 'Preparando'
+            WHEN c.StatusAprobado = -1 AND c.Estado = 0 AND c.EsParcial = -1 THEN 'Parcial'
             WHEN c.StatusAprobado = -1 AND c.Estado = 2 THEN 'Servido'
             ELSE 'Desconocido'
           END as EstadoDescripcion
@@ -240,8 +241,8 @@ const getAdminOrderDetails = async (req, res) => {
           c.*,
           CASE 
             WHEN c.StatusAprobado = 0 THEN 'Pendiente'
-            WHEN c.StatusAprobado = -1 AND c.Estado = 0 THEN 'Preparando'
-            WHEN c.StatusAprobado = -1 AND c.Estado = 1 THEN 'Parcial'
+            WHEN c.StatusAprobado = -1 AND c.Estado = 0 AND c.EsParcial = 0 THEN 'Preparando'
+            WHEN c.StatusAprobado = -1 AND c.Estado = 0 AND c.EsParcial = -1 THEN 'Parcial'
             WHEN c.StatusAprobado = -1 AND c.Estado = 2 THEN 'Servido'
             ELSE 'Desconocido'
           END as EstadoDescripcion

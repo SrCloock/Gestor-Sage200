@@ -8,21 +8,24 @@ const OrderReview = () => {
   const navigate = useNavigate();
   
   const orderData = location.state || {};
-  const { orderId, seriePedido, deliveryDate, items = [], comment, total } = orderData;
+  const { orderId, seriePedido, deliveryDate, items = [], comment } = orderData;
 
   if (!orderId) {
     navigate('/mis-pedidos');
     return null;
   }
 
-  const calcularTotal = () => {
+  // Calcular el subtotal correcto (PrecioVenta * Cantidad)
+  const calcularSubtotal = () => {
     return items.reduce((sum, item) => {
-      const precio = item.PrecioVenta || item.PrecioCompra || 0;
-      return sum + (precio * item.Cantidad);
+      const precio = parseFloat(item.PrecioVenta) || parseFloat(item.PrecioCompra) || 0;
+      const cantidad = parseFloat(item.Cantidad) || 0;
+      return sum + (precio * cantidad);
     }, 0);
   };
 
-  const totalPedido = total || calcularTotal();
+  // NO usar el total que viene del estado, calcularlo siempre
+  const subtotalPedido = calcularSubtotal();
 
   return (
     <div className="orw-container">
@@ -46,31 +49,37 @@ const OrderReview = () => {
             <h3>Detalle del Pedido</h3>
             
             <div className="orw-items-list">
-              {items.map((item, index) => (
-                <div key={index} className="orw-item">
-                  <div className="orw-item-header">
-                    <FaBox className="orw-item-icon" />
-                    <div className="orw-item-info">
-                      <h4>{item.DescripcionArticulo}</h4>
-                      <div className="orw-item-details">
-                        <span><strong>Código:</strong> {item.CodigoArticulo}</span>
-                        {item.Familia && <span><strong>Familia:</strong> {item.Familia}</span>}
-                        <span><strong>Proveedor:</strong> {item.NombreProveedor || 'No especificado'}</span>
+              {items.map((item, index) => {
+                const precio = parseFloat(item.PrecioVenta) || parseFloat(item.PrecioCompra) || 0;
+                const cantidad = parseFloat(item.Cantidad) || 0;
+                const totalLinea = precio * cantidad;
+                
+                return (
+                  <div key={index} className="orw-item">
+                    <div className="orw-item-header">
+                      <FaBox className="orw-item-icon" />
+                      <div className="orw-item-info">
+                        <h4>{item.DescripcionArticulo}</h4>
+                        <div className="orw-item-details">
+                          <span><strong>Código:</strong> {item.CodigoArticulo}</span>
+                          {item.Familia && <span><strong>Familia:</strong> {item.Familia}</span>}
+                          <span><strong>Proveedor:</strong> {item.NombreProveedor || 'No especificado'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="orw-item-financial">
+                      <div className="orw-item-pricing">
+                        <span><strong>Precio:</strong> {precio.toFixed(2)} €</span>
+                        <span><strong>Cantidad:</strong> {cantidad}</span>
+                        <span className="orw-item-total">
+                          <strong>Total:</strong> {totalLinea.toFixed(2)} €
+                        </span>
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="orw-item-financial">
-                    <div className="orw-item-pricing">
-                      <span><strong>Precio:</strong> {(item.PrecioVenta || item.PrecioCompra || 0).toFixed(2)} €</span>
-                      <span><strong>Cantidad:</strong> {item.Cantidad}</span>
-                      <span className="orw-item-total">
-                        <strong>Total:</strong> {((item.PrecioVenta || item.PrecioCompra || 0) * item.Cantidad).toFixed(2)} €
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="orw-order-summary">
@@ -90,7 +99,7 @@ const OrderReview = () => {
               <div className="orw-summary-total">
                 <span><strong>Importe total del pedido:</strong></span>
                 <span className="orw-grand-total">
-                  <FaEuroSign /> <strong>{totalPedido.toFixed(2)}</strong>
+                  <FaEuroSign /> <strong>{subtotalPedido.toFixed(2)} €</strong>
                 </span>
               </div>
             </div>

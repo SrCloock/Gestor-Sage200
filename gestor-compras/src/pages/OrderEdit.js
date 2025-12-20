@@ -22,6 +22,7 @@ import {
 } from 'react-icons/fa';
 import '../styles/OrderEdit.css';
 
+// Componente ProductGrid para OrderEdit
 const ProductGrid = ({ products, onAddProduct, currentPage, totalPages, onPageChange, searchTerm, loading }) => {
   if (loading) {
     return (
@@ -80,6 +81,7 @@ const ProductGrid = ({ products, onAddProduct, currentPage, totalPages, onPageCh
   );
 };
 
+// Componente ResumenPedido para OrderEdit
 const ResumenPedido = ({ 
   items, 
   deliveryDate, 
@@ -318,6 +320,7 @@ const OrderEdit = () => {
         const order = response.data.order;
         setOriginalOrder(order);
         
+        // VERIFICAR SI SE PUEDE EDITAR (solo en estado "Revisando")
         if (order.StatusAprobado !== 0) {
           setError('Este pedido no se puede editar porque ya ha sido aprobado. Solo se pueden editar pedidos en estado "Revisando".');
           setLoading(prev => ({ ...prev, order: false }));
@@ -328,7 +331,7 @@ const OrderEdit = () => {
           const itemsWithQuantity = order.productos.map(item => ({
             ...item,
             Cantidad: item.UnidadesPedidas || 1,
-            addedAt: new Date().getTime() - Math.random() * 1000000
+            addedAt: new Date().getTime() - Math.random() * 1000000 // Para ordenar por antigüedad
           }));
           
           setOriginalItems(itemsWithQuantity);
@@ -341,10 +344,11 @@ const OrderEdit = () => {
         }
         
       } catch (err) {
+        console.error('Error cargando detalles del pedido:', err);
         if (err.response?.status === 401) {
           setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
         } else {
-          setError('Error al cargar los detalles del pedido');
+          setError('Error al cargar los detalles del pedido: ' + (err.message || 'Error desconocido'));
         }
       } finally {
         setLoading(prev => ({ ...prev, order: false }));
@@ -367,6 +371,7 @@ const OrderEdit = () => {
           setError('Error al cargar los productos');
         }
       } catch (err) {
+        console.error('Error fetching products:', err);
         if (err.response?.status === 401) {
           setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
         } else {
@@ -386,9 +391,11 @@ const OrderEdit = () => {
     }
   }, [orderId, user]);
 
+  // Aplicar filtros y búsqueda
   useEffect(() => {
     let result = [...products];
 
+    // Filtro de búsqueda
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(product => 
@@ -398,24 +405,28 @@ const OrderEdit = () => {
       );
     }
 
+    // Filtro por proveedor
     if (filters.proveedor) {
       result = result.filter(product => 
         product.CodigoProveedor === filters.proveedor
       );
     }
 
+    // Filtro por precio mínimo
     if (filters.precioMin) {
       result = result.filter(product => 
         product.PrecioVenta >= parseFloat(filters.precioMin)
       );
     }
 
+    // Filtro por precio máximo
     if (filters.precioMax) {
       result = result.filter(product => 
         product.PrecioVenta <= parseFloat(filters.precioMax)
       );
     }
 
+    // Ordenar
     result.sort((a, b) => {
       switch (sortBy) {
         case 'nombre':
@@ -456,6 +467,7 @@ const OrderEdit = () => {
       );
 
       if (existingItem) {
+        // Si el artículo ya existe, incrementamos la cantidad
         const updatedItems = prev.map(item => 
           generateProductKey(item) === itemKey
             ? { 
@@ -472,6 +484,7 @@ const OrderEdit = () => {
           return timeB - timeA;
         });
       } else {
+        // Si es un artículo nuevo, lo agregamos
         const newItem = {
           ...product,
           Cantidad: 1,
@@ -488,6 +501,7 @@ const OrderEdit = () => {
       }
     });
     
+    // Limpiar el highlight después de un tiempo
     setTimeout(() => setLastAddedItem(null), 1000);
   };
 
@@ -568,6 +582,7 @@ const OrderEdit = () => {
         setError(response.data.message || 'Error al actualizar el pedido');
       }
     } catch (err) {
+      console.error('Error al actualizar pedido:', err);
       if (err.response?.status === 401) {
         setError('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
       } else {

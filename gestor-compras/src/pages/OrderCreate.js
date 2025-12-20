@@ -89,7 +89,8 @@ const ResumenPedido = ({
   const calcularTotal = () => {
     return items.reduce((total, item) => {
       const precio = item.PrecioVenta || 0;
-      return total + (precio * (item.Cantidad || 1));
+      const cantidad = item.Cantidad || 1;
+      return total + (precio * cantidad);
     }, 0);
   };
 
@@ -167,6 +168,9 @@ const ResumenPedido = ({
           {items.map((item, index) => {
             const itemKey = `${item.CodigoArticulo}-${item.CodigoProveedor || 'NP'}`;
             const isNewItem = itemKey === lastAddedItem;
+            const precio = item.PrecioVenta || 0;
+            const cantidad = item.Cantidad || 1;
+            const totalLinea = precio * cantidad;
             
             return (
               <div key={itemKey} className={`oc-order-item ${isNewItem ? 'new-item' : ''}`}>
@@ -197,7 +201,7 @@ const ResumenPedido = ({
                           />
                         </div>
                         <div className="oc-item-subtotal">
-                          {((item.PrecioVenta || 0) * (item.Cantidad || 1)).toFixed(2)} €
+                          {totalLinea.toFixed(2)} €
                         </div>
                       </div>
                     </div>
@@ -406,6 +410,7 @@ const OrderCreate = () => {
           Cantidad: 1,
           CodigoCliente: user?.codigoCliente,
           CifDni: user?.cifDni,
+          PorcentajeIva: product.PorcentajeIva || 21, // CRÍTICO: Añadir PorcentajeIva
           addedAt: new Date().getTime()
         };
         
@@ -474,6 +479,7 @@ const OrderCreate = () => {
         DescripcionArticulo: item.DescripcionArticulo,
         Cantidad: Number(item.Cantidad),
         PrecioVenta: item.PrecioVenta,
+        PorcentajeIva: item.PorcentajeIva || 21, // CRÍTICO: Incluir PorcentajeIva
         CodigoProveedor: item.CodigoProveedor || null,
         CodigoCliente: user.codigoCliente,
         CifDni: user.cifDni
