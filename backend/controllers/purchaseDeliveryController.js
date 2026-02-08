@@ -1,31 +1,42 @@
 const { getPool } = require('../db/Sage200db');
 
-// Función para calcular todos los valores financieros
+// Función para calcular todos los valores financieros - CORREGIDA
 const calcularValoresLinea = (precio, unidades, porcentajeIva) => {
   const precioNum = parseFloat(precio) || 0;
   const unidadesNum = parseFloat(unidades) || 0;
   const porcentajeIvaNum = parseFloat(porcentajeIva) || 21;
   
-  // Importe Bruto = Precio x Unidades
+  // Importe Bruto = Precio x Unidades (PrecioVenta YA INCLUYE IVA)
   const importeBruto = precioNum * unidadesNum;
   
-  // Base Imponible = Importe Bruto / (1 + (IVA/100))
+  // Base Imponible = Importe Bruto / (1 + (IVA/100)) (total sin IVA)
   const baseImponible = importeBruto / (1 + (porcentajeIvaNum / 100));
   
-  // Cuota de IVA = Base Imponible * (IVA/100)
-  const cuotaIva = baseImponible * (porcentajeIvaNum / 100);
+  // Cuota de IVA = Importe Bruto - Base Imponible (IVA incluido en el total)
+  const cuotaIva = importeBruto - baseImponible;
   
-  // Importe Líquido = Base Imponible + Cuota IVA (que debería ser igual a Importe Bruto)
-  const importeLiquido = baseImponible + cuotaIva;
+  // Importe Líquido = Importe Bruto (mismo valor - CON IVA)
+  const importeLiquido = importeBruto;
   
-  // Importe Neto = Importe Bruto (normalmente es lo mismo)
-  const importeNeto = importeBruto;
+  // Importe Neto = Base Imponible (sin IVA)
+  const importeNeto = baseImponible;
   
-  // Base IVA = Base Imponible (normalmente es lo mismo)
+  // Base IVA = Base Imponible (mismo valor)
   const baseIva = baseImponible;
   
-  // Total IVA = Cuota IVA (normalmente es lo mismo)
+  // Total IVA = Cuota IVA (mismo valor)
   const totalIva = cuotaIva;
+  
+  // VALIDACIÓN: Asegurar que Base + IVA = Total con IVA
+  const validacion = Math.abs((baseImponible + cuotaIva) - importeLiquido) < 0.01;
+  if (!validacion) {
+    console.warn('⚠️ Validación fallida en cálculo de IVA:', {
+      base: baseImponible,
+      iva: cuotaIva,
+      total: importeLiquido,
+      suma: baseImponible + cuotaIva
+    });
+  }
   
   return {
     importeBruto: parseFloat(importeBruto.toFixed(2)),
@@ -34,7 +45,8 @@ const calcularValoresLinea = (precio, unidades, porcentajeIva) => {
     baseIva: parseFloat(baseIva.toFixed(2)),
     cuotaIva: parseFloat(cuotaIva.toFixed(2)),
     totalIva: parseFloat(totalIva.toFixed(2)),
-    importeLiquido: parseFloat(importeLiquido.toFixed(2))
+    importeLiquido: parseFloat(importeLiquido.toFixed(2)),
+    validacion: validacion
   };
 };
 
@@ -60,10 +72,21 @@ const generarAlbaranProveedorAutomatico = async (transaction, orderInfo, itemsRe
       itemsPorProveedor[proveedor].push(item);
     });
 
+    // ✅ FECHA CORREGIDA - Formato DATETIME para Sage200/SQL Server
     const now = new Date();
-    const fechaLocal = new Date(now.getTime() - (now.getTimezoneOffset() * 60000));
-    const fechaStr = fechaLocal.toISOString().split('T')[0] + ' 00:00:00.000';
-    const fechaAlbaran = fechaStr;
+    // Usar UTC para consistencia en todas las zonas horarias
+    const year = now.getUTCFullYear();
+    const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(now.getUTCDate()).padStart(2, '0');
+    // Formato: 'YYYY-MM-DD HH:MM:SS.mmm' (sin 'T', con espacio)
+    const fechaAlbaran = `${year}-${month}-${day} 00:00:00.000`;
+    
+    console.log('📅 Fecha albarán generada:', {
+      fecha: fechaAlbaran,
+      tipo: typeof fechaAlbaran,
+      formato: 'YYYY-MM-DD HH:MM:SS.mmm',
+      esValidoParaSQL: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/.test(fechaAlbaran)
+    });
 
     // Verificar si existe columna de observaciones
     let columnaObservacionesExiste = false;
@@ -299,7 +322,7 @@ const generarAlbaranProveedorAutomatico = async (transaction, orderInfo, itemsRe
             .input('Provincia', proveedor.Provincia || '')
             .input('CodigoNacion', proveedor.CodigoNacion || '108')
             .input('Nacion', proveedor.Nacion || 'ESPAÑA')
-            .input('FechaAlbaran', fechaAlbaran)
+            .input('FechaAlbaran', fechaAlbaran) // ✅ Formato corregido
             .input('ObservacionesAlbaran', textoObservaciones)
             .input('StatusFacturado', 0)
             .query(insertQuery);
@@ -323,7 +346,7 @@ const generarAlbaranProveedorAutomatico = async (transaction, orderInfo, itemsRe
             .input('Provincia', proveedor.Provincia || '')
             .input('CodigoNacion', proveedor.CodigoNacion || '108')
             .input('Nacion', proveedor.Nacion || 'ESPAÑA')
-            .input('FechaAlbaran', fechaAlbaran)
+            .input('FechaAlbaran', fechaAlbaran) // ✅ Formato corregido
             .input('StatusFacturado', 0)
             .query(`
               INSERT INTO CabeceraAlbaranProveedor (
@@ -429,7 +452,7 @@ const generarAlbaranProveedorAutomatico = async (transaction, orderInfo, itemsRe
         const precio = parseFloat(item.Precio) || 0;
         const porcentajeIva = parseFloat(item.PorcentajeIva) || 21;
         
-        // CALCULAR TODOS LOS VALORES FINANCIEROS
+        // CALCULAR TODOS LOS VALORES FINANCIEROS (CORREGIDO)
         const valoresCalculados = calcularValoresLinea(precio, unidadesAProcesar, porcentajeIva);
 
         baseImponibleTotal += valoresCalculados.baseImponible;
@@ -624,7 +647,7 @@ const generarAlbaranProveedorAutomatico = async (transaction, orderInfo, itemsRe
           .input('ImporteLiquido', importeLiquidoTotal)
           .input('NumeroLineas', numeroLineasFinal)
           .input('ObservacionesAlbaran', textoObservaciones)
-          .input('FechaAlbaran', fechaAlbaran)
+          .input('FechaAlbaran', fechaAlbaran) // ✅ Formato corregido
           .query(updateQuery);
       } else {
         await transaction.request()
@@ -636,7 +659,7 @@ const generarAlbaranProveedorAutomatico = async (transaction, orderInfo, itemsRe
           .input('TotalIVA', totalIVATotal)
           .input('ImporteLiquido', importeLiquidoTotal)
           .input('NumeroLineas', numeroLineasFinal)
-          .input('FechaAlbaran', fechaAlbaran)
+          .input('FechaAlbaran', fechaAlbaran) // ✅ Formato corregido
           .query(`
             UPDATE CabeceraAlbaranProveedor 
             SET 

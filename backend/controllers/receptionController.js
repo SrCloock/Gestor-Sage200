@@ -392,6 +392,8 @@ const finalizeOrder = async (req, res) => {
     await transaction.begin();
 
     try {
+      console.log(`🚀 Iniciando finalización del pedido ${orderId}`);
+
       const orderResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
@@ -402,7 +404,9 @@ const finalizeOrder = async (req, res) => {
             CodigoEmpresa,
             EjercicioPedido,
             SeriePedido,
-            EsParcial
+            EsParcial,
+            RazonSocial,
+            CodigoCliente
           FROM CabeceraPedidoCliente
           WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
         `);
@@ -417,7 +421,24 @@ const finalizeOrder = async (req, res) => {
         throw new Error('El pedido ya está marcado como servido');
       }
 
-      const pendientesResult = await transaction.request()
+      // 1. OBTENER ESTADO ACTUAL ANTES DE CUALQUIER CAMBIO
+      const estadoActualResult = await transaction.request()
+        .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD')
+        .query(`
+          SELECT 
+            Orden,
+            CodigoArticulo,
+            UnidadesPedidas,
+            UnidadesRecibidas,
+            UnidadesPendientes,
+            ComentarioRecepcion
+          FROM LineasPedidoCliente
+          WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
+          ORDER BY Orden
+        `);
+
+      const totalesResult = await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
         .query(`
@@ -428,15 +449,49 @@ const finalizeOrder = async (req, res) => {
           WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
         `);
 
-      const totalPendiente = pendientesResult.recordset[0].TotalPendiente || 0;
-      const totalRecibido = pendientesResult.recordset[0].TotalRecibido || 0;
+      const totalPendiente = totalesResult.recordset[0].TotalPendiente || 0;
+      const totalRecibido = totalesResult.recordset[0].TotalRecibido || 0;
 
-      // Actualizar estado del pedido a "Servido" y marcar como no parcial
+      console.log('📋 ESTADO ANTES DE FINALIZAR:', {
+        pedido: orderId,
+        cliente: pedido.RazonSocial,
+        codigoCliente: pedido.CodigoCliente,
+        estadoActual: pedido.Estado,
+        esParcialActual: pedido.EsParcial,
+        totalRecibido: totalRecibido,
+        totalPendiente: totalPendiente,
+        lineas: estadoActualResult.recordset.map(l => ({
+          articulo: l.CodigoArticulo,
+          pedidas: l.UnidadesPedidas,
+          recibidas: l.UnidadesRecibidas,
+          pendientes: l.UnidadesPendientes,
+          comentario: l.ComentarioRecepcion
+        }))
+      });
+
+      // 2. VERIFICAR SI HAY ALBARANES EXISTENTES PARA ESTE PEDIDO
+      const albaranesResult = await transaction.request()
+        .input('NumeroPedido', orderId)
+        .query(`
+          SELECT 
+            COUNT(*) as TotalAlbaranes,
+            SUM(CASE WHEN StatusFacturado = -1 THEN 1 ELSE 0 END) as AlbaranesFacturados,
+            SUM(CASE WHEN StatusFacturado = 0 THEN 1 ELSE 0 END) as AlbaranesNoFacturados
+          FROM CabeceraAlbaranProveedor
+          WHERE NumeroPedido = @NumeroPedido
+        `);
+
+      console.log('📦 ALBARANES EXISTENTES:', albaranesResult.recordset[0]);
+
+      // 3. SOLO ACTUALIZAR EL ESTADO DEL PEDIDO (CABECERA)
+      // NO modificar las líneas del pedido
+      // NO modificar UnidadesRecibidas
+      // NO generar albaranes
       await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
-        .input('Estado', 2)
-        .input('EsParcial', 0)
+        .input('Estado', 2)  // Estado = 2 (Servido)
+        .input('EsParcial', 0) // No parcial
         .query(`
           UPDATE CabeceraPedidoCliente 
           SET Estado = @Estado,
@@ -445,107 +500,90 @@ const finalizeOrder = async (req, res) => {
           AND SeriePedido = @SeriePedido
         `);
 
-      // Obtener items pendientes para generar albaranes de compra
-      const itemsPendientesResult = await transaction.request()
-        .input('NumeroPedido', orderId)
-        .input('SeriePedido', 'WebCD')
-        .query(`
-          SELECT 
-            Orden,
-            CodigoArticulo,
-            DescripcionArticulo,
-            (UnidadesPedidas - UnidadesRecibidas) as UnidadesRecibidas,
-            Precio,
-            CodigoProveedor,
-            [%Iva] as PorcentajeIva,
-            GrupoIva,
-            'Pedido finalizado manualmente' as ComentarioRecepcion
-          FROM LineasPedidoCliente
-          WHERE NumeroPedido = @NumeroPedido 
-          AND SeriePedido = @SeriePedido
-          AND UnidadesPendientes > 0
-        `);
-
-      let albaranesFinalizacionGenerados = [];
-      
-      // Generar albaranes de compra para items pendientes
-      if (itemsPendientesResult.recordset.length > 0) {
-        try {
-          // Agrupar por proveedor y artículo
-          const itemsAgrupados = {};
-          itemsPendientesResult.recordset.forEach(item => {
-            const claveUnica = `${item.CodigoProveedor}-${item.CodigoArticulo}`;
-            
-            if (!itemsAgrupados[claveUnica]) {
-              itemsAgrupados[claveUnica] = { 
-                ...item,
-                UnidadesRecibidasTotal: item.UnidadesRecibidas
-              };
-            } else {
-              itemsAgrupados[claveUnica].UnidadesRecibidas += item.UnidadesRecibidas;
-              itemsAgrupados[claveUnica].UnidadesRecibidasTotal += item.UnidadesRecibidas;
-            }
-          });
-
-          const itemsParaGenerar = Object.values(itemsAgrupados);
-
-          albaranesFinalizacionGenerados = await generarAlbaranProveedorAutomatico(
-            transaction, 
-            {
-              EjercicioPedido: pedido.EjercicioPedido,
-              SeriePedido: 'WebCD',
-              NumeroPedido: orderId,
-              CodigoEmpresa: pedido.CodigoEmpresa
-            }, 
-            itemsParaGenerar, 
-            pedido.CodigoEmpresa,
-            true // Es finalización manual
-          );
-        } catch (error) {
-          console.error('Error al generar albaranes en finalización:', error);
-        }
-      }
-
-      // Actualizar todas las líneas como completadas
+      // 4. ACTUALIZAR SOLO EL COMENTARIO EN LAS LÍNEAS (para tracking)
+      // Pero NO cambiar UnidadesRecibidas ni UnidadesPendientes
       await transaction.request()
         .input('NumeroPedido', orderId)
         .input('SeriePedido', 'WebCD')
-        .input('FechaRecepcion', new Date())
         .query(`
           UPDATE LineasPedidoCliente 
           SET 
-            UnidadesPendientes = 0,
-            UnidadesRecibidas = UnidadesPedidas,
-            UnidadesServidas = UnidadesPedidas,
-            ComentarioRecepcion = ISNULL(ComentarioRecepcion, '') + ' - Pedido finalizado manualmente',
-            FechaRecepcion = @FechaRecepcion
+            ComentarioRecepcion = ISNULL(ComentarioRecepcion, '') + 
+              CASE 
+                WHEN LEN(ISNULL(ComentarioRecepcion, '')) > 0 
+                THEN '; [CERRADO MANUALMENTE - Sin más recepciones]'
+                ELSE '[CERRADO MANUALMENTE - Sin más recepciones]'
+              END
           WHERE NumeroPedido = @NumeroPedido 
           AND SeriePedido = @SeriePedido
         `);
 
       await transaction.commit();
+      console.log(`✅ Transacción commitada para pedido ${orderId}`);
+
+      // 5. VERIFICAR DESPUÉS DEL CAMBIO
+      const estadoDespuesResult = await pool.request()
+        .input('NumeroPedido', orderId)
+        .input('SeriePedido', 'WebCD')
+        .query(`
+          SELECT 
+            Estado,
+            EsParcial,
+            (SELECT SUM(UnidadesRecibidas) FROM LineasPedidoCliente 
+             WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido) as TotalRecibidoFinal,
+            (SELECT SUM(UnidadesPendientes) FROM LineasPedidoCliente 
+             WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido) as TotalPendienteFinal
+          FROM CabeceraPedidoCliente
+          WHERE NumeroPedido = @NumeroPedido AND SeriePedido = @SeriePedido
+        `);
+
+      const estadoFinal = estadoDespuesResult.recordset[0];
+
+      console.log('✅ ESTADO DESPUÉS DE FINALIZAR:', {
+        pedido: orderId,
+        estado: estadoFinal.Estado,
+        esParcial: estadoFinal.EsParcial,
+        totalRecibidoFinal: estadoFinal.TotalRecibidoFinal,
+        totalPendienteFinal: estadoFinal.TotalPendienteFinal,
+        nota: 'LAS UNIDADES PENDIENTES SE MANTIENEN IGUAL - NO SE GENERARON ALBARANES'
+      });
 
       res.status(200).json({
         success: true,
-        message: 'Pedido marcado como servido correctamente. Las unidades pendientes se han establecido a 0 y se han generado los albaranes de compra correspondientes.',
+        message: '✅ Pedido marcado como servido correctamente.',
+        detalles: [
+          'Las unidades pendientes se mantienen sin cambios.',
+          'No se generaron nuevos albaranes.',
+          'Los albaranes existentes no se modificaron.',
+          'El pedido ahora aparece como "Servido" en el sistema.'
+        ].join(' '),
         estado: 2,
         esParcial: 0,
-        unidadesPendientesAnteriores: totalPendiente,
-        albaranesGenerados: albaranesFinalizacionGenerados.length,
-        detallesAlbaranes: albaranesFinalizacionGenerados
+        unidadesRecibidas: totalRecibido,
+        unidadesPendientes: totalPendiente,
+        albaranesExistentes: {
+          total: albaranesResult.recordset[0].TotalAlbaranes,
+          facturados: albaranesResult.recordset[0].AlbaranesFacturados,
+          noFacturados: albaranesResult.recordset[0].AlbaranesNoFacturados
+        },
+        advertencia: `Las ${totalPendiente} unidades pendientes no se marcaron como recibidas para no alterar los albaranes existentes.`,
+        nota: 'Este cierre manual solo afecta el estado del pedido, no modifica las cantidades recibidas ni genera nuevos albaranes.'
       });
 
     } catch (err) {
       await transaction.rollback();
+      console.error('❌ Error en finalizeOrder (transacción):', err);
       res.status(500).json({ 
         success: false, 
-        message: err.message || 'Error al finalizar el pedido'
+        message: `Error al finalizar el pedido: ${err.message}`,
+        error: process.env.NODE_ENV === 'development' ? err.stack : undefined
       });
     }
   } catch (error) {
+    console.error('❌ Error en finalizeOrder (global):', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Error al finalizar el pedido'
+      message: `Error al procesar la finalización: ${error.message}`
     });
   }
 };

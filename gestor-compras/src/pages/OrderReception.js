@@ -193,12 +193,11 @@ const OrderReception = () => {
       setError('');
       setSuccess('');
 
+      // CORRECCIÓN: Enviar solicitud sin body (o con body vacío)
+      // El backend no necesita más datos porque el usuario ya está en los headers
       const response = await fetchWithAuth(`/api/reception/${orderId}/finalize`, {
-        method: 'POST',
-        body: {
-          usuario: storedUser.username,
-          codigoempresa: storedUser.codigoCliente
-        }
+        method: 'POST'
+        // No enviar body - el backend no lo necesita para finalizar
       });
 
       if (!response.ok) {
@@ -207,35 +206,41 @@ const OrderReception = () => {
 
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Respuesta no JSON:', text.substring(0, 200));
         throw new Error(`El servidor devolvió un formato inválido`);
       }
 
       const data = await response.json();
       
       if (data.success) {
-        setSuccess('Pedido marcado como servido correctamente');
-        setOrder(prev => ({ ...prev, Estado: 2 }));
+        setSuccess(data.message || 'Pedido marcado como servido correctamente');
         
-        // Actualizar items localmente
-        const updatedItems = receptionItems.map(item => ({
-          ...item,
-          UnidadesRecibidas: item.UnidadesPedidas,
-          UnidadesPendientes: 0
+        // Solo actualizar el estado del pedido localmente
+        // NO actualizar las unidades porque no cambian
+        setOrder(prev => ({ 
+          ...prev, 
+          Estado: 2,
+          EsParcial: 0 
         }));
-        setReceptionItems(updatedItems);
-        setTotalRecibido(totalPedido);
         
+        console.log('✅ Pedido finalizado:', data);
+        
+        // Redirigir después de un breve delay
         setTimeout(() => {
           navigate(`/mis-pedidos/${orderId}`, { 
             state: { 
-              message: 'Pedido finalizado y marcado como servido'
+              message: data.message || 'Pedido finalizado y marcado como servido',
+              finalizado: true
             } 
           });
-        }, 2000);
+        }, 1500);
       } else {
         setError(data.message || 'Error al finalizar el pedido');
       }
     } catch (err) {
+      console.error('❌ Error en handleFinalizeOrder:', err);
+      
       if (err.message.includes('Sesión expirada') || err.message.includes('Acceso denegado')) {
         setError(err.message);
         setTimeout(() => {
@@ -243,7 +248,7 @@ const OrderReception = () => {
           navigate('/login');
         }, 2000);
       } else {
-        setError(err.message || 'Error al finalizar el pedido');
+        setError(err.message || 'Error al finalizar el pedido. Verifique la consola para más detalles.');
       }
     } finally {
       setFinalizing(false);
@@ -303,6 +308,8 @@ const OrderReception = () => {
 
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Respuesta no JSON:', text.substring(0, 200));
         throw new Error(`El servidor devolvió un formato inválido`);
       }
 
@@ -317,7 +324,8 @@ const OrderReception = () => {
         
         setOrder(prev => ({
           ...prev,
-          Estado: data.estado || 2
+          Estado: data.estado || 2,
+          EsParcial: data.esParcial || 0
         }));
 
         setTimeout(() => {
@@ -334,6 +342,8 @@ const OrderReception = () => {
         setError(data.message || 'Error al confirmar la recepción');
       }
     } catch (err) {
+      console.error('❌ Error en handleSubmit:', err);
+      
       if (err.message.includes('Sesión expirada') || err.message.includes('Acceso denegado')) {
         setError(err.message);
         setTimeout(() => {
@@ -593,16 +603,24 @@ const OrderReception = () => {
             <h3>Finalizar Pedido</h3>
             <div className="orr-finalize-info">
               <p>
-                ¿No va a recepcionar más unidades? Puede marcar el pedido como servido para eliminarlo de la lista de pendientes.
+                <strong>¿No va a recepcionar más unidades?</strong> Marque el pedido como servido para eliminarlo de la lista de pendientes.
               </p>
               <p className="orr-warning-text">
-                <strong>Advertencia:</strong> Esto marcará todas las unidades pendientes como recibidas y generará los albaranes de compra correspondientes.
+                <strong>IMPORTANTE:</strong> Esta acción solo cambia el estado del pedido a "Servido". 
+                <br />
+                • NO modifica las unidades recibidas
+                <br />
+                • NO genera nuevos albaranes
+                <br />
+                • NO afecta a los albaranes existentes (facturados o no)
+                <br />
+                • Las unidades pendientes se mantienen igual
               </p>
             </div>
           </div>
           <button 
             onClick={handleFinalizeOrder}
-            disabled={finalizing}
+            disabled={finalizing || order?.Estado === 2}
             className="orr-button orr-finalize-button"
           >
             {finalizing ? (
